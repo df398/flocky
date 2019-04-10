@@ -1,0 +1,161 @@
+/*  RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
+    Department of Chemistry, University of Cambridge, UK.
+    
+    RiPSOGM: 
+    Rotation Invariant Particle Swarm Optimization with Gaussian
+    Mutations.
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program. If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#pragma once
+#ifndef PAR_H
+#define PAR_H
+#include <ctime>
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <algorithm>
+#include <iterator>
+#include <iomanip>
+#include </usr/people/ronnie/davidf/boost/include/boost/format.hpp>
+#include </usr/people/ronnie/davidf/boost/include/boost/algorithm/string.hpp>
+#include </usr/people/ronnie/davidf/boost/include/boost/algorithm/string/split.hpp>
+#include <boost/process.hpp>
+#include <boost/process/async_system.hpp>
+#define BOOST_NO_CXX11_SCOPED_ENUMS
+#include </usr/people/ronnie/davidf/boost/include/boost/filesystem.hpp>
+#undef BOOST_NO_CXX11_SCOPED_ENUMS
+#include <mpi.h>
+
+using namespace std;
+extern int ierr, core, numcores;
+extern int dim;
+extern int maxtime;
+extern int NumP;
+extern double c1;
+extern double c2;
+extern double inertiamax;
+extern double inertiamin;
+extern bool chang;
+extern bool lg_yn;
+extern bool contff;
+extern int freq;
+extern double levyscale;
+extern int faili;
+extern int iter;
+extern int repeatn;
+const long double pi = 3.14159265358979323846;
+const long double econst = 2.71828182845904523536;
+
+
+
+class Par {								// declaration of a particle
+public:
+
+	Par();								// constructor for class Par of position and velocity components
+	~Par() {
+
+	};
+
+	void read_bounds();						// read in min/max bounds of params and set min/max domain. Output dim = number of lines.
+        double get_min_dim();
+	void read_ffield();						// read ffield file into matrix
+	void write_ffield_lg();
+	void write_ffield();					
+	
+	double get_vel(int n);
+	double get_pos(int k);
+	vector <double> get_pos_vec();
+	double get_bpos(int u);
+	vector <double> get_normdir();								// generates a vector (point) uniform on a hypersphere 
+
+	void update_vel(double inertiaf, double CF, vector <double> globpos, double time);
+	void update_pos();
+	void set_pos(vector <double> pos_best_particle);
+	void set_vel(vector <double> vel_best_particle);
+	void update_bpos();
+	void update_pos_levy(vector <double> globpos, double time, double inertiaf);
+	double get_levy_McCul(double time, double maxtime);				// generate Levy deviate via McCullouch Algorithm
+	
+	double get_fitness();								// get particle fitness
+	void set_fitness(double fit);							// set particle fitness
+	double eval_fitness(int parid);
+	double get_bfit();
+	void set_bfit(double bfit);
+
+	
+	vector <vector <string>> ffieldmat;						// ffield inside a vector of vectors (matrix) (for each particle)
+	vector <int> ffline;								// line in ffield file
+	vector <int> ffcol;								// colum in line in ffield file
+	vector <double> mindomain;							// min function domain boundary
+	vector <double> maxdomain;							// max function domain boundary
+	vector <double> minpar; 							// min boundary at initialization step
+	vector <double> maxpar; 							// max boundary at initialization step
+	//vector <double> minpos;							// min position value during optimization 
+	//vector <double> maxpos;							// max position value during optimization
+	int fails;									// number of trials particle did not improve personal fitness
+	
+
+private:
+
+	
+	vector <double> pos; 								// vector of position components of a particle
+	vector <double> vel; 								// vector of velocity components of a particle
+	vector <double> bpos;								// particle's best own position
+	
+	double bfitness;								// particle previous best fitness
+	double fitness;									// particle current fitness
+};
+
+
+class Swarm {										// declaration of a Swarm
+public:
+
+	Swarm();
+	~Swarm() {
+
+	};
+
+	Par& GetPar(int ParID);
+	void AddPar(Par& newPar);
+	void Populate(Swarm& newSwarm, int iter);
+	void Propagate(Swarm& newSwarm, int iter);
+	void printpos(Swarm& newSwarm, int timestep, int iter, int fr);
+	void printvel(Swarm& newSwarm, int timestep, int iter, int fr);
+	void printdeg(Swarm& newSwarm, int timestep, int iter, int fr);
+	void write_ffield_gbest();
+	vector <double> get_gbpos();
+	void update_gbpos(Par& newPar);
+	double get_gbfit();
+	void set_gbfit(double bfit);
+	vector <double>gbpos;
+	double gbfit;
+	int cpuid_gbfit;			// CPU with the global best fitness
+	int parid_gbfit;			// ID of the global best particle
+	int get_worse(Swarm newSwarm);
+	int get_best(Swarm newSwarm);
+	
+private:
+
+	vector <Par> AllParticles;
+
+	// global best fitness
+};
+
+
+
+#endif
