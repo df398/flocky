@@ -32,6 +32,7 @@ Requirements:
 Install procedure:
 
 (1) Install OpenMPI or MPICH for parallel execution:
+
 On Ubuntu to install mpich type:
 ```bash
 sudo apt-get install mpich
@@ -42,13 +43,20 @@ For OpenMPI type:
 sudo apt-get install openmpi-bin
 ```
 
-(2) Install Boost C++:
-* Follow the instructions in [install_boost](https://www.boost.org/doc/libs/1_61_0/more/getting_started/unix-variants.html). 
-Note that RiPSOGM requires the compilation of boost::filesystem and boost:system static libraries in addition to the header files in boost.
+(2) Install Boost C++ required libraries and header files:
+```bash
+cd path/to/boost_1_61_0
+./bootstrap.sh --with-libraries=system,filesystem --prefix=path/to/installation/prefix
+./b2 install link=static
+```
 
-(3) Adjust the PATHS for Boost in the provided Makefile
+(3) Set your BOOST_LIB_PATH and BOOST_INC_PATH environment variables:
+```bash
+export BOOST_LIB_PATH="path/to/installation/prefix/lib" 
+export BOOST_INC_PATH="path/to/installation/prefix/include"
+```
 
-(3) To compile RiPSOGM:
+(4) Finally, compile RiPSOGM:
 ```bash
 make 
 ```
