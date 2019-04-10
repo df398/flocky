@@ -16,8 +16,12 @@
     along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#
-pragma once# ifndef PAR_H# define PAR_H#include <ctime>
+#pragma once
+
+#ifndef PAR_H
+#define PAR_H
+
+#include <ctime>
 
 #include <iostream>
 
@@ -35,19 +39,21 @@ pragma once# ifndef PAR_H# define PAR_H#include <ctime>
 
 #include <iomanip>
 
-#include </usr/people/ronnie/davidf/boost/include/boost/format.hpp>
+#include <boost/format.hpp>
 
-#include </usr/people/ronnie/davidf/boost/include/boost/algorithm/string.hpp>
+#include <boost/algorithm/string.hpp>
 
-#include </usr/people/ronnie/davidf/boost/include/boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/split.hpp>
 
 #include <boost/process.hpp>
 
 #include <boost/process/async_system.hpp>
 
-# define BOOST_NO_CXX11_SCOPED_ENUMS#include </usr/people/ronnie/davidf/boost/include/boost/filesystem.hpp>
+# define BOOST_NO_CXX11_SCOPED_ENUMS
+#include <boost/filesystem.hpp>
+# undef BOOST_NO_CXX11_SCOPED_ENUMS
 
-# undef BOOST_NO_CXX11_SCOPED_ENUMS#include <mpi.h>
+#include <mpi.h>
 
 using namespace std;
 extern int ierr, core, numcores;
@@ -159,4 +165,4 @@ class Swarm { // declaration of a Swarm
 };
 
 #
-endif
+#endif

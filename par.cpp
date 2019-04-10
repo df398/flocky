@@ -551,14 +551,15 @@ void Par::write_ffield_lg() {
     index = index + 1;
 
   };
-
+  string str_core = std::to_string(core);
   // write updated ffield to ffield file
   ofstream output_file;
   // current ffield file stream
   ifstream ffield_file;
   string comment;
-  output_file.open("ffield.tmp", ios::out);
-  ffield_file.open("ffield", ios:: in );
+
+  output_file.open("CPU." + str_core + "/ffield.tmp", ios::out);
+  ffield_file.open("CPU." + str_core + "/ffield", ios:: in );
   // read all ffield file into vector of lines to use it next to write comments/header lines
   vector < string > ffield_lines;
   while (getline(ffield_file, comment)) {

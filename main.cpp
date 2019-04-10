@@ -187,7 +187,7 @@ int main(int argc, char * argv[]) {
 
     Swarm MySwarm;
     MySwarm.Populate(MySwarm, iter);
-    //MySwarm.Propagate(MySwarm, iter);
+    MySwarm.Propagate(MySwarm, iter);
     // Each core should time its own operation, then send its data to core 0. Then, core 0 receives
     // timings from all cores, adds them up and divides by the sizecpus. Then prints this to the log
     // cpu file in the cpu folder. This will be the average CPU time of all CPUS.
