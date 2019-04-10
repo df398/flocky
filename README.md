@@ -9,7 +9,7 @@ Features:
 
 * Interfaced to the "gold standard" Fortran implementation of ReaxFF developed by Prof. Adri van Duin
 * MPI support for an asynchronous parallel performance; swarm members are distributed across processors
-* Flexible parameter space exploration: supports use of bounds or percentage change from current values for parameters
+* Flexible parameter space exploration: supports use of bounds or percentage change from current values
 * Implicit multi-objective fitness function by the use of relative weights
 * Training set supports both finite-size and periodic systems
 
