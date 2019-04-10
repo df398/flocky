@@ -36,6 +36,8 @@ int timestep = 0;
 bool lg_yn = false;
 bool contff = false;
 bool chang = false;
+bool perc_yn = true;
+double perc = 0.2;
 double c1 = 2.0; // constant 1
 double c2 = 2.0; // constant 2
 double inertiafac = 0.9;
@@ -59,11 +61,12 @@ double l2_norm(vector < double >
 };
 
 Par::Par() {
-  // set min/max domains from params.mod file and set dim = numlines in params.mod file
-  read_bounds();
 
   // read ffield file into matrix ffieldmat. split by each entry.
   read_ffield();
+
+  // set min/max domains from params.mod file and set dim = numlines in params.mod file
+  read_bounds();
 
   for (int m = 0; m < dim; m++) {
     std::uniform_real_distribution < double > dist2(mindomain.at(m), maxdomain.at(m));
@@ -1112,12 +1115,26 @@ void Par::read_bounds() {
 
     dim = numlines;
 
-    for (int i = 0; i < dim; i++) {
-      mindomain.push_back(allData[i][5]); // read bounds from modified params file
-      maxdomain.push_back(allData[i][6]);
-      ffline.push_back(allData[i][0] - 1); // read line number of parameter from modified params file
-      ffcol.push_back(allData[i][1] - 1); // read column number of parameter from modified params file
+    if (perc_yn == false){
+      for (int i=0; i<dim; i++){
+        mindomain.push_back(allData[i][5]);         // read bounds from modified params file
+        maxdomain.push_back(allData[i][6]);
+        ffline.push_back(allData[i][0]-1);          // read line number of parameter from modified params file
+        ffcol.push_back(allData[i][1]-1);           // read column number of parameter from modified params file
+      };
+
+    }else{
+      for (int i=0; i<dim; i++){
+        ffline.push_back(allData[i][0]-1);              // read line number of parameter from modified params file
+        ffcol.push_back(allData[i][1]-1);               // read column number of parameter from modified params file
+        mindomain.push_back(stod(ffieldmat.at(ffline.at(i)).at(ffcol.at(i))));
+        maxdomain.push_back(stod(ffieldmat.at(ffline.at(i)).at(ffcol.at(i))));
+        mindomain.at(i) = (1.0 - perc)*mindomain.at(i);
+        maxdomain.at(i) + (1.0 + perc)*maxdomain.at(i);
+        };
+
     };
+
 
   };
 };

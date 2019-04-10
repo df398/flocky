@@ -64,15 +64,14 @@ make
 ## Usage
 To run RiPSOGM, use the corresponding MPI command. Note: N should be less than or equal to the number of swarm agents.
 ```bash
-mpiexec -np N ripsogm_public
+mpiexec -np N ripsogm
 ```
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to contribute.
 
 ## License
-RiPSOGM is distributed under the terms of the GNU GPLv3 license.
-[GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/)
+RiPSOGM is distributed under the terms of the [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/) license.
 
 ## Citations
 If you find RiPSOGM useful, please consider citing:

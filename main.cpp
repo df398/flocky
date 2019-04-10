@@ -99,6 +99,13 @@ int main(int argc, char * argv[]) {
     cout << "Note: Initial positions of all other agents will be random." << endl;
     cin >> contff;
 
+    cout << "Use percent change in parameter bounds? [1=true/0=false: use bounds from params.mod]" << endl;
+    cin >> perc_yn;
+    if (perc_yn == true){
+      cout << "Enter %change [0.0 - 1.0]: " << endl;
+      cin >> perc;
+    };
+
     cout << "Enter swarm size (recommended between 5-20):" << endl;
     cin >> NumP;
     NumP = int(floor(NumP / numcores)); // each CPU gets its own allocation of swarm members 
@@ -177,6 +184,8 @@ int main(int argc, char * argv[]) {
   MPI_Bcast( & maxtime, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & freq, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & repeatn, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&perc_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&perc, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   for (iter = 0; iter < repeatn; iter++) {
     string itercount = std::to_string(iter);

@@ -72,6 +72,8 @@ extern double levyscale;
 extern int faili;
 extern int iter;
 extern int repeatn;
+extern bool perc_yn;
+extern double perc;
 const long double pi = 3.14159265358979323846;
 const long double econst = 2.71828182845904523536;
 

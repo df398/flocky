@@ -12,7 +12,7 @@ BOOST= -lboost_filesystem -lboost_system
 %.o: %.cpp $(DEPS)
 	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST)
 
-ripsogm_public: $(OBJ)
+ripsogm: $(OBJ)
 	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^ $(BOOST)
 clean:
-	rm -rf *.o ripsogm_public
+	rm -rf *.o ripsogm
