@@ -72,5 +72,5 @@ mpiexec -np N ripsogm_public
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to contribute.
 
 ## License
-RiPSOGM is distributed under ther terms of the GNU GPLv3 license.
+RiPSOGM is distributed under the terms of the GNU GPLv3 license.
 [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/)
