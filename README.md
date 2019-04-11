@@ -1,4 +1,5 @@
 # RiPSOGM
+Copyright (c) 2019 David Furman
 
 RiPSOGM is a software package for a simple and efficient parametrization of ReaxFF reactive force fields.
 
