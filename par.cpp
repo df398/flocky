@@ -18,41 +18,46 @@
 
 #include "par.h"
 
-std::random_device seed; // initialize non-determinstic seed
-std::mt19937 generator(seed() + core); // Mersene Twister: Good quality random number generator
-std::uniform_real_distribution < double > dist1(0.0, 1.0); // Type of distribution to sample from and given range
+// initialize non-determinstic seed
+std::random_device seed;
+// Mersene Twister: Good quality random number generator
+std::mt19937 generator(seed() + core);
+std::uniform_real_distribution < double > dist1(0.0, 1.0);
 
 int ierr, core, numcores = 0;
-int funceval = 0; // number of function evaluations
+int funceval = 0;
 double curfit;
-//bool inside = true;							// tag if particle position in dimension lies inside [mindomain, maxdomain]
-int dim = 0; // initialization for extern variable 'int dim' declared in par.h
-int maxtime = 0; // initialization for extern variable 'int maxtime' declared in par.h
-int NumP = 0; // initialization for extern variable 'int NumP' declared in par.h
+// tag if particle position in dimension lies inside [mindomain, maxdomain]
+//bool inside = true;
+int dim = 0;
+int NumP = 0;
 int freq = 1;
+int cycle = 0;
+int maxcycles = 1;
 int iter = 0;
-int repeatn = 1;
-int timestep = 0;
+int maxiters = 0;
+bool fixcharges = false;
 bool lg_yn = false;
 bool contff = false;
 bool chang = false;
 bool perc_yn = true;
 double perc = 0.2;
-double c1 = 2.0; // constant 1
-double c2 = 2.0; // constant 2
+double c1 = 2.0;
+double c2 = 2.0;
 double inertiafac = 0.9;
-double inertiamax = 0.9; // initial inertia weight
-double inertiamin = 0.4; // final inertia weight
+double inertiamax = 0.9;
+double inertiamin = 0.4;
 double levyscale = 1.0;
-double confac = 1.0; //0.72984;							// constriction factor multiplier. Shi and Eberhart (2000)
+double confac = 1.0;
 int faili = 1;
 
-int mod(int x, int m) { // definition of modulo function
+int mod(int x, int m) {
   return (x % m + m) % m;
 }
 
+// return L2-norm (magnitude) of a vector. uses a range-based loop.
 double l2_norm(vector < double >
-  const & u) { // return L2-norm (magnitude) of a vector. uses a range-based loop.
+  const & u) {
   double accum = 0.;
   for (double x: u) {
     accum += x * x;
@@ -71,11 +76,14 @@ Par::Par() {
   for (int m = 0; m < dim; m++) {
     std::uniform_real_distribution < double > dist2(mindomain.at(m), maxdomain.at(m));
     //	std::normal_distribution <double> distnorm(0.0,20.0);
-    double x = dist2(generator); // uniform positions initialization
+    double x = dist2(generator);
     double v = 0.5 * (dist2(generator) - x);
-    pos.push_back(x); // initialize particle's position vector
-    vel.push_back(v); // initialize particle's velocity vector
-    bpos = pos; // initialize particle's best own position vector
+    // initialize particle's position vector
+    pos.push_back(x);
+    // initialize particle's velocity vector
+    vel.push_back(v);
+    // initialize particle's best own position vector
+    bpos = pos;
   };
 };
 
@@ -92,30 +100,42 @@ void Par::read_ffield() {
     std::string line;
     int numlines = 0;
 
-    while (std::getline(fin, line)) { // for each line
+    // for each line
+    while (std::getline(fin, line)) {
       numlines++;
-      std::vector < string > lineData; // create a new row
+      // create a new row
+      std::vector < string > lineData;
       string val;
       std::istringstream lineStream(line);
-      while (lineStream >> val) { // for each value in line
-        lineData.push_back(val); // add to the current row
+      // for each value in line
+      while (lineStream >> val) {
+        // add to the current row
+        lineData.push_back(val);
       };
-      ffieldmat.push_back(lineData); // add row to ffieldmat matrix
+      // add row to ffieldmat matrix
+      ffieldmat.push_back(lineData);
 
     };
   };
 };
 
-void Par::write_ffield() {
+void Par::write_ffield(int cycle, int iter, int par) {
+  string str_cycle = std::to_string(cycle);
+  string str_iter = std::to_string(iter);
+  string str_parID = std::to_string(par);
+
   // update particle ffield
   int index = 0;
-  for (int line: ffline) { // for each line value in ffline and corresponding column value in ffcol cp corresponding pos value into ffieldmat. Range-based for statement --> Following: https://msdn.microsoft.com/en-us/library/jj203382.aspx
-    char buffer[50]; // buffer for sprintf
+  // for each line value in ffline and corresponding column value
+  // in ffcol cp corresponding pos value into ffieldmat. Range-based for
+  // statement --> Following: https://msdn.microsoft.com/en-us/library/jj203382.aspx
+  for (int line: ffline) {
+    // buffer for sprintf
+    char buffer[50];
     double n;
     n = sprintf(buffer, "%9.4f", pos.at(index));
     ffieldmat[line][ffcol.at(index)] = buffer;
     index = index + 1;
-
   };
   string str_core = std::to_string(core);
   // write updated ffield to ffield.tmp file
@@ -123,7 +143,7 @@ void Par::write_ffield() {
   // current ffield file stream
   ifstream ffield_file;
   string comment;
-  output_file.open("CPU." + str_core + "/ffield.tmp", ios::out);
+  output_file.open("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, ios::out);
   ffield_file.open("CPU." + str_core + "/ffield", ios:: in );
   // read all ffield file into vector of lines to use it next to write comments/header lines
   vector < string > ffield_lines;
@@ -162,13 +182,15 @@ void Par::write_ffield() {
     output_file << ffield_lines.at(m) << endl;
   };
   /* 
-          06.03.19 Check how many elements are there in the ffield then limit the write of atom params
-          to only those lines that belong to number of elements. This is to avoid writing lines
-          that belong to the next section (bonds) in the atom section.
-        */
+  06.03.19 Check how many elements are there in the ffield then limit the write of atom params
+  to only those lines that belong to number of elements. This is to avoid writing lines
+  that belong to the next section (bonds) in the atom section.
+  */
   using boost::is_any_of;
-  string numel_line = ffield_lines.at(41); // the line that contains the number of elements
-  vector < string > results; // vector to store the words after split
+  // the line that contains the number of elements
+  string numel_line = ffield_lines.at(41);
+  // vector to store the words after split
+  vector < string > results;
   boost::trim(numel_line);
   boost::split(results, numel_line, is_any_of("\t "));
   int numel = stoi(results.at(0));
@@ -348,8 +370,10 @@ void Par::write_ffield() {
     that belong to the next section (off-dia) in the bond section.
   */
   using boost::is_any_of;
-  string numbty_line = ffield_lines.at(max_line_atompar); // the line the contains the number of bond types
-  vector < string > results_bonds; // vector to store the words after split
+  // the line the contains the number of bond types
+  string numbty_line = ffield_lines.at(max_line_atompar);
+  // vector to store the words after split
+  vector < string > results_bonds;
   boost::trim(numbty_line);
   boost::split(results_bonds, numbty_line, is_any_of("\t "));
   int numbty = stoi(results_bonds.at(0));
@@ -399,17 +423,19 @@ void Par::write_ffield() {
     that belong to the next section (off-dia) in the bond section.
   */
   using boost::is_any_of;
-  string numodty_line = ffield_lines.at(max_line_bondpar + 2); // the line that contains the number of off-diag types
-  //cout << "numodty_line: " << numodty_line << endl;
-  vector < string > results_offdiag; // vector to store the words after split
+  // the line that contains the number of off-diag types
+  string numodty_line = ffield_lines.at(max_line_bondpar + 2);
+  // vector to store the words after split
+  vector < string > results_offdiag;
   boost::trim(numodty_line);
   boost::split(results_offdiag, numodty_line, is_any_of("\t "));
   int numodty = stoi(results_offdiag.at(0));
-  //cout << "results_offdiag.at(0):" << results_offdiag.at(0) << endl;
   int max_line_offdpar = max_line_bondpar + 3 + numodty;
 
   for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
-    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f"); // the last entry is 10.4f because dispersion coeff. can get to 4 digits long. So, to prevent it sticking to the left column
+    // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
+    // So, to prevent it sticking to the left column
+    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -437,14 +463,13 @@ void Par::write_ffield() {
     that belong to the next section (torsions) in the angles section.
   */
   using boost::is_any_of;
-  string numaty_line = ffield_lines.at(max_line_offdpar); // the line that contains the number of angle types
-  //cout << "numaty_line: " << numaty_line << endl;
-  vector < string > results_angle; // vector to store the words after split
+  // the line that contains the number of angle types
+  string numaty_line = ffield_lines.at(max_line_offdpar);
+  // vector to store the words after split
+  vector < string > results_angle;
   boost::trim(numaty_line);
   boost::split(results_angle, numaty_line, is_any_of("\t "));
   int numaty = stoi(results_angle.at(0));
-  //cout << "numaty:" << numaty << endl;
-  //cout << "max_line_offdpar+1" << max_line_offdpar+2;
   int max_line_angles = max_line_offdpar + 1 + numaty;
 
   for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
@@ -476,14 +501,13 @@ void Par::write_ffield() {
     that belong to the next section (h-bonds) in the torsions section.
   */
   using boost::is_any_of;
-  string numtoty_line = ffield_lines.at(max_line_angles); // the line that contains the number of torsion types
-  //cout << "numtoty_line: " << numtoty_line << endl;
-  vector < string > results_tors; // vector to store the words after split
+  // the line that contains the number of torsion types
+  string numtoty_line = ffield_lines.at(max_line_angles);
+  // vector to store the words after split
+  vector < string > results_tors;
   boost::trim(numtoty_line);
   boost::split(results_tors, numtoty_line, is_any_of("\t "));
   int numtoty = stoi(results_tors.at(0));
-  //cout << "numtoty:" << numtoty << endl;
-  //cout << "max_line_offdpar+1" << max_line_offdpar+2;
   int max_line_tors = max_line_angles + 1 + numtoty;
 
   for (int m = max_line_angles + 1; m < max_line_tors; m++) {
@@ -514,14 +538,13 @@ void Par::write_ffield() {
     to only those lines that belong to number of Hbond types. This is to avoid accessing nonexistent cells.
   */
   using boost::is_any_of;
-  string numhbty_line = ffield_lines.at(max_line_tors); // the line that contains the number of Hbond types
-  //cout << "numhbty_line: " << numhbty_line << endl;
-  vector < string > results_hb; // vector to store the words after split
+  // the line that contains the number of Hbond types
+  string numhbty_line = ffield_lines.at(max_line_tors);
+  // vector to store the words after split
+  vector < string > results_hb;
   boost::trim(numhbty_line);
   boost::split(results_hb, numhbty_line, is_any_of("\t "));
   int numhbty = stoi(results_hb.at(0));
-  //cout << "numhbty:" << numhbty << endl;
-  //cout << "max_line_offdpar+1" << max_line_offdpar+2;
   int max_line_hbs = max_line_tors + 1 + numhbty;
 
   for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
@@ -537,17 +560,25 @@ void Par::write_ffield() {
   ffield_file.close();
   // replace ffield file with the new ffield (ffield.tmp)
   boost::filesystem::path pwd(boost::filesystem::current_path());
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp",
+  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
     pwd.string() + "/CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
   // remove temporary ffield so other particles do not append to the file
   boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp");
 };
 
-void Par::write_ffield_lg() {
+void Par::write_ffield_lg(int cycle, int iter, int par) {
+  string str_cycle = std::to_string(cycle);
+  string str_iter = std::to_string(iter);
+  string str_parID = std::to_string(par);
+
   // update particle ffield
   int index = 0;
-  for (int line: ffline) { // for each line value in ffline and corresponding column value in ffcol cp corresponding pos value into ffieldmat. Range-based for statement --> Following: https://msdn.microsoft.com/en-us/library/jj203382.aspx
-    char buffer[50]; // buffer for sprintf
+  // for each line value in ffline and corresponding column value in ffcol 
+  // cp corresponding pos value into ffieldmat. Range-based for statement 
+  // following: https://msdn.microsoft.com/en-us/library/jj203382.aspx
+  for (int line: ffline) {
+    // buffer for sprintf
+    char buffer[50];
     double n;
     n = sprintf(buffer, "%9.4f", pos.at(index));
     ffieldmat[line][ffcol.at(index)] = buffer;
@@ -561,9 +592,10 @@ void Par::write_ffield_lg() {
   ifstream ffield_file;
   string comment;
 
-  output_file.open("CPU." + str_core + "/ffield.tmp", ios::out);
+  output_file.open("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, ios::out);
   ffield_file.open("CPU." + str_core + "/ffield", ios:: in );
-  // read all ffield file into vector of lines to use it next to write comments/header lines
+  // read all ffield file into vector of lines to use it next 
+  // to write comments/header lines
   vector < string > ffield_lines;
   while (getline(ffield_file, comment)) {
     ffield_lines.push_back(comment);
@@ -604,13 +636,15 @@ void Par::write_ffield_lg() {
   };
 
   /* 
-          06.03.19 Check how many elements are there in the ffield then limit the write of atom params
-          to only those lines that belong to number of elements. This is to avoid writing lines
-          that belong to the next section (bonds) in the atom section.
-        */
+    06.03.19 Check how many elements are there in the ffield then limit the write of atom params
+    to only those lines that belong to number of elements. This is to avoid writing lines
+    that belong to the next section (bonds) in the atom section.
+  */
   using boost::is_any_of;
-  string numel_line = ffield_lines.at(41); // the line that contains the number of elements
-  vector < string > results; // vector to store the words after split
+  // the line that contains the number of elements
+  string numel_line = ffield_lines.at(41);
+  // vector to store the words after split
+  vector < string > results;
   boost::trim(numel_line);
   boost::split(results, numel_line, is_any_of("\t "));
   int numel = stoi(results.at(0));
@@ -888,8 +922,10 @@ void Par::write_ffield_lg() {
     that belong to the next section (off-dia) in the bond section.
   */
   using boost::is_any_of;
-  string numbty_line = ffield_lines.at(max_line_atompar); // the line the contains the number of bond types
-  vector < string > results_bonds; // vector to store the words after split
+  // the line the contains the number of bond types
+  string numbty_line = ffield_lines.at(max_line_atompar);
+  // vector to store the words after split
+  vector < string > results_bonds;
   boost::trim(numbty_line);
   boost::split(results_bonds, numbty_line, is_any_of("\t "));
   int numbty = stoi(results_bonds.at(0));
@@ -901,24 +937,23 @@ void Par::write_ffield_lg() {
    */
 
   for (int m = max_line_atompar + 2; m < max_line_bondpar + 2; m++) {
-    //if (mod(m,2) == 0) {
     boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
       f = f % ( * it);
     };
+
     output_file << f << endl;
     m = m + 1;
-    //} else {
     boost::format f2("      %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f2.exceptions(f2.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
       f2 = f2 % ( * it);
     };
+
     output_file << f2 << endl;
-    //};
   };
 
   /* ------------------------------------
@@ -941,17 +976,19 @@ void Par::write_ffield_lg() {
     that belong to the next section (off-dia) in the bond section.
   */
   using boost::is_any_of;
-  string numodty_line = ffield_lines.at(max_line_bondpar + 2); // the line that contains the number of off-diag types
-  //cout << "numodty_line: " << numodty_line << endl;
-  vector < string > results_offdiag; // vector to store the words after split
+  // the line that contains the number of off-diag types
+  string numodty_line = ffield_lines.at(max_line_bondpar + 2);
+  // vector to store the words after split
+  vector < string > results_offdiag; 
   boost::trim(numodty_line);
   boost::split(results_offdiag, numodty_line, is_any_of("\t "));
   int numodty = stoi(results_offdiag.at(0));
-  //cout << "results_offdiag.at(0):" << results_offdiag.at(0) << endl;
   int max_line_offdpar = max_line_bondpar + 3 + numodty;
 
   for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
-    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%10.4f"); // the last entry is 10.4f because dispersion coeff. can get to 4 digits long. So, to prevent it sticking to the left column
+    // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
+    // So, to prevent it sticking to the left column
+    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%10.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -980,14 +1017,13 @@ void Par::write_ffield_lg() {
     that belong to the next section (torsions) in the angles section.
   */
   using boost::is_any_of;
-  string numaty_line = ffield_lines.at(max_line_offdpar); // the line that contains the number of angle types
-  //cout << "numaty_line: " << numaty_line << endl;
-  vector < string > results_angle; // vector to store the words after split
+  // the line that contains the number of angle types
+  string numaty_line = ffield_lines.at(max_line_offdpar);
+  // vector to store the words after split
+  vector < string > results_angle;
   boost::trim(numaty_line);
   boost::split(results_angle, numaty_line, is_any_of("\t "));
   int numaty = stoi(results_angle.at(0));
-  //cout << "numaty:" << numaty << endl;
-  //cout << "max_line_offdpar+1" << max_line_offdpar+2;
   int max_line_angles = max_line_offdpar + 1 + numaty;
 
   for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
@@ -1020,14 +1056,13 @@ void Par::write_ffield_lg() {
     that belong to the next section (h-bonds) in the torsions section.
   */
   using boost::is_any_of;
-  string numtoty_line = ffield_lines.at(max_line_angles); // the line that contains the number of torsion types
-  //cout << "numtoty_line: " << numtoty_line << endl;
-  vector < string > results_tors; // vector to store the words after split
+  // the line that contains the number of torsion types
+  string numtoty_line = ffield_lines.at(max_line_angles);
+  // vector to store the words after split
+  vector < string > results_tors;
   boost::trim(numtoty_line);
   boost::split(results_tors, numtoty_line, is_any_of("\t "));
   int numtoty = stoi(results_tors.at(0));
-  //cout << "numtoty:" << numtoty << endl;
-  //cout << "max_line_offdpar+1" << max_line_offdpar+2;
   int max_line_tors = max_line_angles + 1 + numtoty;
 
   for (int m = max_line_angles + 1; m < max_line_tors; m++) {
@@ -1059,14 +1094,13 @@ void Par::write_ffield_lg() {
     to only those lines that belong to number of Hbond types. This is to avoid accessing nonexistent cells.
   */
   using boost::is_any_of;
-  string numhbty_line = ffield_lines.at(max_line_tors); // the line that contains the number of Hbond types
-  //cout << "numhbty_line: " << numhbty_line << endl;
-  vector < string > results_hb; // vector to store the words after split
+  // the line that contains the number of Hbond types
+  string numhbty_line = ffield_lines.at(max_line_tors);
+  // vector to store the words after split
+  vector < string > results_hb;
   boost::trim(numhbty_line);
   boost::split(results_hb, numhbty_line, is_any_of("\t "));
   int numhbty = stoi(results_hb.at(0));
-  //cout << "numhbty:" << numhbty << endl;
-  //cout << "max_line_offdpar+1" << max_line_offdpar+2;
   int max_line_hbs = max_line_tors + 1 + numhbty;
 
   for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
@@ -1083,7 +1117,8 @@ void Par::write_ffield_lg() {
   ffield_file.close();
   // replace ffield file with the new ffield (ffield.tmp)
   boost::filesystem::path pwd(boost::filesystem::current_path());
-  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp", pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, 
+    pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
   // remove temporary ffield so other particles do not append to the file
   boost::filesystem::remove(pwd.string() + "/ffield.tmp");
 };
@@ -1102,31 +1137,41 @@ void Par::read_bounds() {
     std::string line;
     int numlines = 0;
 
-    while (std::getline(fin, line)) { // for each line
+    // for each line
+    while (std::getline(fin, line)) {
       numlines++;
-      std::vector < double > lineData; // create a new row
+      // create a new row
+      std::vector < double > lineData;
       double val;
       std::istringstream lineStream(line);
-      while (lineStream >> val) { // for each value in line
-        lineData.push_back(val); // add to the current row
+      // for each value in line
+      while (lineStream >> val) {
+        // add to the current row
+        lineData.push_back(val);
       };
-      allData.push_back(lineData); // add row to allData
+      // add row to allData
+      allData.push_back(lineData);
     };
 
     dim = numlines;
 
     if (perc_yn == false){
       for (int i=0; i<dim; i++){
-        mindomain.push_back(allData[i][5]);         // read bounds from modified params file
+        // read bounds from modified params file
+        mindomain.push_back(allData[i][5]);
         maxdomain.push_back(allData[i][6]);
-        ffline.push_back(allData[i][0]-1);          // read line number of parameter from modified params file
-        ffcol.push_back(allData[i][1]-1);           // read column number of parameter from modified params file
+        // read line number of parameter from modified params file
+        ffline.push_back(allData[i][0]-1);
+        // read column number of parameter from modified params file
+        ffcol.push_back(allData[i][1]-1);
       };
 
     }else{
       for (int i=0; i<dim; i++){
-        ffline.push_back(allData[i][0]-1);              // read line number of parameter from modified params file
-        ffcol.push_back(allData[i][1]-1);               // read column number of parameter from modified params file
+        // read line number of parameter from modified params file
+        ffline.push_back(allData[i][0]-1);
+        // read column number of parameter from modified params file
+        ffcol.push_back(allData[i][1]-1);
         mindomain.push_back(stod(ffieldmat.at(ffline.at(i)).at(ffcol.at(i))));
         maxdomain.push_back(stod(ffieldmat.at(ffline.at(i)).at(ffcol.at(i))));
         mindomain.at(i) = (1.0 - perc)*mindomain.at(i);
@@ -1170,8 +1215,7 @@ double Par::get_bpos(int u) {
 vector < double > Par::get_normdir() {
 
   // generate d points uniformly distributed on a d-dimensional sphere (i.e. random direction)
-  // see: http://mathworld.wolfram.com/HyperspherePointPicking.html
-  //
+  // following http://mathworld.wolfram.com/HyperspherePointPicking.html
   std::normal_distribution < double > normdist2(0.0, 1.0);
   vector < double > dir;
   double length = 0.0;
@@ -1183,26 +1227,29 @@ vector < double > Par::get_normdir() {
   length = sqrt(length);
 
   for (int n = 0; n < dim; n++) {
-    dir.at(n) = dir.at(n) / length; // uniformly positioned vector on a hypersphere
+    // uniformly positioned vector on a hypersphere
+    dir.at(n) = dir.at(n) / length;
   };
 
   return dir;
 };
 
-double Par::get_levy_McCul(double time, double maxtime) {
+double Par::get_levy_McCul(double iter, double maxiters) {
   // Generation of Levy symmetric distribution (beta=0) using
   // McCulloch's Algorithm
   // When alpha approaches 2, the distribution becomes Gaussian with mean tau
   // and variance 2 * c ^ 2, and beta has no effect.
 
-  //std::uniform_real_distribution <double> dist1(0.0, 1.0);				// uniform distribution
+  //std::uniform_real_distribution <double> dist1(0.0,1.0)
   std::normal_distribution < double > distnorm(0.0, 1.0);
-  //double w = -log(dist1(generator));							// generate variable from exponential distribution
-  //double phi = (dist1(generator) - 0.5)*pi;						// generate variable from uniform distribution
+  // generate variable from exponential distribution
+  //double w = -log(dist1(generator));
+  // generate variable from uniform distribution
+  //double phi = (dist1(generator) - 0.5)*pi;
   //double alpha_init = 1.0;
   //double alpha_fin = 2.0;
-  //double alpha = 2.0; // alpha_init + time * (alpha_fin - alpha_init) / maxtime; //min(2.0,exp(log(2.0)/10000.0*time)); // alpha_init + time * (alpha_fin - alpha_init) / maxtime;
-  //double c = 1.0; // 0.01 - (0.01 - 1e-50)*time / maxtime; // 0.0003*l2_norm(space_range) - 0.0066; // 0.0003*l2_norm(space_range) - 0.0069; // 0.1 - (0.1 - 0.001)*(time / maxtime);														// scaling parameter
+  //double alpha = 2.0; // alpha_init + iter * (alpha_fin - alpha_init) / maxiters; //min(2.0,exp(log(2.0)/10000.0*time)); // alpha_init + time * (alpha_fin - alpha_init) / maxiters;
+  //double c = 1.0; // 0.01 - (0.01 - 1e-50)*iter / maxiters; // 0.0003*l2_norm(space_range) - 0.0066; // 0.0003*l2_norm(space_range) - 0.0069; // 0.1 - (0.1 - 0.001)*(iter / maxiters);														// scaling parameter
   //cout << 0.0003*l2_norm(space_range) - 0.0066  << endl;
   //double tau = 0.0;														// location parameter
   //double x = c*pow((cos((1 - alpha)*phi)) / w, 1 / alpha - 1)*(sin(alpha*phi)) / pow(cos(phi), 1 / alpha) + tau;
@@ -1217,7 +1264,7 @@ void Par::update_bpos() {
   };
 };
 
-void Par::update_vel(double inertiaf, double CF, vector < double > globpos, double time) {
+void Par::update_vel(double inertiaf, double CF, vector < double > globpos, double iter) {
 
   double r1 = dist1(generator);
   double r2 = dist1(generator);
@@ -1242,15 +1289,15 @@ void Par::update_pos() {
   };
 };
 
-void Par::update_pos_levy(vector < double > globpos, double time, double inertiaf) {
+void Par::update_pos_levy(vector < double > globpos, double iter, double inertiaf) {
   //std::normal_distribution <double> normdist2(0.0, 1.0);
-  double levystep = abs(get_levy_McCul(time, maxtime));
+  double levystep = abs(get_levy_McCul(iter, maxiters));
   vector < double > direction = get_normdir();
 
   for (int i = 0; i < dim; i++) {
     std::uniform_real_distribution < double > dist2(mindomain.at(i), maxdomain.at(i));
     pos.at(i) = pos.at(i) + levyscale * get_min_dim() * levystep * direction.at(i);
-    //pos.at(i) = pos.at(i) + levyscale*(maxdomain.at(i) - mindomain.at(i))*levystep*direction.at(i);	
+    //pos.at(i) = pos.at(i) + levyscale*(maxdomain.at(i) - mindomain.at(i))*levystep*direction.at(i);
 
     if (pos.at(i) > maxdomain.at(i)) {
       pos.at(i) = dist2(generator);
@@ -1260,17 +1307,19 @@ void Par::update_pos_levy(vector < double > globpos, double time, double inertia
   };
 };
 
-double Par::eval_fitness(int parid) {
+double Par::eval_fitness(int cycle, int iter, int parid) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
-  string parID = std::to_string(parid);
+  string str_parID = std::to_string(parid);
   string str_core = std::to_string(core);
+  string str_cycle = std::to_string(cycle);
+  string str_iter = std::to_string(iter);
 
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + parID,
+  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_parID,
     pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
 
   // check if ffield is LG or not. execute correct reac accordingly.
   if (lg_yn == true) {
-    write_ffield_lg();
+    write_ffield_lg(cycle, iter, parid);
     std::ifstream fin5(("CPU." + str_core + "/reac_lg").c_str());
     if (fin5.fail()) {
       cout << "reac_lg executable not found for CPU " + str_core + ". Aborting! \n";
@@ -1283,9 +1332,11 @@ double Par::eval_fitness(int parid) {
 
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
-
-    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/charges",
-      pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+    
+    if (fixcharges == true){
+      boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/charges",
+        pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+    };
 
     // cd to each CPU.x directory
     string old_path = pwd.string();
@@ -1298,7 +1349,7 @@ double Par::eval_fitness(int parid) {
     boost::filesystem::current_path(p2);
 
   } else {
-    write_ffield();
+    write_ffield(cycle, iter, parid);
     std::ifstream fin6(("CPU." + str_core + "/reac").c_str());
     if (fin6.fail()) {
       cout << "reac executable not found for CPU " + str_core + ". Aborting! \n";
@@ -1312,8 +1363,10 @@ double Par::eval_fitness(int parid) {
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
 
+    if (fixcharges == true){
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/charges",
       pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+    };
 
     double st2, et2, df2, smf2, avf2;
     st2 = MPI_Wtime();
@@ -1330,7 +1383,7 @@ double Par::eval_fitness(int parid) {
 
     et2 = MPI_Wtime();
     df2 = et2 - st2;
-    cout << "CPU time of reac: " << df2 << endl;
+    //cout << "CPU time of reac: " << df2 << endl;
 
   };
 
@@ -1339,39 +1392,43 @@ double Par::eval_fitness(int parid) {
   boost::filesystem::ifstream myfile("CPU." + str_core + "/fort.13");
   stringstream tempstr;
   getline(myfile, str);
-  tempstr << str; // insert str into stringstream tempstr
-  tempstr >> std::ws; // get rid from extra whitespace in stringstream
-  tempstr >> str; // insert back to str
+  // insert str into stringstream tempstr
+  tempstr << str;
+  // get rid from extra whitespace in stringstream
+  tempstr >> std::ws;
+  // insert back to str
+  tempstr >> str;
   // check if fitness is numeric or ****** 
   if (str.at(0) == '*') {
     fitness = numeric_limits < double > ::infinity();
   } else {
-    fitness = stod(str); // convert to double  
+    // convert to double
+    fitness = stod(str);
   };
   boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/fort.13");
 
   //	// saving relevant files
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/summary.txt");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/moldyn.vel");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/run.log");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/xmolout");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/bond*");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/molfra.out");		
-  //
-  //	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
-  //	pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
-  //	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
-  //	pwd.string()+"/CPU."+str_core+"/current_molgeo.out",boost::filesystem::copy_option::overwrite_if_exists);
-  //	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.74" ,
-  //	pwd.string()+"/CPU."+str_core+"/current_thermo.out",boost::filesystem::copy_option::overwrite_if_exists);
-  //	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.99" ,
-  //	pwd.string()+"/CPU."+str_core+"/current_results.out",boost::filesystem::copy_option::overwrite_if_exists);
-  //	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
-  //	pwd.string()+"/CPU."+str_core+"/geo."+parID,boost::filesystem::copy_option::overwrite_if_exists);
-  //	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.73" ,
-  //	pwd.string()+"/CPU."+str_core+"/current_partialE.out",boost::filesystem::copy_option::overwrite_if_exists);
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/fort.*");
-
+  /*	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/summary.txt");
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/moldyn.vel");
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/run.log");
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/xmolout");
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/bond*");
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/molfra.out");		
+  */
+  	//boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
+  	  //pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
+  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
+  	  pwd.string()+"/CPU."+str_core+"/molgeo.out."+str_cycle+"."+str_iter, boost::filesystem::copy_option::overwrite_if_exists);
+  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.74" ,
+  	  pwd.string()+"/CPU."+str_core+"/thermo.out."+str_cycle+"."+str_iter, boost::filesystem::copy_option::overwrite_if_exists);
+  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.99" ,
+  	  pwd.string()+"/CPU."+str_core+"/results.out."+str_cycle+"."+str_iter, boost::filesystem::copy_option::overwrite_if_exists);
+  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
+  	  pwd.string()+"/CPU."+str_core+"/geo."+str_cycle+"."+str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
+  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.73" ,
+  	  pwd.string()+"/CPU."+str_core+"/partialE.out."+str_cycle+"."+str_iter, boost::filesystem::copy_option::overwrite_if_exists);
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/fort.*");
+       
   return fitness;
 };
 
@@ -1434,33 +1491,40 @@ int Swarm::get_best(Swarm newSwarm) {
     if (newSwarm.GetPar(p).get_fitness() < fit) {
       fit = newSwarm.GetPar(p).get_fitness();
       particle_id = p;
-      //cout << "particle id: " << p << endl;
-      //cout << "fitness: " << fit << endl;
     }
   };
   return particle_id;
 };
 
-void Swarm::Populate(Swarm & newSwarm, int iter) {
+void Swarm::Populate(Swarm & newSwarm, int cycle) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
-  string itercount = std::to_string(iter);
+  string itercount = std::to_string(cycle);
 
   if (core == 0) {
     cout << "\n";
     cout << "Swarm generation started. Please wait." << endl;
   };
 
-  // initial gbfit is INF for all processes
+  // initial gbfit is INF for all processes and all swarm members
   gbfit = numeric_limits < double > ::infinity();
+  // initial gbpos is 0.0 for all processes and all swarm members
+  gbpos.clear();
+  for (int m=0; m<dim; m++){
+    gbpos.push_back(0.0);
+  };
 
   double starttime, endtime, diff, sumdiff, avgdiff;
   starttime = MPI_Wtime();
 
+  // ---------------------------------------------- //
+  //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
+  // ---------------------------------------------- //
   for (int p = 0; p < NumP; p++) {
     string parID = std::to_string(p);
     // cp geo to geo.parID so each particle works with its own geo file
-    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo", pwd.string() + "/CPU." + str_core + "/geo." + parID, boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo", 
+      pwd.string() + "/CPU." + str_core + "/geo." + parID, boost::filesystem::copy_option::overwrite_if_exists);
 
     Par NewPar;
     newSwarm.AddPar(NewPar);
@@ -1478,47 +1542,53 @@ void Swarm::Populate(Swarm & newSwarm, int iter) {
       contff = false;
     };
 
-    // Initialize global best fitness and corresponding global best position and personal best
-    curfit = newSwarm.GetPar(p).eval_fitness(p);
-
-    //cout << "timing of eval_fit: " << curfit << " in Populate for CPU: " << core << " is: " << diff << endl;
-
+    // evaluate fitness and set personal best equal to fitness
+    curfit = newSwarm.GetPar(p).eval_fitness(cycle, 0, p);
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
 
+    cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
+    cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
+    for (int m=0; m<dim; m++){
+      cout << newSwarm.GetPar(p).get_pos(m) << " ";
+    };
+    cout << endl;
+
     if (curfit < gbfit) {
       gbfit = curfit;
+      gbpos.clear();
+      gbpos = newSwarm.GetPar(p).get_pos_vec();
+      write_ffield_gbest(core, cycle, 0, p);
     };
+  }; // done loop over particles
+  cout << "done with all particles" << endl;
 
-    // define a struct (pair) to hold the minimum fitness across processes and its rank for particle p
-    struct {
-      double tmp_fit;
-      int tmp_cpu;
-    }
-    min_vals_in[1], min_vals_out[1];
+  // pair struct to hold the global best fitness across processes and its core rank
+  struct {
+    double tmp_fit;
+    int tmp_cpu;
+  } min_vals_in[1], min_vals_out[1];
 
-    min_vals_in[0].tmp_fit = gbfit; // store current fit on each process
-    min_vals_in[0].tmp_cpu = core; // store core id of that current process
+  // store current fit on each process
+  min_vals_in[0].tmp_fit = gbfit;
+  // store core id of that current process
+  min_vals_in[0].tmp_cpu = core;
+  // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
+  MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+  // global best fitness across all processes
+  gbfit = min_vals_out[0].tmp_fit;
+  // core rank the above fitness came from
+  cpuid_gbfit = min_vals_out[0].tmp_cpu;
+  cout << "gbfit for CPU " << core << " is: " << gbfit << endl;
+  // broadcast contents of gbpos vector from rank cpuid_gbfit
+  MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
+  cout << "gbpos for CPU " << core << " is: " << endl;
+  for (int m=0; m<dim; m++){
+    cout << newSwarm.get_gbpos().at(m) << " ";
+  };
+  cout << endl;
 
-    // get minimum fitness across all processes and the corresponding core id and store them in min_vals_out
-    MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
-    // global best fitness across all processes for particle p
-    gbfit = min_vals_out[0].tmp_fit;
-    // core rank the above fitness came from
-    cpuid_gbfit = min_vals_out[0].tmp_cpu;
-    // store particle id the above fitness came from in parid_gbfit
-    parid_gbfit = p;
-
-    // broadcast the global best fitness data: gbfit, cpuid_gbfit and parid_gbfit
-    MPI_Bcast( & cpuid_gbfit, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast( & parid_gbfit, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast( & gbfit, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-    gbpos.clear();
-    gbpos = newSwarm.GetPar(parid_gbfit).get_pos_vec();
-    MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-
-  }; // done with all particles
+  newSwarm.printopt(newSwarm, 0, cycle, 1);
 
   endtime = MPI_Wtime();
   diff = endtime - starttime;
@@ -1529,7 +1599,6 @@ void Swarm::Populate(Swarm & newSwarm, int iter) {
     cout << "Time in Populate NumP: " << avgdiff << " seconds" << endl;
   };
 
-  //cout << "gbfit over all particles: " << gbfit << " on CPU " << core << endl;
   if (core == 0) {
     cout << "Swarm generation completed." << endl;
     cout << "Initial global best fit: " << gbfit << endl;
@@ -1537,87 +1606,85 @@ void Swarm::Populate(Swarm & newSwarm, int iter) {
   };
 };
 
-void Swarm::Propagate(Swarm & newSwarm, int iter) {
+void Swarm::Propagate(Swarm & newSwarm, int cycle) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
 
-  boost::filesystem::ofstream outfile("opti_log.out." + std::to_string(iter));
-  outfile << "#Timestep, Global best fitness" << endl;
-  timestep = 0;
   funceval = 0;
-  //if (core == 0) {cout << "Progress:" << endl;};
-
-  for (int time = 0; time < maxtime; time++) {
-    //	if (core == 0){
-    //		cout << time << endl;
-    //	};
-    inertiafac = inertiamax - time * (inertiamax - inertiamin) / maxtime;
-    // Print out particle information
-    //if (core == 0){
-    //newSwarm.printpos(newSwarm, timestep, iter, freq);
-    //newSwarm.printvel(newSwarm, timestep, iter, freq);
-    //newSwarm.printdeg(newSwarm, timestep, iter, freq);
-    //};
+  // ---------------------------------------------------------------- //
+  //         PROPAGATE: main loop over iterations
+  // ---------------------------------------------------------------- //
+  for (iter = 1; iter < maxiters+1; iter++) {
+    inertiafac = inertiamax - iter * (inertiamax - inertiamin) / maxiters;
+    //
+    // main loop over swarm members
+    //
     for (int p = 0; p < NumP; p++) {
       // Update velocities and positions
-      newSwarm.GetPar(p).update_vel(inertiafac, confac, newSwarm.get_gbpos(), time);
+      newSwarm.GetPar(p).update_vel(inertiafac, confac, newSwarm.get_gbpos(), iter);
       if (newSwarm.GetPar(p).fails > faili) {
-        newSwarm.GetPar(p).update_pos_levy(gbpos, time, inertiafac);
+        newSwarm.GetPar(p).update_pos_levy(gbpos, iter, inertiafac);
         newSwarm.GetPar(p).fails = 0;
       } else {
         newSwarm.GetPar(p).update_pos();
       };
 
-      curfit = newSwarm.GetPar(p).eval_fitness(p);
+      curfit = newSwarm.GetPar(p).eval_fitness(cycle, iter, p);
       newSwarm.GetPar(p).set_fitness(curfit);
       funceval = funceval + 1;
+      cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
+      cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
+      for (int m=0; m<dim; m++){
+        cout << newSwarm.GetPar(p).get_pos(m) << " ";
+      };
+      cout << endl;
 
       // Update personal best positions and fitness
       if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
         newSwarm.GetPar(p).update_bpos();
         newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
         newSwarm.GetPar(p).fails = 0;
-
         if (newSwarm.GetPar(p).get_bfit() < gbfit) {
           gbfit = newSwarm.GetPar(p).get_bfit();
           gbpos.clear();
           gbpos = newSwarm.GetPar(p).get_pos_vec();
+	  write_ffield_gbest(core, cycle, iter, p);
         };
-
       } else {
         newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
       };
+    }; // done loop over swarm members
 
-      // define a struct to hold the global best fit and cpuid in each process for particle p
-      struct {
-        double tmp_fit;
-        int tmp_cpu;
-      }
-      min_vals_in[1], min_vals_out[1];
-      // store best fit on each process
-      min_vals_in[0].tmp_fit = gbfit;
-      // store core id of that best fitness process
-      min_vals_in[0].tmp_cpu = core;
-      // get global best fitness across all best fitnesses over processes and the corresponding core id and store them in min_vals_out
-      MPI_Reduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, 0, MPI_COMM_WORLD);
-      MPI_Bcast( & min_vals_out, 1, MPI_DOUBLE_INT, 0, MPI_COMM_WORLD);
-      gbfit = min_vals_out[0].tmp_fit;
-      cpuid_gbfit = min_vals_out[0].tmp_cpu;
-      // broadcast global best position from cpuid_gbfit to everybody
-      MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-      // write gbest data
-      if (core == cpuid_gbfit) {
-        write_ffield_gbest();
-      };
-    }; // done loop on particles
-    // write opti file from core == 0
-    if (core == 0) {
-      outfile << timestep << " " << newSwarm.get_gbfit() << endl;
+    // pair struct to hold the global best fitness across processes and its core rank
+    struct {
+      double tmp_fit;
+      int tmp_cpu;
+    } min_vals_in[1], min_vals_out[1];
+
+    // store current fit on each process
+    min_vals_in[0].tmp_fit = gbfit;
+    // store core id of that current process
+    min_vals_in[0].tmp_cpu = core;
+    // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
+    MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+    // global best fitness across all processes
+    gbfit = min_vals_out[0].tmp_fit;
+    // core rank the above fitness came from
+    cpuid_gbfit = min_vals_out[0].tmp_cpu;
+    cout << "gbfit for CPU " << core << " is: " << gbfit << endl;
+    // broadcast contents of gbpos vector from rank cpuid_gbfit
+    MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
+    cout << "gbpos for CPU " << core << " is: " << endl;
+    for (int m=0; m<dim; m++){
+      cout << newSwarm.get_gbpos().at(m) << " ";
     };
-    newSwarm.printpos(newSwarm, timestep, iter, freq);
-    timestep = timestep + 1;
-  }; // done loop on iterations
-  outfile.close();
+    cout << endl;
+
+    //write_ffield_gbest();
+    newSwarm.printopt(newSwarm, iter, cycle, freq);
+  
+    newSwarm.printpos(newSwarm, iter, cycle, freq);
+  }; // done loop over iterations
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (core == 0) {
@@ -1632,34 +1699,38 @@ void Swarm::Propagate(Swarm & newSwarm, int iter) {
     };
     cout << " ]" << endl;
   };
-  //cout << "Total skipped particles: " << maxtime*NumP - funceval << endl;
-  //	outfile.close();
+  //cout << "Total skipped particles: " << maxiters*NumP - funceval << endl;
 
   // general clean-up
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_results.out");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_thermo.out");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_molgeo.out");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_partialE.out");
-  //	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_dipole.out");
+  	/*boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_results.out");
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_thermo.out");
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_molgeo.out");
+  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_partialE.out");
+  	//boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_dipole.out");
+       */
 };
 
-void Swarm::write_ffield_gbest() {
+void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
+  cout << "I'm in write_ffield_gbest!" << endl;
   // cp current ffield to be the global best and current analysis files to global best analysis files
   boost::filesystem::path pwd(boost::filesystem::current_path());
-  string itercount = std::to_string(iter);
+  string str_cycle = std::to_string(cycle);
   string str_core = std::to_string(core);
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
-    "ffield.gbest." + itercount, boost::filesystem::copy_option::overwrite_if_exists);
+  string str_iter = std::to_string(iter);
+  string str_parID = std::to_string(par);
+
+  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+    "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.99",
-    "results.out." + itercount, boost::filesystem::copy_option::overwrite_if_exists);
+    "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.74",
-    "thermo.out." + itercount, boost::filesystem::copy_option::overwrite_if_exists);
+    "thermo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.90",
-    "molgeo.out." + itercount, boost::filesystem::copy_option::overwrite_if_exists);
+    "molgeo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.73",
-    "partialE.out." + itercount, boost::filesystem::copy_option::overwrite_if_exists);
-  //     	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/current_dipole.out" ,
-  //     	"dipole.out"+itercount,boost::filesystem::copy_option::overwrite_if_exists);
+    "partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/current_dipole.out" ,
+  //  "dipole.out"+itercount,boost::filesystem::copy_option::overwrite_if_exists);
 };
 
 vector < double > Swarm::get_gbpos() {
@@ -1680,16 +1751,30 @@ void Swarm::update_gbpos(Par & newPar) {
     gbpos.push_back(newPar.get_bpos(j));
   };
 };
+void Swarm::printopt(Swarm & newSwarm, int iter, int cycle, int fr) {
+  //boost::filesystem::path pwd(boost::filesystem::current_path());
+  //string str_core = std::to_string(core);
+  //boost::filesystem::create_directory("CPU." + str_core + "/pos");
+  //const char * path = "opti_log.out.";
+  ofstream outfileopt("opti_log.out." + std::to_string(cycle), ofstream::app);
 
-void Swarm::printpos(Swarm & newSwarm, int timestep, int iter, int fr) {
+  if (mod(iter, fr) == 0.0) {
+    outfileopt << "#Timestep: " << iter << endl;
+    outfileopt << newSwarm.get_gbfit() << " ";
+    outfileopt << endl;
+  };
+  outfileopt.close();
+};
+
+void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
   boost::filesystem::create_directory("CPU." + str_core + "/pos");
   const char * path = "/pos/pos_log.out.";
-  ofstream outfilepos("CPU." + str_core + path + std::to_string(iter), ofstream::app);
+  ofstream outfilepos("CPU." + str_core + path + std::to_string(cycle), ofstream::app);
 
-  if (mod(timestep, fr) == 0.0) {
-    outfilepos << "#Timestep: " << timestep << endl;
+  if (mod(iter, fr) == 0.0) {
+    outfilepos << "#Timestep: " << iter << endl;
 
     for (int p = 0; p < NumP; p++) {
       outfilepos << p << "  ";
@@ -1704,17 +1789,15 @@ void Swarm::printpos(Swarm & newSwarm, int timestep, int iter, int fr) {
   };
 };
 
-void Swarm::printvel(Swarm & newSwarm, int timestep, int iter, int fr) {
+void Swarm::printvel(Swarm & newSwarm, int iter, int cycle, int fr) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
   boost::filesystem::create_directory("CPU." + str_core + "/vel");
   const char * pathvel = "./vel/vel_opti.out.";
-  ofstream outfilevel(pathvel + std::to_string(iter), ofstream::app);
+  ofstream outfilevel(pathvel + std::to_string(cycle), ofstream::app);
 
-  //ofstream outfilevel;
-  //outfilevel.open("vel.txt", ofstream::app);
-  if (mod(timestep, fr) == 0.0) {
-    outfilevel << "#timestep: " << timestep << endl;
+  if (mod(iter, fr) == 0.0) {
+    outfilevel << "#iter: " << iter << endl;
 
     for (int n = 0; n < NumP; n++) {
       outfilevel << n << "  ";
@@ -1727,15 +1810,15 @@ void Swarm::printvel(Swarm & newSwarm, int timestep, int iter, int fr) {
   };
 };
 
-void Swarm::printdeg(Swarm & newSwarm, int timestep, int iter, int fr) {
+void Swarm::printdeg(Swarm & newSwarm, int iter, int cycle, int fr) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
   boost::filesystem::create_directory("CPU." + str_core + "/deg");
   const char * pathdeg = "./deg/deg_opti.out.";
-  ofstream outfiledeg(pathdeg + std::to_string(iter), ofstream::app);
+  ofstream outfiledeg(pathdeg + std::to_string(cycle), ofstream::app);
   if (dim >= 2) {
-    if (mod(timestep, fr) == 0.0) {
-      outfiledeg << "#timestep: " << timestep << endl;
+    if (mod(iter, fr) == 0.0) {
+      outfiledeg << "#iter: " << iter << endl;
 
       for (int n = 0; n < NumP; n++) {
         outfiledeg << n << "  ";

@@ -58,7 +58,6 @@
 using namespace std;
 extern int ierr, core, numcores;
 extern int dim;
-extern int maxtime;
 extern int NumP;
 extern double c1;
 extern double c2;
@@ -67,11 +66,14 @@ extern double inertiamin;
 extern bool chang;
 extern bool lg_yn;
 extern bool contff;
+extern bool fixcharges;
 extern int freq;
 extern double levyscale;
 extern int faili;
 extern int iter;
-extern int repeatn;
+extern int maxiters;
+extern int cycle;
+extern int maxcycles;
 extern bool perc_yn;
 extern double perc;
 const long double pi = 3.14159265358979323846;
@@ -88,8 +90,8 @@ class Par { // declaration of a particle
   void read_bounds(); // read in min/max bounds of params and set min/max domain. Output dim = number of lines.
   double get_min_dim();
   void read_ffield(); // read ffield file into matrix
-  void write_ffield_lg();
-  void write_ffield();
+  void write_ffield_lg(int cycle, int iter, int par);
+  void write_ffield(int cycle, int iter, int par);
 
   double get_vel(int n);
   double get_pos(int k);
@@ -107,7 +109,7 @@ class Par { // declaration of a particle
 
   double get_fitness(); // get particle fitness
   void set_fitness(double fit); // set particle fitness
-  double eval_fitness(int parid);
+  double eval_fitness(int cycle, int iter, int parid);
   double get_bfit();
   void set_bfit(double bfit);
 
@@ -144,10 +146,11 @@ class Swarm { // declaration of a Swarm
   void AddPar(Par & newPar);
   void Populate(Swarm & newSwarm, int iter);
   void Propagate(Swarm & newSwarm, int iter);
+  void printopt(Swarm & newSwarm, int timestep, int iter, int fr);
   void printpos(Swarm & newSwarm, int timestep, int iter, int fr);
   void printvel(Swarm & newSwarm, int timestep, int iter, int fr);
   void printdeg(Swarm & newSwarm, int timestep, int iter, int fr);
-  void write_ffield_gbest();
+  void write_ffield_gbest(int core, int cycle, int iter, int par);
   vector < double > get_gbpos();
   void update_gbpos(Par & newPar);
   double get_gbfit();

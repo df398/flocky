@@ -135,11 +135,11 @@ int main(int argc, char * argv[]) {
     //cin >> levyscale;
     cout << "\n";
     cout << "Enter max number of iterations:" << endl;
-    cin >> maxtime;
+    cin >> maxiters;
     cout << "Enter output frequency:" << endl;
     cin >> freq;
     cout << "Enter number of optimization cycles:" << endl;
-    cin >> repeatn;
+    cin >> maxcycles;
   };
 
   // prepare folders for each process
@@ -160,8 +160,15 @@ int main(int argc, char * argv[]) {
     boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/trainset.in", pwd.string() + "/CPU." + str_core + "/trainset.in",
     boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
-    boost::filesystem::copy_option::overwrite_if_exists);
+  // check if reaxff runs with fixed charges (= require charges file)
+  boost::filesystem::ifstream chargeStream("charges");
+  if (!chargeStream.fail()) {
+    boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
+      boost::filesystem::copy_option::overwrite_if_exists);
+   fixcharges = true;
+  };
+  chargeStream.close();
+
   boost::filesystem::ofstream iopt_file(pwd.string() + "/CPU." + str_core + "/fort.20");
   iopt_file << "0";
   iopt_file.close();
@@ -181,22 +188,23 @@ int main(int argc, char * argv[]) {
   MPI_Bcast( & inertiamin, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast( & faili, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & levyscale, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  MPI_Bcast( & maxtime, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & maxiters, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & freq, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast( & repeatn, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&perc_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&perc, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & maxcycles, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & perc_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & perc, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
 
-  for (iter = 0; iter < repeatn; iter++) {
-    string itercount = std::to_string(iter);
+  for (cycle = 0; cycle < maxcycles; cycle++) {
+    string cyclecount = std::to_string(cycle);
     double starttime, endtime, diff, sumdiff, avgdiff;
     starttime = MPI_Wtime();
     // bkup original ffield before eval_fitness generates one for current particle fitness evaluation
-    boost::filesystem::copy_file("ffield", "ffield.initial." + itercount, boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::copy_file("ffield", "ffield.initial." + cyclecount, boost::filesystem::copy_option::overwrite_if_exists);
 
     Swarm MySwarm;
-    MySwarm.Populate(MySwarm, iter);
-    MySwarm.Propagate(MySwarm, iter);
+    MySwarm.Populate(MySwarm, cycle);
+    MySwarm.Propagate(MySwarm, cycle);
     // Each core should time its own operation, then send its data to core 0. Then, core 0 receives
     // timings from all cores, adds them up and divides by the sizecpus. Then prints this to the log
     // cpu file in the cpu folder. This will be the average CPU time of all CPUS.
