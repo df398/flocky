@@ -1,9 +1,10 @@
-/*  RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
-    Department of Chemistry, University of Cambridge, UK.
-    
-    RiPSOGM: 
-    Rotation Invariant Particle Swarm Optimization with Gaussian
+/*  ---------------------------------------------------------------------- *
+    RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
+    University of Cambridge, UK.
+
+    RiPSOGM: Rotation Invariant Particle Swarm Optimization with Gaussian
     Mutations.
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -14,7 +15,7 @@
     GNU General Public License for more details.
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <http://www.gnu.org/licenses/>.
-*/
+* ------------------------------------------------------------------------ */
 
 #include "par.h"
 
@@ -138,7 +139,7 @@ void Par::write_ffield(int cycle, int iter, int par) {
     index = index + 1;
   };
   string str_core = std::to_string(core);
-  // write updated ffield to ffield.tmp file
+  // write updated ffield to ffield.tmp.cycle.iter.parid file
   ofstream output_file;
   // current ffield file stream
   ifstream ffield_file;
@@ -558,12 +559,12 @@ void Par::write_ffield(int cycle, int iter, int par) {
   };
   output_file.close();
   ffield_file.close();
-  // replace ffield file with the new ffield (ffield.tmp)
+  // replace ffield file with the new ffield (ffield.tmp.cycle.iter.parid)
   boost::filesystem::path pwd(boost::filesystem::current_path());
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
     pwd.string() + "/CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
   // remove temporary ffield so other particles do not append to the file
-  boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp");
+  //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp");
 };
 
 void Par::write_ffield_lg(int cycle, int iter, int par) {
@@ -586,7 +587,7 @@ void Par::write_ffield_lg(int cycle, int iter, int par) {
 
   };
   string str_core = std::to_string(core);
-  // write updated ffield to ffield file
+  // write updated ffield to ffield file (ffield.tmp.cycle.iter.parid)
   ofstream output_file;
   // current ffield file stream
   ifstream ffield_file;
@@ -1115,12 +1116,12 @@ void Par::write_ffield_lg(int cycle, int iter, int par) {
 
   output_file.close();
   ffield_file.close();
-  // replace ffield file with the new ffield (ffield.tmp)
+  // replace ffield file with the new ffield (ffield.tmp.cycle.iter.parid)
   boost::filesystem::path pwd(boost::filesystem::current_path());
   boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, 
     pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
   // remove temporary ffield so other particles do not append to the file
-  boost::filesystem::remove(pwd.string() + "/ffield.tmp");
+  //boost::filesystem::remove(pwd.string() + "/ffield.tmp");
 };
 
 void Par::read_bounds() {
@@ -1313,6 +1314,10 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
   string str_core = std::to_string(core);
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
+
+  // count total # func evaluations
+  funceval = funceval + 1;
+  //MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_parID,
     pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
@@ -1588,7 +1593,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   };
   cout << endl;
 
-  newSwarm.printopt(newSwarm, 0, cycle, 1);
+  //newSwarm.printopt(newSwarm, 0, cycle, 1);
 
   endtime = MPI_Wtime();
   diff = endtime - starttime;
@@ -1600,6 +1605,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   };
 
   if (core == 0) {
+    newSwarm.printopt(newSwarm, 0, cycle, 1);
     cout << "Swarm generation completed." << endl;
     cout << "Initial global best fit: " << gbfit << endl;
     cout << "RiPSOGM optimization started!" << endl;
@@ -1610,7 +1616,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
 
-  funceval = 0;
   // ---------------------------------------------------------------- //
   //         PROPAGATE: main loop over iterations
   // ---------------------------------------------------------------- //
@@ -1631,7 +1636,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 
       curfit = newSwarm.GetPar(p).eval_fitness(cycle, iter, p);
       newSwarm.GetPar(p).set_fitness(curfit);
-      funceval = funceval + 1;
       cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
       cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
       for (int m=0; m<dim; m++){
@@ -1680,12 +1684,13 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     };
     cout << endl;
 
-    //write_ffield_gbest();
-    newSwarm.printopt(newSwarm, iter, cycle, freq);
-  
+    if (core == 0) {
+      newSwarm.printopt(newSwarm, iter, cycle, freq);
+    };
+
     newSwarm.printpos(newSwarm, iter, cycle, freq);
   }; // done loop over iterations
-
+  MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   if (core == 0) {
     cout << "Optimization completed successfuly!\n";

@@ -1,9 +1,10 @@
-/*  RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
-    Department of Chemistry, University of Cambridge, UK.
-    
-    RiPSOGM: 
-    Rotation Invariant Particle Swarm Optimization with Gaussian
+/*  ---------------------------------------------------------------------- *
+    RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
+    University of Cambridge, UK.
+
+    RiPSOGM: Rotation Invariant Particle Swarm Optimization with Gaussian
     Mutations.
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -14,45 +15,28 @@
     GNU General Public License for more details.
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <http://www.gnu.org/licenses/>.
-*/
+* ------------------------------------------------------------------------ */
 
 #pragma once
-
 #ifndef PAR_H
 #define PAR_H
-
 #include <ctime>
-
 #include <iostream>
-
 #include <fstream>
-
 #include <vector>
-
 #include <string>
-
 #include <sstream>
-
 #include <algorithm>
-
 #include <iterator>
-
 #include <iomanip>
-
 #include <boost/format.hpp>
-
 #include <boost/algorithm/string.hpp>
-
 #include <boost/algorithm/string/split.hpp>
-
 #include <boost/process.hpp>
-
 #include <boost/process/async_system.hpp>
-
 # define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 # undef BOOST_NO_CXX11_SCOPED_ENUMS
-
 #include <mpi.h>
 
 using namespace std;

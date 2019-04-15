@@ -1,9 +1,10 @@
-/*  RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
-    Department of Chemistry, University of Cambridge, UK.
+/*  ---------------------------------------------------------------------- *
+    RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
+    University of Cambridge, UK.
     
-    RiPSOGM: 
-    Rotation Invariant Particle Swarm Optimization with Gaussian
+    RiPSOGM: Rotation Invariant Particle Swarm Optimization with Gaussian
     Mutations.
+
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -14,16 +15,12 @@
     GNU General Public License for more details.
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <http://www.gnu.org/licenses/>.
-*/
+* ------------------------------------------------------------------------ */
 
 #include <iostream>
-
 #include <math.h>
-
 #include <ctime>
-
 #include <vector>
-
 #include "par.h"
 
 using namespace std;
@@ -35,25 +32,25 @@ int main(int argc, char * argv[]) {
   ierr = MPI_Comm_size(MPI_COMM_WORLD, & numcores);
 
   if (core == 0) {
-    cout << "**********************************************************************\n";
-    cout << "*                                                                    *\n";
-    cout << "*     RiPSOGM Copyright (C) 2019 David Furman, PhD.                  *\n";
-    cout << "*     Parallel Rotation Invariant Particle Swarm Optimization        *\n";
-    cout << "*     with Gaussian Mutations, 2019.             Version: 1.1        *\n";
-    cout << "*                                                                    *\n";
-    cout << "*     Efficient global optimization of ReaxFF reactive force         *\n";
-    cout << "*     fields.                                                        *\n";
-    cout << "*                                                                    *\n";
-    cout << "*     Author: David Furman, PhD                                      *\n";
-    cout << "*     Email: df398@cam.ac.uk                                         *\n";
-    cout << "*                                                                    *\n";
-    cout << "*     Publications using RiPSOGM should cite the following:          *\n";
-    cout << "*     Furman, David; Carmeli, Benny; Zeiri, Yehuda; Kosloff Ronnie,  *\n";
-    cout << "*     J. Chem. Theory Compyut., 2018, 14 (6)                         *\n";
-    cout << "*                                                                    *\n";
-    cout << "*                    https://www.furmanlab.com                       *\n";
-    cout << "*                                                                    *\n";
-    cout << "**********************************************************************\n";
+    cout << "*************************************************************************\n";
+    cout << "*                                                                       *\n";
+    cout << "*        RiPSOGM Copyright (C) 2019 David Furman, PhD.                  *\n";
+    cout << "*        Parallel Rotation Invariant Particle Swarm Optimization        *\n";
+    cout << "*        with Gaussian Mutations, 2019.             Version: 1.1        *\n";
+    cout << "*                                                                       *\n";
+    cout << "*        Efficient global optimization of ReaxFF reactive force         *\n";
+    cout << "*        fields.                                                        *\n";
+    cout << "*                                                                       *\n";
+    cout << "*        Author: David Furman, PhD (df398@cam.ac.uk)                    *\n";
+    cout << "*                University of Cambridge, UK                            *\n";
+    cout << "*                                                                       *\n";
+    cout << "*        Publications using RiPSOGM should cite:                        *\n";
+    cout << "*        Furman, David; Carmeli, Benny; Zeiri, Yehuda; Kosloff,         *\n";
+    cout << "*        Ronnie, J. Chem. Theory Comput., 2018, 14 (6)                  *\n";
+    cout << "*                                                                       *\n";
+    cout << "*                       https://www.furmanlab.com                       *\n";
+    cout << "*                                                                       *\n";
+    cout << "*************************************************************************\n";
 
     // check for necessary files
     std::ifstream fin1("ffield");
