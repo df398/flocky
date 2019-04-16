@@ -1,4 +1,4 @@
-[[https://github.com/df398/RiPSOGM|alt=ripsogm]]
+[[https://github.com/df398/RiPSOGM/logo.svg|alt=ripsogm]]
 
 # RiPSOGM
 Copyright (c) 2019 David Furman
