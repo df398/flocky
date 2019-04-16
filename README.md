@@ -1,4 +1,4 @@
-[[https://github.com/df398/RiPSOGM/blob/master/logo.svg|alt=ripsogm]]
+![ripsogm](https://github.com/df398/RiPSOGM/blob/master/logo.svg)
 
 # RiPSOGM
 Copyright (c) 2019 David Furman
