@@ -1,6 +1,6 @@
-![ripsogm](https://github.com/df398/RiPSOGM/blob/master/logo-small.png)
+![ripsogm](https://github.com/df398/RiPSOGM/blob/master/logo-medium.png)
 
-# RiPSOGM
+
 Copyright (c) 2019 David Furman
 
 RiPSOGM is a software package for a simple and efficient parametrization of ReaxFF reactive force fields.
