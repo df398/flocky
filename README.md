@@ -1,4 +1,4 @@
-![ripsogm](https://github.com/df398/RiPSOGM/blob/master/logo.svg)
+![ripsogm](https://github.com/df398/RiPSOGM/blob/master/logo.svg =50x50)
 
 # RiPSOGM
 Copyright (c) 2019 David Furman
