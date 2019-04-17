@@ -1,9 +1,6 @@
 /*  ---------------------------------------------------------------------- *
-    RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
+    flocky v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
     University of Cambridge, UK.
-
-    RiPSOGM: Rotation Invariant Particle Swarm Optimization with Gaussian
-    Mutations.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

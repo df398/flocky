@@ -1,10 +1,7 @@
 /*  ---------------------------------------------------------------------- *
-    RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
+    flocky v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
     University of Cambridge, UK.
     
-    RiPSOGM: Rotation Invariant Particle Swarm Optimization with Gaussian
-    Mutations.
-
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -34,7 +31,7 @@ int main(int argc, char * argv[]) {
   if (core == 0) {
     cout << "*************************************************************************\n";
     cout << "*                                                                       *\n";
-    cout << "*        RiPSOGM Copyright (C) 2019 David Furman, PhD.                  *\n";
+    cout << "*        flocky Copyright (C) 2019 David Furman, PhD.                  *\n";
     cout << "*        Parallel Rotation Invariant Particle Swarm Optimization        *\n";
     cout << "*        with Gaussian Mutations, 2019.             Version: 1.1        *\n";
     cout << "*                                                                       *\n";
@@ -44,7 +41,7 @@ int main(int argc, char * argv[]) {
     cout << "*        Author: David Furman, PhD (df398@cam.ac.uk)                    *\n";
     cout << "*                University of Cambridge, UK                            *\n";
     cout << "*                                                                       *\n";
-    cout << "*        Publications using RiPSOGM should cite:                        *\n";
+    cout << "*        Publications using flocky should cite:                        *\n";
     cout << "*        Furman, David; Carmeli, Benny; Zeiri, Yehuda; Kosloff,         *\n";
     cout << "*        Ronnie, J. Chem. Theory Comput., 2018, 14 (6)                  *\n";
     cout << "*                                                                       *\n";
@@ -103,11 +100,16 @@ int main(int argc, char * argv[]) {
       cin >> perc;
     };
 
-    cout << "Enter swarm size (recommended between 5-20):" << endl;
-    cin >> NumP;
-    NumP = int(floor(NumP / numcores)); // each CPU gets its own allocation of swarm members 
+    //cout << "Enter swarm size (recommended between 5-20):" << endl;
+    //cin >> NumP;
+    //NumP = int(floor(NumP / numcores)); // each CPU gets its own allocation of swarm members 
+    while (NumP <= 0) {
+      cout << "Enter swarm size to distribute over " << numcores << " processors:" << endl;
+      cin >> NumP;
+      NumP = int(floor(NumP / numcores)); // each CPU gets its own allocation of swarm members
+    };
 
-    cout << "Change optimization defaults? [1=true/0=false]" << endl;
+    cout << "Change flocky optimization defaults? [1=true/0=false]" << endl;
     cin >> chang;
 
     if (chang == true) {
@@ -125,7 +127,8 @@ int main(int argc, char * argv[]) {
       cin >> levyscale;
       cout << "\n";
     } else {
-      cout << "Proceeding with default optimization settings: c1 = c2 = 2.0; w1 = 0.9, w2 = 0.4, fail_i = 1, gamma = 0.01" << endl;
+      cout << "Proceeding with default optimization settings:" << endl;
+      cout <<"c1 = c2 = 2.0; w1 = 0.9, w2 = 0.4, fail_i = 1, gamma = 0.01" << endl;
     };
 
     //cout << "Enter levy scale:" << endl;

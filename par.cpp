@@ -1,9 +1,6 @@
 /*  ---------------------------------------------------------------------- *
-    RiPSOGM v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
+    flocky v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
     University of Cambridge, UK.
-
-    RiPSOGM: Rotation Invariant Particle Swarm Optimization with Gaussian
-    Mutations.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -52,13 +49,14 @@ double levyscale = 1.0;
 double confac = 1.0;
 int faili = 1;
 
+// define int of modulo
 int mod(int x, int m) {
   return (x % m + m) % m;
 }
 
+
 // return L2-norm (magnitude) of a vector. uses a range-based loop.
-double l2_norm(vector < double >
-  const & u) {
+double l2_norm(vector < double > const & u) {
   double accum = 0.;
   for (double x: u) {
     accum += x * x;
@@ -1317,7 +1315,7 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
 
   // count total # func evaluations
   funceval = funceval + 1;
-  //MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_parID,
     pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
@@ -1552,12 +1550,12 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
 
-    cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
-    cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
-    for (int m=0; m<dim; m++){
-      cout << newSwarm.GetPar(p).get_pos(m) << " ";
-    };
-    cout << endl;
+    //cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
+    //cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
+    //for (int m=0; m<dim; m++){
+    //  cout << newSwarm.GetPar(p).get_pos(m) << " ";
+    //};
+    //cout << endl;
 
     if (curfit < gbfit) {
       gbfit = curfit;
@@ -1566,7 +1564,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
       write_ffield_gbest(core, cycle, 0, p);
     };
   }; // done loop over particles
-  cout << "done with all particles" << endl;
+  //cout << "done with all particles" << endl;
 
   // pair struct to hold the global best fitness across processes and its core rank
   struct {
@@ -1584,14 +1582,14 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   gbfit = min_vals_out[0].tmp_fit;
   // core rank the above fitness came from
   cpuid_gbfit = min_vals_out[0].tmp_cpu;
-  cout << "gbfit for CPU " << core << " is: " << gbfit << endl;
+  //cout << "gbfit for CPU " << core << " is: " << gbfit << endl;
   // broadcast contents of gbpos vector from rank cpuid_gbfit
   MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-  cout << "gbpos for CPU " << core << " is: " << endl;
-  for (int m=0; m<dim; m++){
-    cout << newSwarm.get_gbpos().at(m) << " ";
-  };
-  cout << endl;
+  //cout << "gbpos for CPU " << core << " is: " << endl;
+  //for (int m=0; m<dim; m++){
+  //  cout << newSwarm.get_gbpos().at(m) << " ";
+  //};
+  //cout << endl;
 
   //newSwarm.printopt(newSwarm, 0, cycle, 1);
 
@@ -1608,7 +1606,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     newSwarm.printopt(newSwarm, 0, cycle, 1);
     cout << "Swarm generation completed." << endl;
     cout << "Initial global best fit: " << gbfit << endl;
-    cout << "RiPSOGM optimization started!" << endl;
+    cout << "flocky optimization started!" << endl;
   };
 };
 
@@ -1636,12 +1634,12 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 
       curfit = newSwarm.GetPar(p).eval_fitness(cycle, iter, p);
       newSwarm.GetPar(p).set_fitness(curfit);
-      cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
-      cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
-      for (int m=0; m<dim; m++){
-        cout << newSwarm.GetPar(p).get_pos(m) << " ";
-      };
-      cout << endl;
+      //cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
+      //cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
+      //for (int m=0; m<dim; m++){
+      //  cout << newSwarm.GetPar(p).get_pos(m) << " ";
+      //};
+      //cout << endl;
 
       // Update personal best positions and fitness
       if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
@@ -1675,14 +1673,14 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     gbfit = min_vals_out[0].tmp_fit;
     // core rank the above fitness came from
     cpuid_gbfit = min_vals_out[0].tmp_cpu;
-    cout << "gbfit for CPU " << core << " is: " << gbfit << endl;
+    //cout << "gbfit for CPU " << core << " is: " << gbfit << endl;
     // broadcast contents of gbpos vector from rank cpuid_gbfit
     MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-    cout << "gbpos for CPU " << core << " is: " << endl;
-    for (int m=0; m<dim; m++){
-      cout << newSwarm.get_gbpos().at(m) << " ";
-    };
-    cout << endl;
+    //cout << "gbpos for CPU " << core << " is: " << endl;
+    //for (int m=0; m<dim; m++){
+    //  cout << newSwarm.get_gbpos().at(m) << " ";
+    //};
+    //cout << endl;
 
     if (core == 0) {
       newSwarm.printopt(newSwarm, iter, cycle, freq);
@@ -1690,13 +1688,12 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 
     newSwarm.printpos(newSwarm, iter, cycle, freq);
   }; // done loop over iterations
-  MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  //MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   if (core == 0) {
-    cout << "Optimization completed successfuly!\n";
+    cout << "Training completed successfuly!\n";
+    cout << "Total ReaxFF calls: " << funceval << endl;
     cout << "Global best ReaxFF fit: " << newSwarm.get_gbfit() << endl;
-    cout << "Total #function eval: " << funceval << endl;
-    cout << " " << endl;
     cout << "Global best ReaxFF parameters:" << endl;
     cout << "[ ";
     for (int m = 0; m < dim; m++) {
@@ -1716,7 +1713,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 };
 
 void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
-  cout << "I'm in write_ffield_gbest!" << endl;
+  //cout << "I'm in write_ffield_gbest!" << endl;
   // cp current ffield to be the global best and current analysis files to global best analysis files
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
