@@ -1,12 +1,11 @@
-![ripsogm](https://github.com/df398/RiPSOGM/blob/master/logo-medium.png)
+![ripsogm](https://github.com/df398/flocky/blob/master/icon-new-medium.png)
 
 
 Copyright (c) 2019 David Furman
 
-RiPSOGM is a software package for a simple and efficient parametrization of ReaxFF reactive force fields.
+flocky is an open-source software package for a simple and efficient parametrization of ReaxFF reactive force fields.
 
-It is based on the Rotation Invariant Particle Swarm Optimization algorithm and is augmented with Gaussian mutation operators to enhance its exploration abilities.
-This provides an efficient way of generating new, high-quality ReaxFF reactive force fields for new systems of interest.
+It is based on the RiPSOGM algorithm to for efficient development of new, high-quality ReaxFF reactive force fields for new systems of interest.
 
 Features:
 
@@ -17,7 +16,7 @@ Features:
 * Training set supports both finite-size and periodic systems
 
 
-For theoretical background behind RiPSOGM, please see:
+For theoretical background behind flocky, please see:
 
 David Furman, Benny Carmeli, Yehuda Zeiri and Ronnie Kosloff,
 [Enhanced Particle Swarm Optimization Algorithm: Efficient Training of ReaxFF Reactive Force Fields](https://pubs.acs.org/doi/10.1021/acs.jctc.7b01272),
@@ -59,13 +58,13 @@ export BOOST_LIB_PATH="path/to/installation/prefix/lib"
 export BOOST_INC_PATH="path/to/installation/prefix/include"
 ```
 
-(4) Finally, compile RiPSOGM:
+(4) Finally, compile flocky:
 ```bash
 make 
 ```
 
 ## Usage
-To run RiPSOGM, use the corresponding MPI command. Note: N should be less than or equal to the number of swarm agents.
+To run flocky, use the corresponding MPI command. Note: N should be less than or equal to the number of swarm agents.
 ```bash
 mpiexec -np N ripsogm
 ```
@@ -74,10 +73,10 @@ mpiexec -np N ripsogm
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to contribute.
 
 ## License
-RiPSOGM is distributed under the terms of the [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/) license.
+flocky is distributed under the terms of the [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/) license.
 
 ## Citations
-If you find RiPSOGM useful, please consider citing:
+If you find flocky useful, please consider citing:
 
 David Furman, Benny Carmeli, Yehuda Zeiri and Ronnie Kosloff,
 [Enhanced Particle Swarm Optimization Algorithm: Efficient Training of ReaxFF Reactive Force Fields](https://pubs.acs.org/doi/10.1021/acs.jctc.7b01272),
