@@ -1,7 +1,7 @@
-AR  = ar rcus
+AR = ar rcus
 CXX = mpicxx
 CC  = mpicc
-CXXFLAGS = -O3 -std=c++0x
+CXXFLAGS = -g -O3 -std=c++0x
 CFLAGS   = -O3
 DEPS = par.h 
 OBJ = par.o main.o
@@ -12,7 +12,7 @@ BOOST= -lboost_filesystem -lboost_system
 %.o: %.cpp $(DEPS)
 	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST)
 
-ripsogm: $(OBJ)
+ripsogm_mpi: $(OBJ)
 	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^ $(BOOST)
 clean:
-	rm -rf *.o ripsogm
+	rm -f *.o ripsogm_mpi
