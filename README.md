@@ -1,4 +1,4 @@
-![ripsogm](https://github.com/df398/flocky/blob/master/icon-new-medium.png)
+![flocky](https://github.com/df398/flocky/blob/master/icon-new-medium.png)
 
 
 Copyright (c) 2019 David Furman
