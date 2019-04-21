@@ -1,4 +1,4 @@
-![flocky](https://github.com/df398/flocky/blob/master/icon-new-small.png)
+![flocky](https://github.com/df398/flocky/blob/master/FLOCKY-MEDIUM.png)
 
 
 Copyright (c) 2019 David Furman
