@@ -3,9 +3,9 @@
 
 Copyright (c) 2019 David Furman
 
-flocky is an open-source software for efficient development of ReaxFF reactive force fields.
+flocky is an open-source software for development of high-quality ReaxFF reactive force fields.
 
-It is based on the recently developed RiPSOGM algorithm to generate high-quality ReaxFF reactive force fields for new systems of interest.
+It is based on the RiPSOGM swarm intelligence algorithm for global optimization.
 
 Features:
 
