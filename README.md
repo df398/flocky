@@ -33,7 +33,7 @@ Requirements:
 
 Install procedure:
 
-(1) Install OpenMPI or MPICH for parallel execution:
+(1) Install OpenMPI or MPICH for parallel execution (for a serial version, skip to step 2):
 
 On Ubuntu to install mpich type:
 ```bash
@@ -60,13 +60,22 @@ export BOOST_INC_PATH="path/to/installation/prefix/include"
 
 (4) Finally, compile flocky:
 ```bash
-make 
+make -f Makefile.mpi
 ```
+for a parallel version, or:
+```bash
+make -f Makefile.serial
+```
+for a serial version.
 
 ## Usage
-To run flocky, use the corresponding MPI command. Note: N should be less than or equal to the number of swarm agents.
+To run flocky in parallel mode, use the corresponding MPI command. Note: N should be less than or equal to the number of swarm agents.
 ```bash
-mpiexec -np N ripsogm
+mpiexec -np N flocky_mpi
+```
+or, launch a serial version using:
+```bash
+./flocky_serial
 ```
 
 ## Contributing
