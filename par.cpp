@@ -414,10 +414,14 @@ void Par::write_ffield(int cycle, int iter, int par) {
   ffield_file.close();
   // replace ffield file with the new ffield (ffield.tmp.cycle.iter.parid)
   boost::filesystem::path pwd(boost::filesystem::current_path());
+#ifdef WITH_MPI
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
     pwd.string() + "/CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
-  // remove temporary ffield so other particles do not append to the file
-  //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp");
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+    pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
+#endif
 };
 
 void Par::write_ffield_lg(int cycle, int iter, int par) {
@@ -748,10 +752,19 @@ void Par::write_ffield_lg(int cycle, int iter, int par) {
   ffield_file.close();
   // replace ffield file with the new ffield (ffield.tmp.cycle.iter.parid)
   boost::filesystem::path pwd(boost::filesystem::current_path());
-  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, 
+#ifdef WITH_MPI
+  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+    pwd.string() + "/CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
+  // remove temporary ffield so other particles do not append to the file
+  //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp.*");
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
     pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
   // remove temporary ffield so other particles do not append to the file
-  //boost::filesystem::remove(pwd.string() + "/ffield.tmp");
+  //boost::filesystem::remove(pwd.string() + "/ffield.tmp.*");
+#endif
+
 };
 
 void Par::read_bounds() {
@@ -759,11 +772,19 @@ void Par::read_bounds() {
   // following: https://stackoverflow.com/questions/10521658/reading-files-columns-into-array
 
   std::vector < std::vector < double > > allData;
+#ifdef WITH_MPI
   string str_core = std::to_string(core);
   std::ifstream fin(("CPU." + str_core + "/params.mod").c_str());
   if (fin.fail()) {
     cout << "Unable to open parameters file 'params.mod' on CPU " << core << ". \n";
     exit(EXIT_FAILURE);
+#endif
+#ifndef WITH_MPI
+  std::ifstream fin("params.mod");
+  if (fin.fail()) {
+    cout << "Unable to open parameters file 'params.mod'. \n";
+    exit(EXIT_FAILURE);
+#endif
   } else {
     std::string line;
     int numlines = 0;
@@ -939,6 +960,7 @@ void Par::update_pos_levy(vector < double > globpos, double iter, double inertia
 };
 
 double Par::eval_fitness(int cycle, int iter, int parid) {
+#ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_parID = std::to_string(parid);
   string str_core = std::to_string(core);
@@ -947,25 +969,16 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
 
   // count total # func evaluations
   funceval = funceval + 1;
-#ifdef WITH_MPI
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_parID,
     pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
-#endif
-#ifndef WITH_MPI
-  boost::filesystem::copy_file(pwd.string() + "/geo." + str_parID,
-    pwd.string() + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
-#endif
   // check if ffield is LG or not. execute correct reac accordingly.
   if (lg_yn == true) {
     write_ffield_lg(cycle, iter, parid);
-#ifdef WITH_MPI
     std::ifstream fin5(("CPU." + str_core + "/reac_lg").c_str());
     if (fin5.fail()) {
       cout << "reac_lg executable not found for CPU " + str_core + ". Aborting! \n";
       exit(EXIT_FAILURE);
     }
-#endif
-#ifdef WITH_MPI
     // prepare mandatory files before executing reac_lg in each CPU directory
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
       pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
@@ -982,17 +995,14 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     string old_path = pwd.string();
     boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
     boost::filesystem::current_path(p);
-#endif
+
     // execute reac within each CPU.x directory
     boost::process::system("./reac_lg", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
-#ifdef WITH_MPI
     // cd back to main directory
     boost::filesystem::path p2(old_path);
     boost::filesystem::current_path(p2);
-#endif
   } else {
     write_ffield(cycle, iter, parid);
-#ifdef WITH_MPI
     std::ifstream fin6(("CPU." + str_core + "/reac").c_str());
     if (fin6.fail()) {
       cout << "reac executable not found for CPU " + str_core + ". Aborting! \n";
@@ -1018,10 +1028,8 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     string old_path = pwd.string();
     boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
     boost::filesystem::current_path(p);
-#endif
     // execute reac within each CPU.x directory
     boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
-#ifdef WITH_MPI
     // cd back to main directory
     boost::filesystem::path p2(old_path);
     boost::filesystem::current_path(p2);
@@ -1029,17 +1037,11 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     et2 = MPI_Wtime();
     df2 = et2 - st2;
     //cout << "CPU time of reac: " << df2 << endl;
-#endif
   };
 
   // read fitness value contained in fort.13 file
   string str;
-#ifdef WITH_MPI
   boost::filesystem::ifstream myfile("CPU." + str_core + "/fort.13");
-#endif
-#ifndef WITH_MPI
-  boost::filesystem::ifstream myfile("fort.13");
-#endif
   stringstream tempstr;
   getline(myfile, str);
   // insert str into stringstream tempstr
@@ -1055,23 +1057,9 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     // convert to double
     fitness = stod(str);
   };
-#ifdef WITH_MPI
   boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/fort.13");
-#endif
-#ifndef WITH_MPI
-  boost::filesystem::remove(pwd.string() + "fort.13");
-#endif
-  //	// saving relevant files
-  /*	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/summary.txt");
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/moldyn.vel");
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/run.log");
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/xmolout");
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/bond*");
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/molfra.out");		
-  */
   	//boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
   	  //pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
-#ifdef WITH_MPI
   	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
   	  pwd.string()+"/CPU."+str_core+"/molgeo.out."+str_cycle+"."+str_iter, 
             boost::filesystem::copy_option::overwrite_if_exists);
@@ -1087,9 +1075,104 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
   	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.73" ,
   	  pwd.string()+"/CPU."+str_core+"/partialE.out."+str_cycle+"."+str_iter, 
            boost::filesystem::copy_option::overwrite_if_exists);
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/fort.*");
-#endif
   return fitness;
+#endif
+
+#ifndef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  string str_parID = std::to_string(parid);
+  string str_cycle = std::to_string(cycle);
+  string str_iter = std::to_string(iter);
+
+  // count total # func evaluations
+  funceval = funceval + 1;
+  boost::filesystem::copy_file(pwd.string() + "/geo." + str_parID,
+    pwd.string() + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
+  // check if ffield is LG or not. execute correct reac accordingly.
+  if (lg_yn == true) {
+    write_ffield_lg(cycle, iter, parid);
+    std::ifstream fin5("reac_lg");
+    if (fin5.fail()) {
+      cout << "reac_lg executable not found. Aborting! \n";
+      exit(EXIT_FAILURE);
+    }
+    // prepare mandatory files before executing reac_lg
+    boost::filesystem::copy_file(pwd.string() + "/geo",
+      pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+
+    boost::filesystem::copy_file(pwd.string() + "/ffield",
+      pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+
+    if (fixcharges == true){
+      boost::filesystem::copy_file(pwd.string() + "/charges",
+        pwd.string() + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+    };
+
+    // execute reac
+    boost::process::system("./reac_lg", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
+  } else {
+    write_ffield(cycle, iter, parid);
+    std::ifstream fin6("reac");
+    if (fin6.fail()) {
+      cout << "reac executable not found. Aborting! \n";
+      exit(EXIT_FAILURE);
+    }
+
+    // prepare mandatory files before executing reac
+    boost::filesystem::copy_file(pwd.string() + "/geo",
+      pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+
+    boost::filesystem::copy_file(pwd.string() + "/ffield",
+      pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+
+    if (fixcharges == true){
+    boost::filesystem::copy_file(pwd.string() + "/charges",
+      pwd.string() + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+    };
+
+    // execute reac within each CPU.x directory
+    boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
+
+  };
+
+  // read fitness value contained in fort.13 file
+  string str;
+  boost::filesystem::ifstream myfile("fort.13");
+  stringstream tempstr;
+  getline(myfile, str);
+  // insert str into stringstream tempstr
+  tempstr << str;
+  // get rid from extra whitespace in stringstream
+  tempstr >> std::ws;
+  // insert back to str
+  tempstr >> str;
+  // check if fitness is numeric or ******
+  if (str.at(0) == '*') {
+    fitness = numeric_limits < double > ::infinity();
+  } else {
+    // convert to double
+    fitness = stod(str);
+  };
+  boost::filesystem::remove(pwd.string() + "/fort.13");
+        //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
+          //pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
+        boost::filesystem::copy_file(pwd.string() + "/fort.90" ,
+          pwd.string() + "/molgeo.out." + str_cycle + "." + str_iter,
+            boost::filesystem::copy_option::overwrite_if_exists);
+        boost::filesystem::copy_file(pwd.string() + "/fort.74" ,
+          pwd.string() + "/thermo.out." + str_cycle+"." + str_iter,
+            boost::filesystem::copy_option::overwrite_if_exists);
+        boost::filesystem::copy_file(pwd.string() + "/fort.99" ,
+          pwd.string() + "/results.out." + str_cycle+"." + str_iter,
+           boost::filesystem::copy_option::overwrite_if_exists);
+        boost::filesystem::copy_file(pwd.string() + "/fort.90" ,
+          pwd.string() + "/geo."+str_cycle+"." + str_iter + "." + str_parID,
+           boost::filesystem::copy_option::overwrite_if_exists);
+        boost::filesystem::copy_file(pwd.string() + "/fort.73" ,
+          pwd.string() + "/partialE.out." + str_cycle + "." + str_iter,
+           boost::filesystem::copy_option::overwrite_if_exists);
+  return fitness;
+#endif
 };
 
 double Par::get_bfit() {
@@ -1190,6 +1273,12 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
       pwd.string() + "/CPU." + str_core + "/geo." + parID, 
         boost::filesystem::copy_option::overwrite_if_exists);
 #endif
+#ifndef WITH_MPI
+    // cp geo to geo.parID so each particle works with its own geo file
+    boost::filesystem::copy_file(pwd.string() + "/geo",
+      pwd.string() + "/geo." + parID,
+        boost::filesystem::copy_option::overwrite_if_exists);
+#endif
     Par NewPar;
     newSwarm.AddPar(NewPar);
 #ifdef WITH_MPI
@@ -1264,9 +1353,6 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   MPI_Reduce( & diff, & sumdiff, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   avgdiff = sumdiff / numcores;
 
-  if (core == 0) {
-    cout << "Time in Populate NumP: " << avgdiff << " seconds" << endl;
-  };
 #endif
 #ifdef WITH_MPI
   if (core == 0) {
@@ -1398,6 +1484,11 @@ void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
   //cout << "I'm in write_ffield_gbest!" << endl;
   // cp current ffield to be the global best and current analysis files to global best analysis files
 #ifndef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  string str_cycle = std::to_string(cycle);
+  string str_iter = std::to_string(iter);
+  string str_parID = std::to_string(par);
+
   boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
     "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/fort.99",
@@ -1410,6 +1501,9 @@ void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
     "partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   //boost::filesystem::copy_file(pwd.string() + "/current_dipole.out" ,
   //  "dipole.out"+itercount,boost::filesystem::copy_option::overwrite_if_exists);
+
+  // clean temp files
+  boost::filesystem::remove(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
 #endif
 #ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
@@ -1430,6 +1524,9 @@ void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
     "partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/current_dipole.out" ,
   //  "dipole.out"+itercount,boost::filesystem::copy_option::overwrite_if_exists);
+
+  // clean temp files
+  boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
 #endif
 };
 
@@ -1476,7 +1573,7 @@ void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
 #endif
 #ifndef WITH_MPI
   boost::filesystem::create_directory("pos");
-  const char * path = "/pos/pos_log.out.";
+  const char * path = "pos/pos_log.out.";
   ofstream outfilepos(path + std::to_string(cycle), ofstream::app);
 #endif
   if (mod(iter, fr) == 0.0) {

@@ -1,6 +1,6 @@
 /*  ---------------------------------------------------------------------- *
-    flocky v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
-    University of Cambridge, UK.
+    flocky v1.0 Copyright (C) 2019 David Furman, PhD. 
+    df398@cam.ac.uk, University of Cambridge, UK.
     
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -20,10 +20,15 @@
 #include <vector>
 #include "par.h"
 
+#ifndef WITH_MPI
+#include <chrono>
+using sec = chrono::seconds;
+#endif
+
 using namespace std;
 
 int main(int argc, char * argv[]) {
-
+#ifdef WITH_MPI
   ierr = MPI_Init( & argc, & argv);
   ierr = MPI_Comm_rank(MPI_COMM_WORLD, & core);
   ierr = MPI_Comm_size(MPI_COMM_WORLD, & numcores);
@@ -31,17 +36,11 @@ int main(int argc, char * argv[]) {
   if (core == 0) {
     cout << "*************************************************************************\n";
     cout << "*                                                                       *\n";
-    cout << "*        flocky Copyright (C) 2019 David Furman, PhD.                  *\n";
-    cout << "*        Parallel Rotation Invariant Particle Swarm Optimization        *\n";
-    cout << "*        with Gaussian Mutations, 2019.             Version: 1.1        *\n";
+    cout << "*        flocky v1.0 Copyright (C) 2019, GNU L-GPL 3.0                  *\n";
+    cout << "*              David Furman, PhD, df398@cam.ac.uk                       *\n";
+    cout << "*                 University of Cambridge, UK.                          *\n";
     cout << "*                                                                       *\n";
-    cout << "*        Efficient global optimization of ReaxFF reactive force         *\n";
-    cout << "*        fields.                                                        *\n";
-    cout << "*                                                                       *\n";
-    cout << "*        Author: David Furman, PhD (df398@cam.ac.uk)                    *\n";
-    cout << "*                University of Cambridge, UK                            *\n";
-    cout << "*                                                                       *\n";
-    cout << "*        Publications using flocky should cite:                        *\n";
+    cout << "*        Publications using flocky should cite:                         *\n";
     cout << "*        Furman, David; Carmeli, Benny; Zeiri, Yehuda; Kosloff,         *\n";
     cout << "*        Ronnie, J. Chem. Theory Comput., 2018, 14 (6)                  *\n";
     cout << "*                                                                       *\n";
@@ -100,15 +99,11 @@ int main(int argc, char * argv[]) {
       cin >> perc;
     };
 
-    //cout << "Enter swarm size (recommended between 5-20):" << endl;
-    //cin >> NumP;
-    //NumP = int(floor(NumP / numcores)); // each CPU gets its own allocation of swarm members 
     while (NumP <= 0) {
       cout << "Enter swarm size to distribute over " << numcores << " processors:" << endl;
       cin >> NumP;
       NumP = int(floor(NumP / numcores)); // each CPU gets its own allocation of swarm members
     };
-
     cout << "Change flocky optimization defaults? [1=true/0=false]" << endl;
     cin >> chang;
 
@@ -141,8 +136,7 @@ int main(int argc, char * argv[]) {
     cout << "Enter number of optimization cycles:" << endl;
     cin >> maxcycles;
   };
-
-  // prepare folders for each process
+  // prepare directories for each CPU process
   string str_core = std::to_string(core);
   boost::filesystem::create_directory("CPU." + str_core);
   // get present working directory full path
@@ -200,7 +194,8 @@ int main(int argc, char * argv[]) {
     double starttime, endtime, diff, sumdiff, avgdiff;
     starttime = MPI_Wtime();
     // bkup original ffield before eval_fitness generates one for current particle fitness evaluation
-    boost::filesystem::copy_file("ffield", "ffield.initial." + cyclecount, boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::copy_file("ffield", "ffield.initial." + cyclecount, 
+    boost::filesystem::copy_option::overwrite_if_exists);
 
     Swarm MySwarm;
     MySwarm.Populate(MySwarm, cycle);
@@ -216,10 +211,150 @@ int main(int argc, char * argv[]) {
     if (core == 0) {
       cout << "Total CPU time: " << avgdiff << " seconds" << endl;
     };
-
     MySwarm = Swarm();
 
   };
   ierr = MPI_Finalize();
   return 0;
-}
+};
+#endif
+
+#ifndef WITH_MPI
+    cout << "*************************************************************************\n";
+    cout << "*                                                                       *\n";
+    cout << "*        flocky v1.0 Copyright (C) 2019, GNU L-GPL 3.0                  *\n";
+    cout << "*              David Furman, PhD, df398@cam.ac.uk                       *\n";
+    cout << "*                 University of Cambridge, UK.                          *\n";
+    cout << "*                                                                       *\n";
+    cout << "*        Publications using flocky should cite:                         *\n";
+    cout << "*        Furman, David; Carmeli, Benny; Zeiri, Yehuda; Kosloff,         *\n";
+    cout << "*        Ronnie, J. Chem. Theory Comput., 2018, 14 (6)                  *\n";
+    cout << "*                                                                       *\n";
+    cout << "*                       https://www.furmanlab.com                       *\n";
+    cout << "*                                                                       *\n";
+    cout << "*************************************************************************\n";
+
+    // check for necessary files
+    std::ifstream fin1("ffield");
+    if (fin1.fail()) {
+      cout << "Unable to open ReaxFF 'ffield' file. Aborting! \n";
+      exit(EXIT_FAILURE);
+    }
+
+    std::ifstream fin2("control");
+    if (fin2.fail()) {
+      cout << "Unable to open 'control' file. Aborting! \n";
+      exit(EXIT_FAILURE);
+    }
+
+    std::ifstream fin3("geo");
+    if (fin3.fail()) {
+      cout << "Unable to open geo file on CPU. Aborting! \n";
+      exit(EXIT_FAILURE);
+    }
+
+    std::ifstream fin4("params.mod");
+    if (fin4.fail()) {
+      cout << "Unable to open 'params.mod' file. Aborting! \n";
+      exit(EXIT_FAILURE);
+    }
+    // get optimization settings from user
+    cout << "\n";
+    cout << "Is ffield file of the ReaxFF_lg type? [1=true/0=false]" << endl;
+    cin >> lg_yn;
+
+    if (lg_yn == true) {
+      cout << "\n";
+      cout << "Proceeding with LG-augmented ReaxFF ffield. " << endl;
+      cout << "Important: make sure your params.mod file is adjusted accordingly!\n" << endl;
+    } else {
+      cout << "\n";
+      cout << "Proceeding with standard ReaxFF ffield." << endl;
+      cout << "Important: make sure your params.mod file is adjusted accordingly!\n" << endl;
+    };
+
+    cout << "Take initial positions of first search agent from current ffield file? [1=true/0=false]" << endl;
+    cout << "Note: Initial positions of all other agents will be random." << endl;
+    cin >> contff;
+
+    cout << "Use percent change in parameter bounds? [1=true/0=false: use bounds from params.mod]" << endl;
+    cin >> perc_yn;
+    if (perc_yn == true){
+      cout << "Enter %change [0.0 - 1.0]: " << endl;
+      cin >> perc;
+    };
+    while (NumP <= 0) {
+      cout << "Enter swarm size (recommended 4-20 for serial job):" << endl;
+      cin >> NumP;
+    };
+    cout << "Change flocky optimization defaults? [1=true/0=false]" << endl;
+    cin >> chang;
+
+    if (chang == true) {
+      cout << "New c1 value:" << endl;
+      cin >> c1;
+      cout << "New c2 value:" << endl;
+      cin >> c2;
+      cout << "New w1 value:" << endl;
+      cin >> inertiamax;
+      cout << "New w2 value (w2 >= w1):" << endl;
+      cin >> inertiamin;
+      cout << "New fail_i value (int > 0): " << endl;
+      cin >> faili;
+      cout << "New gamma value (> 0): " << endl;
+      cin >> levyscale;
+      cout << "\n";
+    } else {
+      cout << "Proceeding with default optimization settings:" << endl;
+      cout <<"c1 = c2 = 2.0; w1 = 0.9, w2 = 0.4, fail_i = 1, gamma = 0.01" << endl;
+    };
+
+    //cout << "Enter levy scale:" << endl;
+    //cin >> levyscale;
+    cout << "\n";
+    cout << "Enter max number of iterations:" << endl;
+    cin >> maxiters;
+    cout << "Enter output frequency:" << endl;
+    cin >> freq;
+    cout << "Enter number of optimization cycles:" << endl;
+    cin >> maxcycles;
+  
+  // check if reaxff runs with fixed charges (= require charges file)
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  boost::filesystem::ifstream chargeStream("charges");
+  if (!chargeStream.fail()) {
+    boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/charges",
+      boost::filesystem::copy_option::overwrite_if_exists);
+   fixcharges = true;
+  };
+  chargeStream.close();
+
+  boost::filesystem::ofstream iopt_file(pwd.string() + "/fort.20");
+  iopt_file << "0";
+  iopt_file.close();
+  ofstream outfile35(pwd.string() + "/fort.35");
+  outfile35 << "23434.1" << endl;
+  outfile35.close();
+  for (cycle = 0; cycle < maxcycles; cycle++) {
+    string cyclecount = std::to_string(cycle);
+
+    auto starttime = chrono::steady_clock::now();
+
+    // bkup original ffield before eval_fitness generates one for current particle fitness evaluation
+    boost::filesystem::copy_file("ffield", "ffield.initial." + cyclecount,
+    boost::filesystem::copy_option::overwrite_if_exists);
+
+    Swarm MySwarm;
+    MySwarm.Populate(MySwarm, cycle);
+    MySwarm.Propagate(MySwarm, cycle);
+    
+    auto endtime = chrono::steady_clock::now();
+    auto diff = endtime - starttime;
+    cout << " " << endl;
+    cout << "Total CPU time: " << chrono::duration_cast<sec>(diff).count() << " seconds " << endl;
+    MySwarm = Swarm();
+
+  };
+  return 0;
+};
+#endif

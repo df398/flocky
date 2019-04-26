@@ -1,6 +1,6 @@
 /*  ---------------------------------------------------------------------- *
-    flocky v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
-    University of Cambridge, UK.
+    flocky v1.0 Copyright (C) 2019 David Furman, PhD.
+    df398@cam.ac.uk, University of Cambridge, UK.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,7 +34,9 @@
 # define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 # undef BOOST_NO_CXX11_SCOPED_ENUMS
+#ifdef WITH_MPI
 #include <mpi.h>
+#endif
 
 using namespace std;
 extern int ierr, core, numcores;
