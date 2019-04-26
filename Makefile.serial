@@ -12,7 +12,7 @@ BOOST= -lboost_filesystem -lboost_system
 %.o: %.cpp $(DEPS)
 	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST)
 
-ripsogm_mpi: $(OBJ)
+flocky_serial: $(OBJ)
 	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^ $(BOOST)
 clean:
-	rm -f *.o ripsogm_mpi
+	rm -f *.o flocky_serial
