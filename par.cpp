@@ -1,6 +1,6 @@
 /*  ---------------------------------------------------------------------- *
-    flocky v 1.1 Copyright (C) 2019 David Furman, PhD. df398@cam.ac.uk
-    University of Cambridge, UK.
+    flocky v1.0 Copyright (C) 2019 David Furman, PhD.
+    df398@cam.ac.uk, University of Cambridge, UK.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -90,10 +90,20 @@ void Par::read_ffield() {
   // read ffield file into ffieldmat matrix split by entries
   // following: https://stackoverflow.com/questions/10521658/reading-files-columns-into-array
   ffieldmat.clear();
+#ifdef WITH_MPI
   string str_core = std::to_string(core);
   std::ifstream fin("CPU." + str_core + "/ffield");
+#endif
+#ifndef WITH_MPI
+  std::ifstream fin("ffield"); 
+#endif
   if (fin.fail()) {
+#ifdef WITH_MPI
     cout << "Unable to open 'ffield' file on CPU" << core << " \n";
+#endif
+#ifndef WITH_MPI
+    cout << "Unable to open 'ffield' file \n"; 
+#endif
     exit(EXIT_FAILURE);
   } else {
     std::string line;
@@ -142,8 +152,14 @@ void Par::write_ffield(int cycle, int iter, int par) {
   // current ffield file stream
   ifstream ffield_file;
   string comment;
+#ifdef WITH_MPI
   output_file.open("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, ios::out);
   ffield_file.open("CPU." + str_core + "/ffield", ios:: in );
+#endif
+#ifndef WITH_MPI
+  output_file.open("ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, ios::out);
+  ffield_file.open("ffield", ios:: in );
+#endif
   // read all ffield file into vector of lines to use it next to write comments/header lines
   vector < string > ffield_lines;
   while (getline(ffield_file, comment)) {
@@ -180,11 +196,7 @@ void Par::write_ffield(int cycle, int iter, int par) {
   for (int m = 41; m < 45; m++) {
     output_file << ffield_lines.at(m) << endl;
   };
-  /* 
-  06.03.19 Check how many elements are there in the ffield then limit the write of atom params
-  to only those lines that belong to number of elements. This is to avoid writing lines
-  that belong to the next section (bonds) in the atom section.
-  */
+  
   using boost::is_any_of;
   // the line that contains the number of elements
   string numel_line = ffield_lines.at(41);
@@ -199,161 +211,28 @@ void Par::write_ffield(int cycle, int iter, int par) {
    * -------------------------------------
    */
 
-  for (int m = 45; m < 46; m++) {
-    if (m < max_line_atompar) {
-      //cout << "m: " << m << endl;
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
+  int m = 45;
+  while (m < max_line_atompar) {
+    boost::format f("% s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions( f.exceptions() &
+    ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+    for (std::vector<std::string>::iterator it=ffieldmat.at(m).begin();it!=ffieldmat.at(m).end();++it){
+            f = f % (*it);
     };
-  };
-  for (int m = 46; m < 49; m++) {
-    if (m < max_line_atompar) {
+    output_file << f << endl;
+    for (int i = 1; i < 4; i++){
+      m = m + 1;
       boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
+      f.exceptions( f.exceptions() &
+      ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+      for (std::vector<std::string>::iterator it=ffieldmat.at(m).begin();it!=ffieldmat.at(m).end();++it){
+              f = f % (*it);
       };
       output_file << f << endl;
     };
+    m = m + 1;
   };
-  for (int m = 49; m < 50; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 50; m < 53; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 53; m < 54; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 54; m < 57; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 57; m < 58; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 58; m < 61; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 61; m < 62; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 62; m < 65; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 65; m < 66; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("% 2s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 66; m < 69; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 69; m < 70; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("% s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-  for (int m = 70; m < 73; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
+
   /* ------------------------------------
    * WRITE BONDS PARAMS HEADERS
    * ------------------------------------
@@ -363,11 +242,6 @@ void Par::write_ffield(int cycle, int iter, int par) {
     output_file << ffield_lines.at(m) << endl;
   };
 
-  /* 
-    06.03.19 Check how many elements are there in the ffield then limit the write of bond params
-    to only those lines that belong to number of bond types. This is to avoid writing lines
-    that belong to the next section (off-dia) in the bond section.
-  */
   using boost::is_any_of;
   // the line the contains the number of bond types
   string numbty_line = ffield_lines.at(max_line_atompar);
@@ -416,11 +290,6 @@ void Par::write_ffield(int cycle, int iter, int par) {
    * ------------------------------------
    */
 
-  /* 
-    06.03.19 Check how many elements are there in the ffield then limit the write of bond params
-    to only those lines that belong to number of bond types. This is to avoid writing lines
-    that belong to the next section (off-dia) in the bond section.
-  */
   using boost::is_any_of;
   // the line that contains the number of off-diag types
   string numodty_line = ffield_lines.at(max_line_bondpar + 2);
@@ -456,11 +325,6 @@ void Par::write_ffield(int cycle, int iter, int par) {
    * ------------------------------------
    */
 
-  /* 
-    06.03.19 Check how many angles are there in the ffield then limit the write of angle params
-    to only those lines that belong to number of angle types. This is to avoid writing lines
-    that belong to the next section (torsions) in the angles section.
-  */
   using boost::is_any_of;
   // the line that contains the number of angle types
   string numaty_line = ffield_lines.at(max_line_offdpar);
@@ -494,11 +358,6 @@ void Par::write_ffield(int cycle, int iter, int par) {
    * ------------------------------------
    */
 
-  /* 
-    06.03.19 Check how many torsion types are there in the ffield then limit the write of torsion params
-    to only those lines that belong to number of torsion types. This is to avoid writing lines
-    that belong to the next section (h-bonds) in the torsions section.
-  */
   using boost::is_any_of;
   // the line that contains the number of torsion types
   string numtoty_line = ffield_lines.at(max_line_angles);
@@ -532,10 +391,6 @@ void Par::write_ffield(int cycle, int iter, int par) {
    * ------------------------------------
    */
 
-  /* 
-    06.03.19 Check how many Hbond types are there in the ffield then limit the write of Hbond params
-    to only those lines that belong to number of Hbond types. This is to avoid accessing nonexistent cells.
-  */
   using boost::is_any_of;
   // the line that contains the number of Hbond types
   string numhbty_line = ffield_lines.at(max_line_tors);
@@ -634,11 +489,6 @@ void Par::write_ffield_lg(int cycle, int iter, int par) {
     output_file << ffield_lines.at(m) << endl;
   };
 
-  /* 
-    06.03.19 Check how many elements are there in the ffield then limit the write of atom params
-    to only those lines that belong to number of elements. This is to avoid writing lines
-    that belong to the next section (bonds) in the atom section.
-  */
   using boost::is_any_of;
   // the line that contains the number of elements
   string numel_line = ffield_lines.at(41);
@@ -654,256 +504,38 @@ void Par::write_ffield_lg(int cycle, int iter, int par) {
    * -------------------------------------
    */
 
-  for (int m = 45; m < 46; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
+  int m = 45;
+  while (m < max_line_atompar) {
+    boost::format f("% s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions( f.exceptions() &
+    ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+    for (std::vector<std::string>::iterator it=ffieldmat.at(m).begin();it!=ffieldmat.at(m).end();++it){
+            f = f % (*it);
     };
-  };
-
-  for (int m = 46; m < 49; m++) {
-    if (m < max_line_atompar) {
+    output_file << f << endl;
+    
+    for (int i = 1; i < 4; i++){
+      m = m + 1;
       boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
+      f.exceptions( f.exceptions() &
+      ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+      for (std::vector<std::string>::iterator it=ffieldmat.at(m).begin();it!=ffieldmat.at(m).end();++it){
+              f = f % (*it);
       };
       output_file << f << endl;
     };
-  };
+    
+    m = m +1;
+    boost::format f2("   %9.4f%9.4f");
+    f2.exceptions( f2.exceptions() &
+    ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+    for (std::vector<std::string>::iterator it=ffieldmat.at(m).begin();it!=ffieldmat.at(m).end();++it){
+            f2 = f2 % (*it);
+    };
+    output_file << f2 << endl;
 
-  for (int m = 49; m < 50; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
 
-  for (int m = 50; m < 51; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 51; m < 54; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 54; m < 55; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 55; m < 56; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 56; m < 59; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 59; m < 60; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 60; m < 61; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 61; m < 64; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 64; m < 65; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 65; m < 66; m++) {
-    if (m < max_line_atompar) {
-      boost::format f(" %s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 66; m < 69; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 69; m < 70; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 70; m < 71; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("% 2s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 71; m < 74; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 74; m < 75; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 75; m < 76; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("% s %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 76; m < 79; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
-  };
-
-  for (int m = 79; m < 80; m++) {
-    if (m < max_line_atompar) {
-      boost::format f("   %9.4f%9.4f");
-      f.exceptions(f.exceptions() &
-        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
-      for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
-        f = f % ( * it);
-      };
-      output_file << f << endl;
-    };
+    m = m + 1;
   };
 
   /* ------------------------------------
@@ -1315,20 +947,25 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
 
   // count total # func evaluations
   funceval = funceval + 1;
-  MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
+#ifdef WITH_MPI
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_parID,
     pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
-
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::copy_file(pwd.string() + "/geo." + str_parID,
+    pwd.string() + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
+#endif
   // check if ffield is LG or not. execute correct reac accordingly.
   if (lg_yn == true) {
     write_ffield_lg(cycle, iter, parid);
+#ifdef WITH_MPI
     std::ifstream fin5(("CPU." + str_core + "/reac_lg").c_str());
     if (fin5.fail()) {
       cout << "reac_lg executable not found for CPU " + str_core + ". Aborting! \n";
       exit(EXIT_FAILURE);
     }
-
+#endif
+#ifdef WITH_MPI
     // prepare mandatory files before executing reac_lg in each CPU directory
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
       pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
@@ -1345,14 +982,17 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     string old_path = pwd.string();
     boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
     boost::filesystem::current_path(p);
+#endif
     // execute reac within each CPU.x directory
     boost::process::system("./reac_lg", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
+#ifdef WITH_MPI
     // cd back to main directory
     boost::filesystem::path p2(old_path);
     boost::filesystem::current_path(p2);
-
+#endif
   } else {
     write_ffield(cycle, iter, parid);
+#ifdef WITH_MPI
     std::ifstream fin6(("CPU." + str_core + "/reac").c_str());
     if (fin6.fail()) {
       cout << "reac executable not found for CPU " + str_core + ". Aborting! \n";
@@ -1378,8 +1018,10 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     string old_path = pwd.string();
     boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
     boost::filesystem::current_path(p);
+#endif
     // execute reac within each CPU.x directory
     boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
+#ifdef WITH_MPI
     // cd back to main directory
     boost::filesystem::path p2(old_path);
     boost::filesystem::current_path(p2);
@@ -1387,12 +1029,17 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     et2 = MPI_Wtime();
     df2 = et2 - st2;
     //cout << "CPU time of reac: " << df2 << endl;
-
+#endif
   };
 
   // read fitness value contained in fort.13 file
   string str;
+#ifdef WITH_MPI
   boost::filesystem::ifstream myfile("CPU." + str_core + "/fort.13");
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::ifstream myfile("fort.13");
+#endif
   stringstream tempstr;
   getline(myfile, str);
   // insert str into stringstream tempstr
@@ -1408,8 +1055,12 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     // convert to double
     fitness = stod(str);
   };
+#ifdef WITH_MPI
   boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/fort.13");
-
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::remove(pwd.string() + "fort.13");
+#endif
   //	// saving relevant files
   /*	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/summary.txt");
   	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/moldyn.vel");
@@ -1420,18 +1071,24 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
   */
   	//boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
   	  //pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
+#ifdef WITH_MPI
   	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
-  	  pwd.string()+"/CPU."+str_core+"/molgeo.out."+str_cycle+"."+str_iter, boost::filesystem::copy_option::overwrite_if_exists);
+  	  pwd.string()+"/CPU."+str_core+"/molgeo.out."+str_cycle+"."+str_iter, 
+            boost::filesystem::copy_option::overwrite_if_exists);
   	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.74" ,
-  	  pwd.string()+"/CPU."+str_core+"/thermo.out."+str_cycle+"."+str_iter, boost::filesystem::copy_option::overwrite_if_exists);
+  	  pwd.string()+"/CPU."+str_core+"/thermo.out."+str_cycle+"."+str_iter, 
+            boost::filesystem::copy_option::overwrite_if_exists);
   	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.99" ,
-  	  pwd.string()+"/CPU."+str_core+"/results.out."+str_cycle+"."+str_iter, boost::filesystem::copy_option::overwrite_if_exists);
+  	  pwd.string()+"/CPU."+str_core+"/results.out."+str_cycle+"."+str_iter, 
+           boost::filesystem::copy_option::overwrite_if_exists);
   	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
-  	  pwd.string()+"/CPU."+str_core+"/geo."+str_cycle+"."+str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
+  	  pwd.string()+"/CPU."+str_core+"/geo."+str_cycle+"."+str_iter+"."+str_parID, 
+           boost::filesystem::copy_option::overwrite_if_exists);
   	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.73" ,
-  	  pwd.string()+"/CPU."+str_core+"/partialE.out."+str_cycle+"."+str_iter, boost::filesystem::copy_option::overwrite_if_exists);
+  	  pwd.string()+"/CPU."+str_core+"/partialE.out."+str_cycle+"."+str_iter, 
+           boost::filesystem::copy_option::overwrite_if_exists);
   	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/fort.*");
-       
+#endif
   return fitness;
 };
 
@@ -1503,12 +1160,14 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
   string itercount = std::to_string(cycle);
-
+#ifdef WITH_MPI
   if (core == 0) {
+#endif
     cout << "\n";
     cout << "Swarm generation started. Please wait." << endl;
+#ifdef WITH_MPI
   };
-
+#endif
   // initial gbfit is INF for all processes and all swarm members
   gbfit = numeric_limits < double > ::infinity();
   // initial gbpos is 0.0 for all processes and all swarm members
@@ -1516,23 +1175,26 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   for (int m=0; m<dim; m++){
     gbpos.push_back(0.0);
   };
-
+#ifdef WITH_MPI
   double starttime, endtime, diff, sumdiff, avgdiff;
   starttime = MPI_Wtime();
-
+#endif
   // ---------------------------------------------- //
   //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
   // ---------------------------------------------- //
   for (int p = 0; p < NumP; p++) {
     string parID = std::to_string(p);
+#ifdef WITH_MPI
     // cp geo to geo.parID so each particle works with its own geo file
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo", 
-      pwd.string() + "/CPU." + str_core + "/geo." + parID, boost::filesystem::copy_option::overwrite_if_exists);
-
+      pwd.string() + "/CPU." + str_core + "/geo." + parID, 
+        boost::filesystem::copy_option::overwrite_if_exists);
+#endif
     Par NewPar;
     newSwarm.AddPar(NewPar);
-
+#ifdef WITH_MPI
     if (core == 0) {
+#endif
       // If contff == y, then take force field's current values for the position of particle 0 (the rest are just random)
       if (contff == true) {
         vector < double > ffpos;
@@ -1543,8 +1205,9 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
         newSwarm.GetPar(0).set_pos(ffpos);
       };
       contff = false;
+#ifdef WITH_MPI
     };
-
+#endif
     // evaluate fitness and set personal best equal to fitness
     curfit = newSwarm.GetPar(p).eval_fitness(cycle, 0, p);
     newSwarm.GetPar(p).set_fitness(curfit);
@@ -1561,11 +1224,14 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
       gbfit = curfit;
       gbpos.clear();
       gbpos = newSwarm.GetPar(p).get_pos_vec();
+#ifndef WITH_MPI
+      core = 0;
+#endif
       write_ffield_gbest(core, cycle, 0, p);
     };
   }; // done loop over particles
   //cout << "done with all particles" << endl;
-
+#ifdef WITH_MPI
   // pair struct to hold the global best fitness across processes and its core rank
   struct {
     double tmp_fit;
@@ -1601,13 +1267,17 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   if (core == 0) {
     cout << "Time in Populate NumP: " << avgdiff << " seconds" << endl;
   };
-
+#endif
+#ifdef WITH_MPI
   if (core == 0) {
+#endif
     newSwarm.printopt(newSwarm, 0, cycle, 1);
     cout << "Swarm generation completed." << endl;
     cout << "Initial global best fit: " << gbfit << endl;
     cout << "flocky optimization started!" << endl;
+#ifdef WITH_MPI
   };
+#endif
 };
 
 void Swarm::Propagate(Swarm & newSwarm, int cycle) {
@@ -1650,13 +1320,16 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
           gbfit = newSwarm.GetPar(p).get_bfit();
           gbpos.clear();
           gbpos = newSwarm.GetPar(p).get_pos_vec();
+#ifndef WITH_MPI
+          core = 0;
+#endif
 	  write_ffield_gbest(core, cycle, iter, p);
         };
       } else {
         newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
       };
     }; // done loop over swarm members
-
+#ifdef WITH_MPI
     // pair struct to hold the global best fitness across processes and its core rank
     struct {
       double tmp_fit;
@@ -1681,16 +1354,23 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     //  cout << newSwarm.get_gbpos().at(m) << " ";
     //};
     //cout << endl;
-
+#endif
+#ifdef WITH_MPI
     if (core == 0) {
+#endif
       newSwarm.printopt(newSwarm, iter, cycle, freq);
+#ifdef WITH_MPI
     };
-
+#endif
     newSwarm.printpos(newSwarm, iter, cycle, freq);
   }; // done loop over iterations
-  //MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+#ifdef WITH_MPI
+  MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
+#endif
+#ifdef WITH_MPI
   if (core == 0) {
+#endif
     cout << "Training completed successfuly!\n";
     cout << "Total ReaxFF calls: " << funceval << endl;
     cout << "Global best ReaxFF fit: " << newSwarm.get_gbfit() << endl;
@@ -1700,7 +1380,9 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       cout << newSwarm.get_gbpos().at(m) << " ";
     };
     cout << " ]" << endl;
+#ifdef WITH_MPI
   };
+#endif
   //cout << "Total skipped particles: " << maxiters*NumP - funceval << endl;
 
   // general clean-up
@@ -1715,6 +1397,21 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
   //cout << "I'm in write_ffield_gbest!" << endl;
   // cp current ffield to be the global best and current analysis files to global best analysis files
+#ifndef WITH_MPI
+  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+    "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/fort.99",
+    "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/fort.74",
+    "thermo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/fort.90",
+    "molgeo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/fort.73",
+    "partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/current_dipole.out" ,
+  //  "dipole.out"+itercount,boost::filesystem::copy_option::overwrite_if_exists);
+#endif
+#ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
   string str_core = std::to_string(core);
@@ -1733,6 +1430,7 @@ void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
     "partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/current_dipole.out" ,
   //  "dipole.out"+itercount,boost::filesystem::copy_option::overwrite_if_exists);
+#endif
 };
 
 vector < double > Swarm::get_gbpos() {
@@ -1770,11 +1468,17 @@ void Swarm::printopt(Swarm & newSwarm, int iter, int cycle, int fr) {
 
 void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
+#ifdef WITH_MPI
   string str_core = std::to_string(core);
   boost::filesystem::create_directory("CPU." + str_core + "/pos");
   const char * path = "/pos/pos_log.out.";
   ofstream outfilepos("CPU." + str_core + path + std::to_string(cycle), ofstream::app);
-
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::create_directory("pos");
+  const char * path = "/pos/pos_log.out.";
+  ofstream outfilepos(path + std::to_string(cycle), ofstream::app);
+#endif
   if (mod(iter, fr) == 0.0) {
     outfilepos << "#Timestep: " << iter << endl;
 
@@ -1793,11 +1497,17 @@ void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
 
 void Swarm::printvel(Swarm & newSwarm, int iter, int cycle, int fr) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
+#ifdef WITH_MPI
   string str_core = std::to_string(core);
   boost::filesystem::create_directory("CPU." + str_core + "/vel");
   const char * pathvel = "./vel/vel_opti.out.";
   ofstream outfilevel(pathvel + std::to_string(cycle), ofstream::app);
-
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::create_directory("vel");
+  const char * pathvel = "./vel/vel_opti.out.";
+  ofstream outfilevel(pathvel + std::to_string(cycle), ofstream::app);
+#endif
   if (mod(iter, fr) == 0.0) {
     outfilevel << "#iter: " << iter << endl;
 
@@ -1813,11 +1523,19 @@ void Swarm::printvel(Swarm & newSwarm, int iter, int cycle, int fr) {
 };
 
 void Swarm::printdeg(Swarm & newSwarm, int iter, int cycle, int fr) {
+#ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
   boost::filesystem::create_directory("CPU." + str_core + "/deg");
   const char * pathdeg = "./deg/deg_opti.out.";
   ofstream outfiledeg(pathdeg + std::to_string(cycle), ofstream::app);
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  boost::filesystem::create_directory("deg");
+  const char * pathdeg = "./deg/deg_opti.out.";
+  ofstream outfiledeg(pathdeg + std::to_string(cycle), ofstream::app);
+#endif
   if (dim >= 2) {
     if (mod(iter, fr) == 0.0) {
       outfiledeg << "#iter: " << iter << endl;
