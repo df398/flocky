@@ -17,6 +17,7 @@
 #pragma once
 #ifndef PAR_H
 #define PAR_H
+#include <stdio.h>
 #include <ctime>
 #include <iostream>
 #include <fstream>
@@ -34,6 +35,7 @@
 # define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 # undef BOOST_NO_CXX11_SCOPED_ENUMS
+#include <regex>
 #ifdef WITH_MPI
 #include <mpi.h>
 #endif
@@ -50,8 +52,14 @@ extern bool chang;
 extern bool lg_yn;
 extern bool contff;
 extern bool fixcharges;
+extern bool ofit;
+extern bool uq;
+extern bool gbfitfound;
+extern bool printonce;
+extern bool firstovfit;
 extern int freq;
 extern double levyscale;
+extern int parid_gbfit;
 extern int faili;
 extern int iter;
 extern int maxiters;
@@ -109,7 +117,7 @@ class Par { // declaration of a particle
 
   private:
 
-    vector < double > pos; // vector of position components of a particle
+  vector < double > pos; // vector of position components of a particle
   vector < double > vel; // vector of velocity components of a particle
   vector < double > bpos; // particle's best own position
 
@@ -126,15 +134,22 @@ class Swarm { // declaration of a Swarm
   };
 
   Par & GetPar(int ParID);
+  void get_userinp();
   void AddPar(Par & newPar);
   void Populate(Swarm & newSwarm, int iter);
   void Propagate(Swarm & newSwarm, int iter);
+  void printdisp(Swarm & newSwarm, int timestep, int iter, int fr);
   void printopt(Swarm & newSwarm, int timestep, int iter, int fr);
   void printpos(Swarm & newSwarm, int timestep, int iter, int fr);
+  void printUQFF(Swarm & newSwarm, int timestep, int iter, int fr);
+  void printUQQoI(Swarm & newSwarm, int timestep, int iter, int fr);
   void printvel(Swarm & newSwarm, int timestep, int iter, int fr);
   void printdeg(Swarm & newSwarm, int timestep, int iter, int fr);
   void write_ffield_gbest(int core, int cycle, int iter, int par);
+  void detovfit(Swarm & newSwram, int cpuid_gbfit, int cycle, int iter, int parID);
   vector < double > get_gbpos();
+  vector <double> get_com(Swarm newSwarm);
+  double get_disp(Swarm newSwarm); 
   void update_gbpos(Par & newPar);
   double get_gbfit();
   void set_gbfit(double bfit);

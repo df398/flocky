@@ -34,11 +34,19 @@ int cycle = 0;
 int maxcycles = 1;
 int iter = 0;
 int maxiters = 0;
+int parid_gbfit = 0;
 bool fixcharges = false;
 bool lg_yn = false;
 bool contff = false;
 bool chang = false;
 bool perc_yn = true;
+bool ofit = false;
+bool uq = false;
+bool gbfitfound = false;
+bool firstovfit = true;
+double ovfitness = 0.0;
+double currovfitness = 0.0;
+double initial_disp = 0.0;
 double perc = 0.2;
 double c1 = 2.0;
 double c2 = 2.0;
@@ -48,6 +56,10 @@ double inertiamin = 0.4;
 double levyscale = 1.0;
 double confac = 1.0;
 int faili = 1;
+
+// --------------------------------------------------------------- //
+//             General functions definitions                       //
+// --------------------------------------------------------------- //
 
 // define int of modulo
 int mod(int x, int m) {
@@ -63,6 +75,9 @@ double l2_norm(vector < double > const & u) {
   }
   return sqrt(accum);
 };
+
+// --------------- End general functions definitions -------------- //
+
 
 Par::Par() {
 
@@ -99,11 +114,12 @@ void Par::read_ffield() {
 #endif
   if (fin.fail()) {
 #ifdef WITH_MPI
-    cout << "Unable to open 'ffield' file on CPU" << core << " \n";
+    cout << "Error: unable to open 'ffield' file on CPU" << core << " \n";
 #endif
 #ifndef WITH_MPI
     cout << "Unable to open 'ffield' file \n"; 
 #endif
+    fin.close();
     exit(EXIT_FAILURE);
   } else {
     std::string line;
@@ -125,6 +141,7 @@ void Par::read_ffield() {
       ffieldmat.push_back(lineData);
 
     };
+    fin.close();
   };
 };
 
@@ -165,6 +182,7 @@ void Par::write_ffield(int cycle, int iter, int par) {
   while (getline(ffield_file, comment)) {
     ffield_lines.push_back(comment);
   };
+  ffield_file.close();
   /* -------------------------------------
    * WRITE HEADER LINE FOR FFIELD
    * -------------------------------------
@@ -410,8 +428,9 @@ void Par::write_ffield(int cycle, int iter, int par) {
     };
     output_file << f << endl;
   };
+
   output_file.close();
-  ffield_file.close();
+
   // replace ffield file with the new ffield (ffield.tmp.cycle.iter.parid)
   boost::filesystem::path pwd(boost::filesystem::current_path());
 #ifdef WITH_MPI
@@ -458,6 +477,7 @@ void Par::write_ffield_lg(int cycle, int iter, int par) {
   while (getline(ffield_file, comment)) {
     ffield_lines.push_back(comment);
   };
+  ffield_file.close();
 
   /* -------------------------------------
    * WRITE HEADER LINE FOR FFIELD
@@ -749,7 +769,7 @@ void Par::write_ffield_lg(int cycle, int iter, int par) {
   };
 
   output_file.close();
-  ffield_file.close();
+
   // replace ffield file with the new ffield (ffield.tmp.cycle.iter.parid)
   boost::filesystem::path pwd(boost::filesystem::current_path());
 #ifdef WITH_MPI
@@ -772,19 +792,12 @@ void Par::read_bounds() {
   // following: https://stackoverflow.com/questions/10521658/reading-files-columns-into-array
 
   std::vector < std::vector < double > > allData;
-#ifdef WITH_MPI
   string str_core = std::to_string(core);
-  std::ifstream fin(("CPU." + str_core + "/params.mod").c_str());
-  if (fin.fail()) {
-    cout << "Unable to open parameters file 'params.mod' on CPU " << core << ". \n";
-    exit(EXIT_FAILURE);
-#endif
-#ifndef WITH_MPI
   std::ifstream fin("params.mod");
   if (fin.fail()) {
-    cout << "Unable to open parameters file 'params.mod'. \n";
+    cout << "Unable to open parameters file 'params.mod' on CPU " << core << ". \n";
+    fin.close();
     exit(EXIT_FAILURE);
-#endif
   } else {
     std::string line;
     int numlines = 0;
@@ -804,6 +817,7 @@ void Par::read_bounds() {
       // add row to allData
       allData.push_back(lineData);
     };
+    fin.close();
 
     dim = numlines;
 
@@ -817,8 +831,7 @@ void Par::read_bounds() {
         // read column number of parameter from modified params file
         ffcol.push_back(allData[i][1]-1);
       };
-
-    }else{
+    } else {
       for (int i=0; i<dim; i++){
         // read line number of parameter from modified params file
         ffline.push_back(allData[i][0]-1);
@@ -922,7 +935,6 @@ void Par::update_vel(double inertiaf, double CF, vector < double > globpos, doub
   double r2 = dist1(generator);
 
   for (int v = 0; v < dim; v++) {
-
     // velocity update with perturbations
     vel.at(v) = CF * (inertiaf * vel.at(v) + c1 * r1 * (bpos.at(v) - pos.at(v)) + c2 * r2 * (globpos.at(v) - pos.at(v)));
 
@@ -969,19 +981,21 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
 
   // count total # func evaluations
   funceval = funceval + 1;
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_parID,
-    pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
+
+  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
+     pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+
   // check if ffield is LG or not. execute correct reac accordingly.
   if (lg_yn == true) {
     write_ffield_lg(cycle, iter, parid);
     std::ifstream fin5(("CPU." + str_core + "/reac_lg").c_str());
     if (fin5.fail()) {
       cout << "reac_lg executable not found for CPU " + str_core + ". Aborting! \n";
+      fin5.close();
       exit(EXIT_FAILURE);
     }
+    fin5.close();
     // prepare mandatory files before executing reac_lg in each CPU directory
-    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
-      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
@@ -997,21 +1011,21 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     boost::filesystem::current_path(p);
 
     // execute reac within each CPU.x directory
-    boost::process::system("./reac_lg", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
+    system("./reac_lg > /dev/null 2>&1");
     // cd back to main directory
     boost::filesystem::path p2(old_path);
     boost::filesystem::current_path(p2);
   } else {
-    write_ffield(cycle, iter, parid);
-    std::ifstream fin6(("CPU." + str_core + "/reac").c_str());
-    if (fin6.fail()) {
-      cout << "reac executable not found for CPU " + str_core + ". Aborting! \n";
-      exit(EXIT_FAILURE);
-    }
+      write_ffield(cycle, iter, parid);
+      std::ifstream fin6(("CPU." + str_core + "/reac").c_str());
+      if (fin6.fail()) {
+        cout << "reac executable not found for CPU " + str_core + ". Aborting! \n";
+        fin6.close();
+        exit(EXIT_FAILURE);
+      }
+      fin6.close();
 
     // prepare mandatory files before executing reac in each CPU directory
-    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
-      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
@@ -1021,60 +1035,74 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
       pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
     };
 
-    double st2, et2, df2, smf2, avf2;
-    st2 = MPI_Wtime();
 
     // cd to each CPU.x directory
     string old_path = pwd.string();
     boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
     boost::filesystem::current_path(p);
+
     // execute reac within each CPU.x directory
-    boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
+    //system("./reac > run.log");
+    system("./reac > /dev/null 2>&1");
+    //boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null);
     // cd back to main directory
     boost::filesystem::path p2(old_path);
     boost::filesystem::current_path(p2);
 
-    et2 = MPI_Wtime();
-    df2 = et2 - st2;
-    //cout << "CPU time of reac: " << df2 << endl;
   };
 
   // read fitness value contained in fort.13 file
   string str;
-  boost::filesystem::ifstream myfile("CPU." + str_core + "/fort.13");
-  stringstream tempstr;
-  getline(myfile, str);
-  // insert str into stringstream tempstr
-  tempstr << str;
-  // get rid from extra whitespace in stringstream
-  tempstr >> std::ws;
-  // insert back to str
-  tempstr >> str;
-  // check if fitness is numeric or ****** 
-  if (str.at(0) == '*') {
+  if ( !boost::filesystem::exists( "CPU." + str_core + "/fort.13" ) )
+  {
     fitness = numeric_limits < double > ::infinity();
   } else {
-    // convert to double
-    fitness = stod(str);
+    boost::filesystem::ifstream file13("CPU." + str_core + "/fort.13");
+    stringstream tempstr;
+    getline(file13, str);
+    // insert str into stringstream tempstr
+    tempstr << str;
+    // get rid from extra whitespace in stringstream
+    tempstr >> std::ws;
+    // insert back to str
+    tempstr >> str;
+    // check if fitness is numeric or ******
+    if (str.at(0) == '*') {
+      fitness = numeric_limits < double > ::infinity();
+    } else {
+      // convert to double
+      fitness = stod(str);
+      file13.close();
+    };
+    boost::filesystem::remove( "CPU." + str_core + "/fort.13" );
   };
-  boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/fort.13");
-  	//boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
-  	  //pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
-  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
-  	  pwd.string()+"/CPU."+str_core+"/molgeo.out."+str_cycle+"."+str_iter, 
-            boost::filesystem::copy_option::overwrite_if_exists);
-  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.74" ,
-  	  pwd.string()+"/CPU."+str_core+"/thermo.out."+str_cycle+"."+str_iter, 
-            boost::filesystem::copy_option::overwrite_if_exists);
-  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.99" ,
-  	  pwd.string()+"/CPU."+str_core+"/results.out."+str_cycle+"."+str_iter, 
-           boost::filesystem::copy_option::overwrite_if_exists);
-  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
-  	  pwd.string()+"/CPU."+str_core+"/geo."+str_cycle+"."+str_iter+"."+str_parID, 
-           boost::filesystem::copy_option::overwrite_if_exists);
-  	boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.73" ,
-  	  pwd.string()+"/CPU."+str_core+"/partialE.out."+str_cycle+"."+str_iter, 
-           boost::filesystem::copy_option::overwrite_if_exists);
+
+
+  //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
+    //pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
+    //pwd.string()+"/CPU."+str_core+"/molgeo.out."+str_cycle+"."+str_iter, 
+    //boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.74" ,
+    //pwd.string()+"/CPU."+str_core+"/thermo.out."+str_cycle+"."+str_iter+"."+str_parID, 
+    //boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.99" ,
+    //pwd.string()+"/CPU."+str_core+"/results.out."+str_cycle+"."+str_iter+"."+str_parID, 
+    //boost::filesystem::copy_option::overwrite_if_exists);
+
+  // Note: do not update the geometry file during iterations. Each member should use one geo file throughout
+  // the training. Assuming we start with DFT_optimized (or sensible structures), and that we use some small
+  // number of structural minimizations (3-10), the sensible structures won't change much, so no need to
+  // provide previous structure as initial structure for the next round of iteration - since momentarily bad
+  // parameters could completely destroy the structure and make the successive minimization work on a crazy
+  // structure.
+  // boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.90" ,
+  //   pwd.string()+"/CPU."+str_core+"/geo." + str_cycle + "." + str_parID, 
+  //     boost::filesystem::copy_option::overwrite_if_exists);
+
+  //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.73" ,
+    //pwd.string()+"/CPU."+str_core+"/partialE.out."+str_cycle+"."+str_iter+"."+str_parID, 
+    //boost::filesystem::copy_option::overwrite_if_exists);
   return fitness;
 #endif
 
@@ -1086,19 +1114,20 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
 
   // count total # func evaluations
   funceval = funceval + 1;
-  boost::filesystem::copy_file(pwd.string() + "/geo." + str_parID,
-    pwd.string() + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/geo." + str_cycle + "." + str_parID,
+    pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
   // check if ffield is LG or not. execute correct reac accordingly.
   if (lg_yn == true) {
     write_ffield_lg(cycle, iter, parid);
     std::ifstream fin5("reac_lg");
     if (fin5.fail()) {
       cout << "reac_lg executable not found. Aborting! \n";
+      fin5.close();
       exit(EXIT_FAILURE);
     }
+    fin5.close();
+
     // prepare mandatory files before executing reac_lg
-    boost::filesystem::copy_file(pwd.string() + "/geo",
-      pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
     boost::filesystem::copy_file(pwd.string() + "/ffield",
       pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
@@ -1109,16 +1138,19 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     };
 
     // execute reac
-    boost::process::system("./reac_lg", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
+    system("./reac_lg > /dev/null 2>&1"); 
   } else {
     write_ffield(cycle, iter, parid);
     std::ifstream fin6("reac");
     if (fin6.fail()) {
       cout << "reac executable not found. Aborting! \n";
+      fin6.close();
       exit(EXIT_FAILURE);
     }
+    fin6.close();
 
     // prepare mandatory files before executing reac
+
     boost::filesystem::copy_file(pwd.string() + "/geo",
       pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
@@ -1131,46 +1163,62 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     };
 
     // execute reac within each CPU.x directory
-    boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > stderr);
-
+    system("./reac > /dev/null 2>&1");
+    
   };
 
   // read fitness value contained in fort.13 file
   string str;
-  boost::filesystem::ifstream myfile("fort.13");
-  stringstream tempstr;
-  getline(myfile, str);
-  // insert str into stringstream tempstr
-  tempstr << str;
-  // get rid from extra whitespace in stringstream
-  tempstr >> std::ws;
-  // insert back to str
-  tempstr >> str;
-  // check if fitness is numeric or ******
-  if (str.at(0) == '*') {
+  if ( !boost::filesystem::exists("fort.13") )
+  {
     fitness = numeric_limits < double > ::infinity();
   } else {
-    // convert to double
-    fitness = stod(str);
+    boost::filesystem::ifstream file13("fort.13");
+    stringstream tempstr;
+    getline(file13, str);
+    // insert str into stringstream tempstr
+    tempstr << str;
+    // get rid from extra whitespace in stringstream
+    tempstr >> std::ws;
+    // insert back to str
+    tempstr >> str;
+    // check if fitness is numeric or ******
+    if (str.at(0) == '*') {
+      fitness = numeric_limits < double > ::infinity();
+    } else {
+      // convert to double
+      fitness = stod(str);
+    };
+    file13.close();
+    boost::filesystem::remove("fort.13");
   };
-  boost::filesystem::remove(pwd.string() + "/fort.13");
-        //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
-          //pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
-        boost::filesystem::copy_file(pwd.string() + "/fort.90" ,
-          pwd.string() + "/molgeo.out." + str_cycle + "." + str_iter,
-            boost::filesystem::copy_option::overwrite_if_exists);
-        boost::filesystem::copy_file(pwd.string() + "/fort.74" ,
-          pwd.string() + "/thermo.out." + str_cycle+"." + str_iter,
-            boost::filesystem::copy_option::overwrite_if_exists);
-        boost::filesystem::copy_file(pwd.string() + "/fort.99" ,
-          pwd.string() + "/results.out." + str_cycle+"." + str_iter,
-           boost::filesystem::copy_option::overwrite_if_exists);
-        boost::filesystem::copy_file(pwd.string() + "/fort.90" ,
-          pwd.string() + "/geo."+str_cycle+"." + str_iter + "." + str_parID,
-           boost::filesystem::copy_option::overwrite_if_exists);
-        boost::filesystem::copy_file(pwd.string() + "/fort.73" ,
-          pwd.string() + "/partialE.out." + str_cycle + "." + str_iter,
-           boost::filesystem::copy_option::overwrite_if_exists);
+
+  //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/dipole.out" ,
+    //pwd.string()+"/CPU."+str_core+"/current_dipole.out",boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/fort.90" ,
+     //pwd.string() + "/molgeo.out." + str_cycle + "." + str_iter,
+     //boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/fort.74" ,
+     //pwd.string() + "/thermo.out." + str_cycle+"." + str_iter + "." + str_parID,
+     //boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/fort.99" ,
+    //pwd.string() + "/results.out." + str_cycle+"." + str_iter + "." + str_parID,
+    //boost::filesystem::copy_option::overwrite_if_exists);
+
+    // Note: do not update the geometry file during iterations. Each member should use one geo file throughout
+    // the training. Assuming we start with DFT_optimized (or sensible structures), and that we use some small
+    // number of structural minimizations (3-10), the sensible structures won't change much, so no need to
+    // provide previous structure as initial structure for the next round of iteration - since momentarily bad
+    // parameters could completely destroy the structure and make the successive minimization work on a crazy
+    // structure.
+    // boost::filesystem::copy_file(pwd.string() + "/fort.90" ,
+    //   pwd.string() + "/geo."+str_cycle+"." + str_parID ,
+    //      boost::filesystem::copy_option::overwrite_if_exists);
+
+
+   //boost::filesystem::copy_file(pwd.string() + "/fort.73" ,
+     //pwd.string() + "/partialE.out." + str_cycle + "." + str_iter + "." + str_parID,
+     //boost::filesystem::copy_option::overwrite_if_exists);
   return fitness;
 #endif
 };
@@ -1207,6 +1255,250 @@ Swarm::Swarm() {
 
 };
 
+void Swarm::get_userinp(){
+#ifdef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  // prepare dirs for each CPU process
+  string str_core = std::to_string(core);
+  boost::filesystem::create_directory("CPU." + str_core);
+
+  if (core == 0){
+    vector <string> tempinput;
+    std::ifstream fin("inp_flocky.in");
+    if (fin.fail()) {
+      cout << "Unable to open 'inp_flocky.in' file \n";
+      fin.close();
+      exit(EXIT_FAILURE);
+    } else {
+      std::string line;
+      // for each line
+      tempinput.clear();
+      while (std::getline(fin, line)) {
+        boost::trim(line);
+        if ( line[0] == '#' || line == ""){
+          continue;
+        }else{
+          // create a new line to split
+          vector <string> values;
+          //std::istringstream lineStream(line);
+          using boost::is_any_of;
+          boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+          tempinput.push_back(values.at(0));
+        };
+      };
+      fin.close();
+    };
+
+    istringstream(tempinput.at(0)) >> lg_yn;
+    istringstream(tempinput.at(1)) >> contff;
+    istringstream(tempinput.at(2)) >> perc_yn;
+    istringstream(tempinput.at(3)) >> perc;
+    istringstream(tempinput.at(4)) >> ofit;
+    istringstream(tempinput.at(5)) >> uq;
+    istringstream(tempinput.at(6)) >> NumP;
+    NumP = int(floor(NumP / numcores));
+    istringstream(tempinput.at(7)) >> c1;
+    istringstream(tempinput.at(8)) >> c2;
+    istringstream(tempinput.at(9)) >> inertiamax;
+    istringstream(tempinput.at(10)) >> inertiamin; 
+    istringstream(tempinput.at(11)) >> faili;
+    istringstream(tempinput.at(12)) >> levyscale;
+    istringstream(tempinput.at(13)) >> freq;
+    istringstream(tempinput.at(14)) >> maxiters;
+    istringstream(tempinput.at(15)) >> maxcycles;
+  };  
+  // check if reaxff is set to run with fixed charges (=> require charges file)
+  boost::filesystem::ifstream charge_file("charges");
+  if (!charge_file.fail()) {
+    boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
+      boost::filesystem::copy_option::overwrite_if_exists);
+   fixcharges = true;
+  };
+  charge_file.close();
+
+  if (lg_yn == true){
+  boost::filesystem::copy_file(pwd.string() + "/reac-lg", pwd.string() + "/CPU." + str_core + "/reac-lg",
+    boost::filesystem::copy_option::overwrite_if_exists);
+  }else{
+  boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/CPU." + str_core + "/reac",
+    boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
+  boost::filesystem::copy_file(pwd.string() + "/ffield", pwd.string() + "/CPU." + str_core + "/ffield",
+    boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/control", pwd.string() + "/CPU." + str_core + "/control",
+    boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/geo", pwd.string() + "/CPU." + str_core + "/geo",
+    boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/trainset.in", pwd.string() + "/CPU." + str_core + "/trainset.in",
+    boost::filesystem::copy_option::overwrite_if_exists);
+
+  // create fort.20 file needed by reac and reac.lg
+  boost::filesystem::ofstream iopt_file(pwd.string() + "/CPU." + str_core + "/fort.20");
+  iopt_file << "0";
+  iopt_file.close();
+
+  // create fort.35 file needed by reac and reac.lg
+  ofstream fort35_file(pwd.string() + "/CPU." + str_core + "/fort.35");
+  fort35_file << "23434.1" << endl;
+  fort35_file.close();
+
+  // broadcast between all processes from process 0
+  // MPI_Bcast must be visible to all processes!
+  MPI_Bcast( & lg_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & contff, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & NumP, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & c1, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & c2, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & inertiamax, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & inertiamin, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & faili, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & levyscale, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & maxiters, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & freq, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & maxcycles, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & perc_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & perc, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & ofit, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+#endif
+
+#ifndef WITH_MPI
+    vector <string> tempinput;
+    std::ifstream fin("inp_flocky.in");
+    if (fin.fail()) {
+      cout << "Unable to open 'inp_flocky.in' file \n";
+      fin.close();
+      exit(EXIT_FAILURE);
+    } else {
+      std::string line;
+      // for each line
+      tempinput.clear();
+      while (std::getline(fin, line)) {
+        boost::trim(line);
+        if ( line[0] == '#' || line == ""){
+          continue;
+        }else{
+          // create a new line to split
+          vector <string> values;
+          //std::istringstream lineStream(line);
+          using boost::is_any_of;
+          boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+          tempinput.push_back(values.at(0));
+        };
+      };
+      fin.close();
+    };
+
+    istringstream(tempinput.at(0)) >> lg_yn;
+    istringstream(tempinput.at(1)) >> contff;
+    istringstream(tempinput.at(2)) >> perc_yn;
+    istringstream(tempinput.at(3)) >> perc;
+    istringstream(tempinput.at(4)) >> ofit;
+    istringstream(tempinput.at(5)) >> uq;
+    istringstream(tempinput.at(6)) >> NumP;
+    istringstream(tempinput.at(7)) >> c1;
+    istringstream(tempinput.at(8)) >> c2;
+    istringstream(tempinput.at(9)) >> inertiamax;
+    istringstream(tempinput.at(10)) >> inertiamin;
+    istringstream(tempinput.at(11)) >> faili;
+    istringstream(tempinput.at(12)) >> levyscale;
+    istringstream(tempinput.at(13)) >> freq;
+    istringstream(tempinput.at(14)) >> maxiters;
+    istringstream(tempinput.at(15)) >> maxcycles;
+
+  // check if reaxff runs with fixed charges (= require charges file)
+  boost::filesystem::ifstream charge_file("charges");
+  if (!charge_file.fail()) {
+    fixcharges = true;
+  };
+  charge_file.close();
+
+  // create fort.20 file needed by reac and reac.lg
+  boost::filesystem::ofstream iopt_file("fort.20");
+  iopt_file << "0";
+  iopt_file.close();
+
+  // create fort.35 file needed by reac and reac.lg
+  ofstream fort35_file("fort.35");
+  fort35_file << "23434.1" << endl;
+  fort35_file.close();
+
+#endif
+};
+
+vector <double> Swarm::get_com(Swarm newSwarm) {
+ vector <double> swarmcom(dim, 0.0);
+ double sumpos = 0.0;
+ double totsumpos = 0.0;
+#ifdef WITH_MPI
+ //NumP = numcores*NumP;
+ for (int m = 0; m < dim; m++){
+   for (int p = 0; p < NumP; p++){
+     sumpos = sumpos + 1.0/(float(NumP)*numcores)*newSwarm.GetPar(p).get_pos(m);
+   };
+   MPI_Allreduce( & sumpos,  & totsumpos, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+   swarmcom.at(m) = totsumpos;
+   sumpos = 0.0;
+   totsumpos = 0.0;
+#endif
+#ifndef WITH_MPI
+ for (int m = 0; m < dim; m++){
+   for (int p = 0; p < NumP; p++){
+     sumpos = sumpos + 1.0/(float(NumP)*newSwarm.GetPar(p).get_pos(m));
+   };
+   swarmcom.at(m) = sumpos;
+   sumpos = 0.0;
+#endif
+ };
+/* if (core == 0) {
+   cout << "com(0) on CPU: " << core << " is: " << swarmcom.at(0) << endl;
+   cout << "com(1) on CPU: " << core << " is: " << swarmcom.at(1) << endl;
+ };
+*/
+ return swarmcom;
+};
+
+double Swarm::get_disp(Swarm newSwarm) {
+  double swarm_dispersion = 0.0;
+  // define deviation vector between a swarm member and the center-of-mass
+  vector <double> deviation_vec(dim, 0.0);
+  double deviation = 0.0;
+  double totdeviation = 0.0;
+  // calculate deviation vector
+  for (int m = 0; m < dim; m++){
+   for (int p = 0; p < NumP; p++){
+     deviation = deviation + pow(newSwarm.GetPar(p).get_pos(m) - newSwarm.get_com(newSwarm).at(m),2);
+   };
+#ifdef WITH_MPI
+  MPI_Allreduce(& deviation, & totdeviation, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  deviation_vec.at(m) = sqrt(totdeviation);
+  deviation = 0.0;
+  totdeviation = 0.0;
+#endif
+#ifndef WITH_MPI
+  deviation_vec.at(m) = sqrt(deviation);
+  deviation = 0.0;
+#endif
+  };
+
+  // To calculate the median separation between swarm members and COM
+  // we first sort the array
+  int n = deviation_vec.size();
+  sort(deviation_vec.begin(), deviation_vec.end()); 
+  
+  // calculate median
+  // check for even case
+  if (n % 2 != 0) {
+    swarm_dispersion = deviation_vec.at(n/2.0);
+  }else{
+    swarm_dispersion = (deviation_vec.at((n-1)/2.0) + deviation_vec.at(n/2))/2.0;
+  };
+
+  return swarm_dispersion;
+};
+
 Par & Swarm::GetPar(int ParID) {
   return AllParticles[ParID];
 };
@@ -1239,52 +1531,44 @@ int Swarm::get_best(Swarm newSwarm) {
   return particle_id;
 };
 
+
 void Swarm::Populate(Swarm & newSwarm, int cycle) {
+#ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
   string itercount = std::to_string(cycle);
-#ifdef WITH_MPI
   if (core == 0) {
-#endif
-    cout << "\n";
-    cout << "Swarm generation started. Please wait." << endl;
-#ifdef WITH_MPI
+    boost::filesystem::ofstream log("log.flocky", ofstream::app);
+    log << "\n";
+    log << "Swarm generation started. Please wait." << endl;
+    log.close();
   };
-#endif
-  // initial gbfit is INF for all processes and all swarm members
-  gbfit = numeric_limits < double > ::infinity();
-  // initial gbpos is 0.0 for all processes and all swarm members
-  gbpos.clear();
-  for (int m=0; m<dim; m++){
-    gbpos.push_back(0.0);
-  };
-#ifdef WITH_MPI
-  double starttime, endtime, diff, sumdiff, avgdiff;
-  starttime = MPI_Wtime();
-#endif
   // ---------------------------------------------- //
   //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
   // ---------------------------------------------- //
+
+    // initial gbfit is INF for all processes and all swarm members
+    gbfit = numeric_limits < double > ::infinity();
+    // initial gbpos is 0.0 for all processes and all swarm members
+    gbpos.clear();
+    for (int m=0; m < dim; m++){
+      gbpos.push_back(0.0);
+    };
+
   for (int p = 0; p < NumP; p++) {
     string parID = std::to_string(p);
-#ifdef WITH_MPI
+    string str_cycle = std::to_string(cycle);
+
     // cp geo to geo.parID so each particle works with its own geo file
-    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo", 
-      pwd.string() + "/CPU." + str_core + "/geo." + parID, 
+    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
+      pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + parID,
         boost::filesystem::copy_option::overwrite_if_exists);
-#endif
-#ifndef WITH_MPI
-    // cp geo to geo.parID so each particle works with its own geo file
-    boost::filesystem::copy_file(pwd.string() + "/geo",
-      pwd.string() + "/geo." + parID,
-        boost::filesystem::copy_option::overwrite_if_exists);
-#endif
+
     Par NewPar;
     newSwarm.AddPar(NewPar);
-#ifdef WITH_MPI
+
     if (core == 0) {
-#endif
-      // If contff == y, then take force field's current values for the position of particle 0 (the rest are just random)
+      // If contff == y, then take force field's current values for the position of particle 0 (others are random)
       if (contff == true) {
         vector < double > ffpos;
         ffpos.clear();
@@ -1294,39 +1578,30 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
         newSwarm.GetPar(0).set_pos(ffpos);
       };
       contff = false;
-#ifdef WITH_MPI
     };
-#endif
-    // evaluate fitness and set personal best equal to fitness
+
+    // evaluate fitness and set bfit = curfit
     curfit = newSwarm.GetPar(p).eval_fitness(cycle, 0, p);
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
-
-    //cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
-    //cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
-    //for (int m=0; m<dim; m++){
-    //  cout << newSwarm.GetPar(p).get_pos(m) << " ";
-    //};
-    //cout << endl;
 
     if (curfit < gbfit) {
       gbfit = curfit;
       gbpos.clear();
       gbpos = newSwarm.GetPar(p).get_pos_vec();
-#ifndef WITH_MPI
-      core = 0;
-#endif
       write_ffield_gbest(core, cycle, 0, p);
     };
-  }; // done loop over particles
-  //cout << "done with all particles" << endl;
-#ifdef WITH_MPI
+
+    // cleaning ffield.tmp.* files after write_ffield_gbest already
+    // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
+    boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
+  }; // done loop on members
+
   // pair struct to hold the global best fitness across processes and its core rank
   struct {
     double tmp_fit;
     int tmp_cpu;
   } min_vals_in[1], min_vals_out[1];
-
   // store current fit on each process
   min_vals_in[0].tmp_fit = gbfit;
   // store core id of that current process
@@ -1337,50 +1612,139 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   gbfit = min_vals_out[0].tmp_fit;
   // core rank the above fitness came from
   cpuid_gbfit = min_vals_out[0].tmp_cpu;
-  //cout << "gbfit for CPU " << core << " is: " << gbfit << endl;
   // broadcast contents of gbpos vector from rank cpuid_gbfit
   MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-  //cout << "gbpos for CPU " << core << " is: " << endl;
-  //for (int m=0; m<dim; m++){
-  //  cout << newSwarm.get_gbpos().at(m) << " ";
-  //};
-  //cout << endl;
 
-  //newSwarm.printopt(newSwarm, 0, cycle, 1);
-
-  endtime = MPI_Wtime();
-  diff = endtime - starttime;
-  MPI_Reduce( & diff, & sumdiff, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-  avgdiff = sumdiff / numcores;
-
-#endif
-#ifdef WITH_MPI
   if (core == 0) {
-#endif
+    // clean up any old files belonging to previous job
+    if ( boost::filesystem::exists( "opti_log.out." + std::to_string(cycle)) ){
+      boost::filesystem::remove( "opti_log.out." + std::to_string(cycle) );
+    };
+    if ( boost::filesystem::exists( "disp_log.out." + std::to_string(cycle)) ){
+      boost::filesystem::remove( "disp_log.out." + std::to_string(cycle) );
+    };
+
     newSwarm.printopt(newSwarm, 0, cycle, 1);
-    cout << "Swarm generation completed." << endl;
-    cout << "Initial global best fit: " << gbfit << endl;
-    cout << "flocky optimization started!" << endl;
-#ifdef WITH_MPI
+    boost::filesystem::ofstream log("log.flocky", ofstream::app);
+    log << "\nSwarm generation completed." << endl;
+    log << "Initial global best fit: " << gbfit << endl;
+    log << "flocky optimization started!" << endl;
+    log.close();
+  };
+
+  //newSwarm.printdisp(newSwarm, 0, cycle, 1);
+  newSwarm.printpos(newSwarm, 0, cycle, 1);
+  if (uq == true) {
+    newSwarm.printUQFF(newSwarm, 0, cycle, 1);
+    newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
   };
 #endif
+
+#ifndef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  string itercount = std::to_string(cycle);
+  boost::filesystem::ofstream log("log.flocky", ofstream::app);
+  log << "\n";
+  log << "Swarm generation started. Please wait." << endl;
+  log.close();
+
+  // ---------------------------------------------- //
+  //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
+  // ---------------------------------------------- //
+
+    // initial gbfit is INF
+    gbfit = numeric_limits < double > ::infinity();
+    // initial gbpos is 0.0
+    gbpos.clear();
+    for (int m=0; m < dim; m++){
+      gbpos.push_back(0.0);
+    };
+
+  for (int p = 0; p < NumP; p++) {
+    string parID = std::to_string(p);
+    string str_cycle = std::to_string(cycle);
+    
+    // cp geo to geo.parID so each particle works with its own geo file
+    boost::filesystem::copy_file(pwd.string() + "/geo",
+      pwd.string() + "/geo." + str_cycle + "." + parID,
+        boost::filesystem::copy_option::overwrite_if_exists);
+    
+    Par NewPar;
+    newSwarm.AddPar(NewPar);
+    
+    // If contff == y, then take force field's current values for the position of particle 0 (others are random)
+    if (contff == true) {
+      vector < double > ffpos;
+      ffpos.clear();
+      for (int m = 0; m < dim; m++) {
+        ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
+      };
+      newSwarm.GetPar(0).set_pos(ffpos);
+    };
+    contff = false;
+
+    // evaluate fitness and set bfit = curfit
+    curfit = newSwarm.GetPar(p).eval_fitness(cycle, 0, p);
+    newSwarm.GetPar(p).set_fitness(curfit);
+    newSwarm.GetPar(p).set_bfit(curfit);
+
+    if (curfit < gbfit) {
+      gbfit = curfit;
+      gbpos.clear();
+      gbpos = newSwarm.GetPar(p).get_pos_vec();
+      write_ffield_gbest(0, cycle, 0, p);
+    };
+    // cleaning ffield.tmp.* files after write_ffield_gbest already
+    // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
+    boost::filesystem::remove("ffield.tmp." + str_cycle + ".0." + "." + parID);
+  }; // done loop over members
+
+  //initial_disp = newSwarm.get_disp(newSwarm);
+
+  // clean up any old files belonging to previous job
+  if ( boost::filesystem::exists( "opti_log.out." + std::to_string(cycle)) ){
+    boost::filesystem::remove( "opti_log.out." + std::to_string(cycle) );
+  };
+  if ( boost::filesystem::exists( "disp_log.out." + std::to_string(cycle)) ){
+    boost::filesystem::remove( "disp_log.out." + std::to_string(cycle) );
+  };
+
+  newSwarm.printopt(newSwarm, 0, cycle, 1);
+  //boost::filesystem::ofstream log("log.flocky", ofstream::app);
+  log << "\nSwarm generation completed." << endl;
+  log << "Initial global best fit: " << gbfit << endl;
+  log << "flocky optimization started!" << endl;
+  log.close();
+
+  //newSwarm.printdisp(newSwarm, 0, cycle, 1);
+  newSwarm.printpos(newSwarm, 0, cycle, 1);
+  if (uq == true){
+    newSwarm.printUQFF(newSwarm, 0, cycle, 1);
+    newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
+  };
+#endif
+
 };
 
+
+
 void Swarm::Propagate(Swarm & newSwarm, int cycle) {
+#ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
 
   // ---------------------------------------------------------------- //
   //         PROPAGATE: main loop over iterations
   // ---------------------------------------------------------------- //
-  for (iter = 1; iter < maxiters+1; iter++) {
+  for (iter = 1; iter < maxiters; iter++) {
     inertiafac = inertiamax - iter * (inertiamax - inertiamin) / maxiters;
     //
     // main loop over swarm members
     //
     for (int p = 0; p < NumP; p++) {
       // Update velocities and positions
-      newSwarm.GetPar(p).update_vel(inertiafac, confac, newSwarm.get_gbpos(), iter);
+      newSwarm.GetPar(p).update_vel(inertiafac, confac, gbpos, iter);
+
       if (newSwarm.GetPar(p).fails > faili) {
         newSwarm.GetPar(p).update_pos_levy(gbpos, iter, inertiafac);
         newSwarm.GetPar(p).fails = 0;
@@ -1390,12 +1754,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 
       curfit = newSwarm.GetPar(p).eval_fitness(cycle, iter, p);
       newSwarm.GetPar(p).set_fitness(curfit);
-      //cout << "curfit for particle " << p << " for CPU " << core << " is: " << curfit << endl;
-      //cout << "pos for particle " << p << " for CPU " << core << " is: " << endl;
-      //for (int m=0; m<dim; m++){
-      //  cout << newSwarm.GetPar(p).get_pos(m) << " ";
-      //};
-      //cout << endl;
 
       // Update personal best positions and fitness
       if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
@@ -1403,19 +1761,27 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
         newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
         newSwarm.GetPar(p).fails = 0;
         if (newSwarm.GetPar(p).get_bfit() < gbfit) {
+          gbfitfound = true;
+          parid_gbfit = p;
           gbfit = newSwarm.GetPar(p).get_bfit();
           gbpos.clear();
           gbpos = newSwarm.GetPar(p).get_pos_vec();
-#ifndef WITH_MPI
-          core = 0;
-#endif
-	  write_ffield_gbest(core, cycle, iter, p);
+          write_ffield_gbest(core, cycle, iter, p);
         };
       } else {
+        gbfitfound = false;
         newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
       };
+      // cleaning ffield.tmp.* files after write_ffield_gbest already
+      // copied the correct ffield.tmp.* file as the ffield.gbest.*
+      string str_cycle = std::to_string(cycle);
+      string str_iter = std::to_string(iter);
+      string str_parID = std::to_string(p);
+      //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
     }; // done loop over swarm members
-#ifdef WITH_MPI
+
+    //newSwarm.get_com(newSwarm);
+
     // pair struct to hold the global best fitness across processes and its core rank
     struct {
       double tmp_fit;
@@ -1428,60 +1794,160 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     min_vals_in[0].tmp_cpu = core;
     // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
     MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+
+    // pair struct to hold the global best fitness across processes and its parID
+    // The parID is required in detection of overfitting to cp the correct ffield.gbest file
+    struct {
+      double tmp_fit2;
+      int tmp_parid;
+    } min_vals_in2[1], min_vals_out2[1];
+
+    // store current fit on each process
+    min_vals_in2[0].tmp_fit2 = gbfit;
+    // store par id of that current process
+    min_vals_in2[0].tmp_parid = parid_gbfit;
+    // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
+    MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+    // parid of the gbfit
+    parid_gbfit = min_vals_out2[0].tmp_parid;
+
+
     // global best fitness across all processes
     gbfit = min_vals_out[0].tmp_fit;
     // core rank the above fitness came from
     cpuid_gbfit = min_vals_out[0].tmp_cpu;
-    //cout << "gbfit for CPU " << core << " is: " << gbfit << endl;
     // broadcast contents of gbpos vector from rank cpuid_gbfit
     MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-    //cout << "gbpos for CPU " << core << " is: " << endl;
-    //for (int m=0; m<dim; m++){
-    //  cout << newSwarm.get_gbpos().at(m) << " ";
-    //};
-    //cout << endl;
-#endif
-#ifdef WITH_MPI
-    if (core == 0) {
-#endif
-      newSwarm.printopt(newSwarm, iter, cycle, freq);
-#ifdef WITH_MPI
+
+    if (ofit == true){
+      if (gbfitfound == true) {
+        // detect overfitting by evaluating fitness on validation set
+        if (core == cpuid_gbfit){
+          boost::filesystem::ofstream log("log.flocky", ofstream::app);
+          newSwarm.detovfit(newSwarm, cpuid_gbfit, cycle, iter, parid_gbfit);
+          log.close();
+        };
+        firstovfit = false;
+      };
+      MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, MPI_COMM_WORLD);
     };
-#endif
+
+    if (core == 0) {
+      newSwarm.printopt(newSwarm, iter, cycle, freq);
+    };
     newSwarm.printpos(newSwarm, iter, cycle, freq);
+    if (uq == true){
+      newSwarm.printUQFF(newSwarm, iter, cycle, freq);
+      newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
+    };
+    //newSwarm.printdisp(newSwarm, iter, cycle, freq);
+
   }; // done loop over iterations
-#ifdef WITH_MPI
+
   MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
-#endif
-#ifdef WITH_MPI
   if (core == 0) {
-#endif
-    cout << "Training completed successfuly!\n";
-    cout << "Total ReaxFF calls: " << funceval << endl;
-    cout << "Global best ReaxFF fit: " << newSwarm.get_gbfit() << endl;
-    cout << "Global best ReaxFF parameters:" << endl;
-    cout << "[ ";
+    boost::filesystem::ofstream log("log.flocky", ofstream::app);
+    log << "\nTraining completed successfuly!\n";
+    log << "Total ReaxFF calls: " << funceval << endl;
+    log << "Global best ReaxFF fit: " << newSwarm.get_gbfit() << endl;
+    log << "Global best ReaxFF parameters:" << endl;
+    log << "[ ";
     for (int m = 0; m < dim; m++) {
-      cout << newSwarm.get_gbpos().at(m) << " ";
+      log << newSwarm.get_gbpos().at(m) << " ";
     };
-    cout << " ]" << endl;
-#ifdef WITH_MPI
+    log << "]" << endl;
+    log.close();
   };
 #endif
-  //cout << "Total skipped particles: " << maxiters*NumP - funceval << endl;
 
-  // general clean-up
-  	/*boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_results.out");
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_thermo.out");
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_molgeo.out");
-  	boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_partialE.out");
-  	//boost::filesystem::remove(pwd.string()+"/CPU."+str_core+"/current_dipole.out");
-       */
+#ifndef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  string str_core = std::to_string(core);
+
+  // ---------------------------------------------------------------- //
+  //         PROPAGATE: main loop over iterations
+  // ---------------------------------------------------------------- //
+  for (iter = 1; iter < maxiters; iter++) {
+    inertiafac = inertiamax - iter * (inertiamax - inertiamin) / maxiters;
+    //
+    // main loop over swarm members
+    //
+    for (int p = 0; p < NumP; p++) {
+      // Update velocities and positions
+      newSwarm.GetPar(p).update_vel(inertiafac, confac, gbpos, iter);
+
+      if (newSwarm.GetPar(p).fails > faili) {
+        newSwarm.GetPar(p).update_pos_levy(gbpos, iter, inertiafac);
+        newSwarm.GetPar(p).fails = 0;
+      } else {
+        newSwarm.GetPar(p).update_pos();
+      };
+      curfit = newSwarm.GetPar(p).eval_fitness(cycle, iter, p);
+      newSwarm.GetPar(p).set_fitness(curfit);
+
+      // Update personal best positions and fitness
+      if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
+        newSwarm.GetPar(p).update_bpos();
+        newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
+        newSwarm.GetPar(p).fails = 0;
+        if (newSwarm.GetPar(p).get_bfit() < gbfit) {
+          gbfitfound = true;
+          parid_gbfit = p;
+          gbfit = newSwarm.GetPar(p).get_bfit();
+          gbpos.clear();
+          gbpos = newSwarm.GetPar(p).get_pos_vec();
+	  write_ffield_gbest(0, cycle, iter, p);
+        };
+      } else {
+        gbfitfound = false;
+        newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
+      };
+      // cleaning ffield.tmp.* files after write_ffield_gbest already
+      // copied the correct ffield.tmp.* file as the ffield.gbest.*
+      string str_cycle = std::to_string(cycle);
+      string str_iter = std::to_string(iter);
+      string str_parID = std::to_string(p);
+      //boost::filesystem::remove(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
+    }; // done loop over swarm members
+
+    //newSwarm.get_com(newSwarm);
+   
+    if (ofit == true) {
+      if (gbfitfound == true){
+        // detect overfitting by evaluating fitness on validation set
+        newSwarm.detovfit(newSwarm, 0, cycle, iter, parid_gbfit);
+        firstovfit = false;
+      };
+    };
+
+    newSwarm.printopt(newSwarm, iter, cycle, freq);
+    newSwarm.printpos(newSwarm, iter, cycle, freq);
+    if (uq == true){
+      newSwarm.printUQFF(newSwarm, iter, cycle, freq);
+      newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
+    };
+    //newSwarm.printdisp(newSwarm, iter, cycle, freq);
+  }; // done loop over iterations
+
+  if (core == 0) {
+    boost::filesystem::ofstream log("log.flocky", ofstream::app);
+    log << "\nTraining completed successfuly!\n";
+    log << "Total ReaxFF calls: " << funceval << endl;
+    log << "Global best ReaxFF fit: " << newSwarm.get_gbfit() << endl;
+    log << "Global best ReaxFF parameters:" << endl;
+    log << "[ ";
+    for (int m = 0; m < dim; m++) {
+      log << newSwarm.get_gbpos().at(m) << " ";
+    };
+    log << "]" << endl;
+    log.close();
+  //cout << "Total skipped particles: " << maxiters*NumP - funceval << endl;
+  };
+#endif
 };
 
 void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
-  //cout << "I'm in write_ffield_gbest!" << endl;
   // cp current ffield to be the global best and current analysis files to global best analysis files
 #ifndef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
@@ -1489,21 +1955,21 @@ void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
   string str_iter = std::to_string(iter);
   string str_parID = std::to_string(par);
 
-  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
-    "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID,
+    "ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID, boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/fort.99",
     "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/fort.74",
-    "thermo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/fort.90",
-    "molgeo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/fort.73",
-    "partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/fort.74",
+    //"thermo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/fort.90",
+    //"molgeo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/fort.73",
+    //"partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   //boost::filesystem::copy_file(pwd.string() + "/current_dipole.out" ,
   //  "dipole.out"+itercount,boost::filesystem::copy_option::overwrite_if_exists);
 
   // clean temp files
-  boost::filesystem::remove(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
+  //boost::filesystem::remove(pwd.string() + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
 #endif
 #ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
@@ -1516,17 +1982,242 @@ void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
     "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.99",
     "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.74",
-    "thermo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.90",
-    "molgeo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.73",
-    "partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.74",
+    //"thermo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.90",
+    //"molgeo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  //boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.73",
+    //"partialE.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/current_dipole.out" ,
   //  "dipole.out"+itercount,boost::filesystem::copy_option::overwrite_if_exists);
 
   // clean temp files
-  boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
+  //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
+#endif
+};
+
+void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int parid_gbfit) {
+#ifdef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  string str_core = std::to_string(cpuid_gbfit);
+  string str_cycle = std::to_string(cycle);
+  string str_iter = std::to_string(iter);
+  string str_parID = std::to_string(parid_gbfit);
+  // prepare mandatory files for reaxff in 'testovfit' directory
+  if (firstovfit == true) {
+      boost::filesystem::create_directory("testovfit");
+      boost::filesystem::copy_file(pwd.string() + "/ffield.initial." + str_cycle,
+        pwd.string() + "/testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  } else {
+    boost::filesystem::copy_file(pwd.string() + "/ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID,
+      pwd.string() + "/testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
+  boost::filesystem::copy_file(pwd.string() + "/geo.val",
+    pwd.string() + "/testovfit/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+
+  if (fixcharges == true){
+    boost::filesystem::copy_file(pwd.string() + "/charges_val",
+      pwd.string() + "/testovfit/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
+  boost::filesystem::copy_file(pwd.string() + "/control", pwd.string() + "/testovfit/control",
+    boost::filesystem::copy_option::overwrite_if_exists);
+
+  boost::filesystem::copy_file(pwd.string() + "/valset.in", pwd.string() + "/testovfit/trainset.in",
+    boost::filesystem::copy_option::overwrite_if_exists);
+
+  boost::filesystem::ofstream iopt_file(pwd.string() + "/testovfit/fort.20");
+  iopt_file << "0";
+  iopt_file.close();
+  ofstream outfile35(pwd.string() + "/testovfit/fort.35");
+  outfile35 << "23434.1" << endl;
+  outfile35.close();
+
+  // cd to testovfit directory
+  string old_path = pwd.string();
+  boost::filesystem::path p(pwd.string() + "/testovfit");
+  boost::filesystem::current_path(p);
+
+  if (lg_yn == true) {
+    // execute reac or reac_lg
+    boost::filesystem::copy_file(pwd.string() + "/reac_lg", pwd.string() + "/testovfit/reac_lg",
+    boost::filesystem::copy_option::overwrite_if_exists);
+    system("./reac_lg > /dev/null 2>&1");
+  } else {
+    boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
+    boost::filesystem::copy_option::overwrite_if_exists);
+    system("./reac > /dev/null 2>&1");
+  };
+
+  // cd back to main directory
+  boost::filesystem::path p2(old_path);
+  boost::filesystem::current_path(p2);
+
+  // read fitness value contained in newly generated fort.13 file
+  string str;
+  boost::filesystem::ifstream myfile("testovfit/fort.13");
+  stringstream tempstr;
+  tempstr.str("");
+  getline(myfile, str);
+  // insert str into stringstream tempstr
+  tempstr << str;
+  // get rid from extra whitespace in stringstream
+  tempstr >> std::ws;
+  // insert back to str
+  tempstr >> str;
+  // check if fitness is numeric or ******
+  if (str.at(0) == '*') {
+    currovfitness = numeric_limits < double > ::infinity();
+  } else {
+    // convert to double
+    currovfitness = stod(str);
+  };
+  myfile.close();
+  boost::filesystem::remove( "testovfit/fort.13" );
+  if (firstovfit == true) {
+  //  cout << "firstovfit is true" << endl;
+  ovfitness = currovfitness;
+  };
+  //cout << "firstovfit on CPU: " << core << " is: " << firstovfit << endl;
+
+    //cout << "current over-fitting fitness: " << currovfitness << endl;
+    //cout << "previous over-fitting fitness: " << ovfitness << endl;
+
+  //if (currovfitness > ovfitness) {
+    //cout << "\nOverfitting detected! current fitness: " << currovfitness << "> previous fitness: " << ovfitness << endl;
+    //cout << "Early-stopping ReaxFF optimization.\n";
+    //cout << "Training completed successfuly!\n";
+    //cout << "Total ReaxFF calls: " << funceval << endl;
+    //cout << "Global best ReaxFF fit: " << newSwarm.get_gbfit() << endl;
+    //cout << "Global best ReaxFF parameters:\n";
+    //cout << "[ ";
+    //for (int m = 0; m < dim; m++) {
+    //  cout << newSwarm.get_gbpos().at(m) << " ";
+    //};
+    //cout << "]" << endl;
+    //ierr = MPI_Finalize();
+    //exit(EXIT_SUCCESS);
+    ofstream outfileovfit("overfit.out." + std::to_string(cycle), ofstream::app);
+    stringstream ss3;
+    ss3 << boost::format("%5i %25.4f") %iter %currovfitness;
+    outfileovfit << ss3.str();
+    ss3.str("");
+    outfileovfit << endl;
+    outfileovfit.close();
+  //}else{
+   //ovfitness = currovfitness;
+  //};
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  string str_cycle = std::to_string(cycle);
+  string str_iter = std::to_string(iter);
+  string str_parID = std::to_string(parid_gbfit);
+  // prepare mandatory files for reaxff in 'testovfit' directory
+  if (firstovfit == true) {
+      boost::filesystem::create_directory("testovfit");
+      boost::filesystem::copy_file(pwd.string() + "/ffield.initial." + str_cycle,
+        pwd.string() + "/testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  } else {
+    boost::filesystem::copy_file(pwd.string() + "/ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID,
+      pwd.string() + "/testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
+  boost::filesystem::copy_file(pwd.string() + "/geo.val",
+    pwd.string() + "/testovfit/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+
+  if (fixcharges == true){
+    boost::filesystem::copy_file(pwd.string() + "/charges_val",
+      pwd.string() + "/testovfit/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
+  boost::filesystem::copy_file(pwd.string() + "/control", pwd.string() + "/testovfit/control",
+    boost::filesystem::copy_option::overwrite_if_exists);
+
+  boost::filesystem::copy_file(pwd.string() + "/valset.in", pwd.string() + "/testovfit/trainset.in",
+    boost::filesystem::copy_option::overwrite_if_exists);
+
+  boost::filesystem::ofstream iopt_file(pwd.string() + "/testovfit/fort.20");
+  iopt_file << "0";
+  iopt_file.close();
+  ofstream outfile35(pwd.string() + "/testovfit/fort.35");
+  outfile35 << "23434.1" << endl;
+  outfile35.close();
+
+  // cd to testovfit directory
+  string old_path = pwd.string();
+  boost::filesystem::path p(pwd.string() + "/testovfit");
+  boost::filesystem::current_path(p);
+  if (lg_yn == true) {
+    // execute reac or reac_lg
+    boost::filesystem::copy_file(pwd.string() + "/reac_lg", pwd.string() + "/testovfit/reac_lg",
+    boost::filesystem::copy_option::overwrite_if_exists);
+    system("./reac_lg > /dev/null 2>&1");
+  } else {
+    boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
+    boost::filesystem::copy_option::overwrite_if_exists);
+    system("./reac > /dev/null 2>&1");
+  };
+
+  // cd back to main directory
+  boost::filesystem::path p2(old_path);
+  boost::filesystem::current_path(p2);
+
+  // read fitness value contained in newly generated fort.13 file
+  string str;
+  boost::filesystem::ifstream myfile("testovfit/fort.13");
+  stringstream tempstr;
+  tempstr.str("");
+  getline(myfile, str);
+  // insert str into stringstream tempstr
+  tempstr << str;
+  // get rid from extra whitespace in stringstream
+  tempstr >> std::ws;
+  // insert back to str
+  tempstr >> str;
+  // check if fitness is numeric or ******
+  if (str.at(0) == '*') {
+    currovfitness = numeric_limits < double > ::infinity();
+  } else {
+    // convert to double
+    currovfitness = stod(str);
+  };
+  myfile.close();
+  boost::filesystem::remove( "testovfit/fort.13" );
+  if (firstovfit == true) {
+  //  cout << "firstovfit is true" << endl;
+  ovfitness = currovfitness;
+  };
+  //cout << "firstovfit on CPU: " << core << " is: " << firstovfit << endl;
+
+    //cout << "current over-fitting fitness: " << currovfitness << endl;
+    //cout << "previous over-fitting fitness: " << ovfitness << endl;
+
+  //if (currovfitness > ovfitness) {
+    //cout << "\nOverfitting detected! current fitness: " << currovfitness << "> previous fitness: " << ovfitness << endl;
+    //cout << "Early-stopping ReaxFF optimization.\n";
+    //cout << "Training completed successfuly!\n";
+    //cout << "Total ReaxFF calls: " << funceval << endl;
+    //cout << "Global best ReaxFF fit: " << newSwarm.get_gbfit() << endl;
+    //cout << "Global best ReaxFF parameters:\n";
+    //cout << "[ ";
+    //for (int m = 0; m < dim; m++) {
+    //  cout << newSwarm.get_gbpos().at(m) << " ";
+    //};
+    //cout << "]" << endl;
+    //ierr = MPI_Finalize();
+    //exit(EXIT_SUCCESS);
+    ofstream outfileovfit("overfit.out." + std::to_string(cycle), ofstream::app);
+    stringstream ss3;
+    ss3 << boost::format("%5i %25.4f") %iter %currovfitness;
+    outfileovfit << ss3.str();
+    ss3.str("");
+    outfileovfit << endl;
+    outfileovfit.close();
+  //}else{
+   //ovfitness = currovfitness;
+  //};
 #endif
 };
 
@@ -1538,8 +2229,8 @@ double Swarm::get_gbfit() {
   return gbfit;
 };
 
-void Swarm::set_gbfit(double bfit) {
-  gbfit = bfit;
+void Swarm::set_gbfit(double fit) {
+  gbfit = fit;
 };
 
 void Swarm::update_gbpos(Par & newPar) {
@@ -1548,20 +2239,195 @@ void Swarm::update_gbpos(Par & newPar) {
     gbpos.push_back(newPar.get_bpos(j));
   };
 };
-void Swarm::printopt(Swarm & newSwarm, int iter, int cycle, int fr) {
-  //boost::filesystem::path pwd(boost::filesystem::current_path());
-  //string str_core = std::to_string(core);
-  //boost::filesystem::create_directory("CPU." + str_core + "/pos");
-  //const char * path = "opti_log.out.";
-  ofstream outfileopt("opti_log.out." + std::to_string(cycle), ofstream::app);
 
+void Swarm::printdisp(Swarm & newSwarm, int iter, int cycle, int fr) {
+#ifdef WITH_MPI
+ ofstream outfiledisp("disp_log.out." + std::to_string(cycle), ofstream::app);
+ if (mod(iter, fr) == 0.0) {
+   stringstream ss;
+   ss << boost::format("%5i %15.4f") %iter %(newSwarm.get_disp(newSwarm)/initial_disp);
+   if (core == 0){
+     outfiledisp << ss.str();
+     outfiledisp << endl;
+     outfiledisp.close();
+   };
+ };
+#endif
+#ifndef WITH_MPI
+ ofstream outfiledisp("disp_log.out." + std::to_string(cycle), ofstream::app);
+ if (mod(iter, fr) == 0.0) {
+   stringstream ss;
+   ss << boost::format("%5i %15.4f") %iter %(newSwarm.get_disp(newSwarm)/initial_disp);
+   outfiledisp << ss.str();
+   outfiledisp << endl;
+ };
+ outfiledisp.close();
+#endif
+};
+
+void Swarm::printopt(Swarm & newSwarm, int iter, int cycle, int fr) {
+  ofstream outfileopt("opti_log.out." + std::to_string(cycle), ofstream::app);
   if (mod(iter, fr) == 0.0) {
-    outfileopt << "#Timestep: " << iter << endl;
-    outfileopt << newSwarm.get_gbfit() << " ";
+    stringstream ss;
+    ss << boost::format("%5i %25.4f") %iter %newSwarm.get_gbfit(); 
+    outfileopt << ss.str();
     outfileopt << endl;
+    
   };
   outfileopt.close();
 };
+
+
+void Swarm::printUQQoI(Swarm & newSwarm, int iter, int cycle, int fr) {
+  string str_core = std::to_string(core);
+  string line;
+  // define temp sums of partial errors from fort.99 file for each core
+  double serr_bonds = 0.0;
+  double serr_angles = 0.0;
+  double serr_torsions = 0.0;
+  double serr_energies = 0.0;
+  double serr_charges = 0.0;
+  double serr_heats = 0.0;
+  std::smatch m;
+  std::regex e1 ("Heat of formation:");
+  std::regex e2 ("Bond distance:");
+  std::regex e3 ("Valence angle:");
+  std::regex e4 ("Charge atom:");
+  std::regex e5 ("Torsion angle:");
+  std::regex e6 ("Energy");
+
+  vector <string> values; 
+
+  if (mod(iter, fr) == 0.0) {
+    for (int p = 0; p < NumP; p++){
+      boost::filesystem::ifstream myfile("CPU." + str_core +"/fort.99");
+      // only include swarm members whose fitness is not higher than (gbfit + 15%)
+      if (newSwarm.GetPar(p).get_fitness() <= 1.15*gbfit){
+        // for each line
+        while (getline(myfile, line)) {
+          if (regex_search (line,m,e1)){
+            boost::trim(line);
+            using boost::is_any_of;
+            boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+            // UQHEATS.* file will be generated for every cycle containing errors of all members
+            ofstream outfileUQHEATS("UQHEATS." + std::to_string(cycle), ofstream::app);
+            stringstream ss1;
+            // determine position of error backwards
+            int tmpcell = values.size() - 2;
+            ss1 << boost::format("%25.4f") %sqrt(stod(values.at(tmpcell)));
+            outfileUQHEATS << ss1.str() << endl;
+            ss1.str("");
+            values.clear();
+            outfileUQHEATS.close();
+            continue;
+          };
+          if (regex_search (line,m,e2)){
+            boost::trim(line);
+            using boost::is_any_of;
+            boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+            // UQBONDS.* file will be generated for every cycle containing errors of all members
+            ofstream outfileUQBONDS("UQBONDS." + std::to_string(cycle), ofstream::app);
+            stringstream ss1;
+            // determine position of error backwards
+            int tmpcell = values.size() - 2;
+            ss1 << boost::format("%25.4f") %sqrt(stod(values.at(tmpcell)));
+            outfileUQBONDS << ss1.str() << endl;
+            ss1.str("");
+            values.clear();
+            outfileUQBONDS.close();
+            continue;
+          };
+          if (regex_search (line,m,e3)){
+            boost::trim(line);
+            using boost::is_any_of;
+            boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+            // UQANGLES.* file will be generated for every cycle containing errors of all members
+            ofstream outfileUQANGLES("UQANGLES." + std::to_string(cycle), ofstream::app);
+            stringstream ss1;
+            // determine position of error backwards
+            int tmpcell = values.size() - 2;
+            ss1 << boost::format("%25.4f") %sqrt(stod(values.at(tmpcell)));
+            outfileUQANGLES << ss1.str() << endl;
+            ss1.str("");
+            values.clear();
+            outfileUQANGLES.close();
+            continue;
+          };
+          if (regex_search (line,m,e4)){
+            boost::trim(line);
+            using boost::is_any_of;
+            boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+            // UQCHARGES.* file will be generated for every cycle containing errors of all members
+            ofstream outfileUQCHARGES("UQCHARGES." + std::to_string(cycle), ofstream::app);
+            stringstream ss1;
+            // determine position of error backwards
+            int tmpcell = values.size() - 2;
+            ss1 << boost::format("%25.4f") %sqrt(stod(values.at(tmpcell)));
+            outfileUQCHARGES << ss1.str() << endl;
+            ss1.str("");
+            values.clear();
+            outfileUQCHARGES.close();
+            continue;
+          };
+          if (regex_search (line,m,e5)){
+            boost::trim(line);
+            using boost::is_any_of;
+            boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+            // UQTORSIONS.* file will be generated for every cycle containing errors of all members
+            ofstream outfileUQTORSIONS("UQTORSIONS." + std::to_string(cycle), ofstream::app);
+            stringstream ss1;
+            // determine position of error backwards
+            int tmpcell = values.size() - 2;
+            ss1 << boost::format("%25.4f") %sqrt(stod(values.at(tmpcell)));
+            outfileUQTORSIONS << ss1.str() << endl;
+            ss1.str("");
+            values.clear();
+            outfileUQTORSIONS.close();
+            continue;
+          };
+          if (regex_search (line,m,e6)){
+            boost::trim(line);
+            using boost::is_any_of;
+            boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+            // UQENER.* file will be generated for every cycle containing errors of all members
+            ofstream outfileUQENER("UQENER." + std::to_string(cycle), ofstream::app);
+            stringstream ss1;
+            // determine position of error backwards
+            int tmpcell = values.size() - 2;
+            ss1 << boost::format("%25.4f") %sqrt(stod(values.at(tmpcell)));
+            outfileUQENER << ss1.str() << endl;
+            ss1.str("");
+            values.clear();
+            outfileUQENER.close();
+            continue;
+          };
+        }; // done reading all lines
+      };
+      myfile.close();
+    }; // done loop on members
+  };
+};
+
+void Swarm::printUQFF(Swarm & newSwarm, int iter, int cycle, int fr) {
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  if (mod(iter, fr) == 0.0) {
+    stringstream ss1;
+    for (int p = 0; p < NumP; p++){
+      // only include swarm members whose fitness is not higher than (gbfit + 15%)
+      if (newSwarm.GetPar(p).get_fitness() <= 1.15*gbfit){
+          for (int m = 0; m < dim; m++){
+            // UQFF.* file will be generated for each m dimension (ffield parameter) for every cycle
+            ofstream outfileUQFF("UQFF." + std::to_string(m) + "." + std::to_string(cycle), ofstream::app);
+            ss1 << boost::format("%10.4f") %newSwarm.GetPar(p).get_pos_vec().at(m);
+            outfileUQFF << ss1.str() << endl;
+            ss1.str("");
+            outfileUQFF.close();
+          };
+      };
+    };
+  };
+};
+
 
 void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
   boost::filesystem::path pwd(boost::filesystem::current_path());
@@ -1578,18 +2444,25 @@ void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
 #endif
   if (mod(iter, fr) == 0.0) {
     outfilepos << "#Timestep: " << iter << endl;
-
+    stringstream ss1;
+    stringstream ss2;
+    stringstream ss3;
     for (int p = 0; p < NumP; p++) {
-      outfilepos << p << "  ";
+      ss1 << boost::format("%3i") %p;
+      outfilepos << ss1.str();
+      ss1.str("");
       for (int m = 0; m < dim; m++) {
-        outfilepos << newSwarm.GetPar(p).get_pos(m) << "  ";
+        ss2 << boost::format("%10.4f") %newSwarm.GetPar(p).get_pos(m); 
+        outfilepos << ss2.str();
+        ss2.str("");
       };
-      outfilepos << newSwarm.GetPar(p).get_fitness() << "  ";
+      ss3 << boost::format("%25.4f") %newSwarm.GetPar(p).get_fitness();
+      outfilepos << ss3.str();
+      ss3.str("");
       outfilepos << endl;
     };
-
-    outfilepos.close();
   };
+  outfilepos.close();
 };
 
 void Swarm::printvel(Swarm & newSwarm, int iter, int cycle, int fr) {
@@ -1615,8 +2488,8 @@ void Swarm::printvel(Swarm & newSwarm, int iter, int cycle, int fr) {
       };
       outfilevel << endl;
     };
-    outfilevel.close();
   };
+  outfilevel.close();
 };
 
 void Swarm::printdeg(Swarm & newSwarm, int iter, int cycle, int fr) {
@@ -1647,6 +2520,6 @@ void Swarm::printdeg(Swarm & newSwarm, int iter, int cycle, int fr) {
 
       };
     };
-    outfiledeg.close();
   };
+  outfiledeg.close();
 };

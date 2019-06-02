@@ -1,7 +1,7 @@
-AR = ar rcus
+AR  = ar rcus
 CXX = mpicxx
 CC  = mpicc
-CXXFLAGS = -g -O3 -std=c++0x -DWITH_MPI
+CXXFLAGS = -O3 -std=c++0x -DWITH_MPI -Wno-unused-result
 CFLAGS   = -O3
 DEPS = par.h 
 OBJ = par.o main.o
