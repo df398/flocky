@@ -18,6 +18,7 @@
 #ifndef PAR_H
 #define PAR_H
 #include <stdio.h>
+#include <random>
 #include <ctime>
 #include <iostream>
 #include <fstream>
@@ -135,6 +136,7 @@ class Swarm { // declaration of a Swarm
 
   Par & GetPar(int ParID);
   void get_userinp();
+  void read_icharg_control();
   void AddPar(Par & newPar);
   void Populate(Swarm & newSwarm, int iter);
   void Propagate(Swarm & newSwarm, int iter);
