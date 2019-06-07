@@ -12,8 +12,8 @@ Features:
 * Flexible parameter space exploration: supports use of bounds or percentage change from current values
 * Implicit multi-objective fitness function by the use of relative weights
 * Training set supports both finite-size and periodic systems
-* Automated detection of over-fitting during optimization (soon)
-* Bayesian error analysis for uncertainty quantification (soon)
+* On the fly detection of over-fitting during optimization
+* On the fly Bayesian errors analysis for uncertainty quantification
 
 
 For theoretical background behind RiPSOGM and flocky:
@@ -27,9 +27,9 @@ A user's manual can be downloaded from: [link](http://insertlink)
 
 ## Installation
 Requirements:
-
-* OpenMPI or MPICH2
-* Boost C++
+* GCC (tested with 5.4.0 and 7.3.0)
+* OpenMPI (tested with 1.10.2) or MPICH2
+* Boost C++ (tested with 1.70.0)
 
 Install procedure:
 
