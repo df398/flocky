@@ -1255,6 +1255,34 @@ Swarm::Swarm() {
 
 };
 
+void Swarm::read_icharg_control() {
+  // Read icharg value from reax control file
+  std::ifstream control_file("control");
+  if (control_file.fail()) {
+    cout << "Unable to open control file on CPU " << core << ". \n";
+    control_file.close();
+    exit(EXIT_FAILURE);
+  } else{
+    std::string line;
+    int numlines = 0;
+    // for each line
+    while (std::getline(control_file, line)) {
+      boost::trim(line);
+      if ( line[0] == '#' || line == ""){
+        continue;
+      }else{
+        numlines++;
+        // locate icharg line
+        if (numlines == 10) {
+          if (line[0] == '5') {
+            fixcharges = true;
+          };
+        };
+      };
+    };
+  };
+};
+
 void Swarm::get_userinp(){
 #ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
@@ -1296,7 +1324,12 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(4)) >> ofit;
     istringstream(tempinput.at(5)) >> uq;
     istringstream(tempinput.at(6)) >> NumP;
-    NumP = int(floor(NumP / numcores));
+    if (NumP < numcores) {
+      cout << "Error: Number of swarm members should be bigger than number of allocated processors." << endl;
+      exit(EXIT_FAILURE);
+    } else {
+      NumP = int(floor(NumP / numcores));
+    };
     istringstream(tempinput.at(7)) >> c1;
     istringstream(tempinput.at(8)) >> c2;
     istringstream(tempinput.at(9)) >> inertiamax;
@@ -1309,10 +1342,12 @@ void Swarm::get_userinp(){
   };  
   // check if reaxff is set to run with fixed charges (=> require charges file)
   boost::filesystem::ifstream charge_file("charges");
-  if (!charge_file.fail()) {
+  if (charge_file.fail()) {
+    cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
+  } else {
     boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
       boost::filesystem::copy_option::overwrite_if_exists);
-   fixcharges = true;
+   //fixcharges = true;
   };
   charge_file.close();
 
@@ -1410,10 +1445,11 @@ void Swarm::get_userinp(){
 
   // check if reaxff runs with fixed charges (= require charges file)
   boost::filesystem::ifstream charge_file("charges");
-  if (!charge_file.fail()) {
-    fixcharges = true;
+  if (charge_file.fail()) {
+    cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
+    charge_file.close();
+    exit(EXIT_FAILURE);
   };
-  charge_file.close();
 
   // create fort.20 file needed by reac and reac.lg
   boost::filesystem::ofstream iopt_file("fort.20");
