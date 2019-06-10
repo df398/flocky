@@ -149,7 +149,6 @@ void Par::write_ffield(int cycle, int iter, int par) {
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
   string str_parID = std::to_string(par);
-
   // update particle ffield
   int index = 0;
   // for each line value in ffline and corresponding column value
@@ -442,6 +441,10 @@ void Par::write_ffield(int cycle, int iter, int par) {
     pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
 #endif
 };
+
+
+
+
 
 void Par::write_ffield_lg(int cycle, int iter, int par) {
   string str_cycle = std::to_string(cycle);
@@ -984,7 +987,6 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
 
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
-
   // check if ffield is LG or not. execute correct reac accordingly.
   if (lg_yn == true) {
     write_ffield_lg(cycle, iter, parid);
@@ -1011,7 +1013,11 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     boost::filesystem::current_path(p);
 
     // execute reac within each CPU.x directory
-    system("./reac_lg > /dev/null 2>&1");
+    //int status = system("./reac_lg > /dev/null 2>&1");
+    int status = boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null);
+    if (WIFSIGNALED (status)) {
+      cout << "Program exited abnormaly on CPU:" << core << "\n";
+    };
     // cd back to main directory
     boost::filesystem::path p2(old_path);
     boost::filesystem::current_path(p2);
@@ -1026,15 +1032,12 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
       fin6.close();
 
     // prepare mandatory files before executing reac in each CPU directory
-
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
-
     if (fixcharges == true){
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/charges",
       pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
     };
-
 
     // cd to each CPU.x directory
     string old_path = pwd.string();
@@ -1043,12 +1046,15 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
 
     // execute reac within each CPU.x directory
     //system("./reac > run.log");
-    system("./reac > /dev/null 2>&1");
+    //int status = system("./reac > /dev/null 2>&1");
+    int status = boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null);
+    if (WIFSIGNALED (status)) {
+      cout << "reac exited abnormaly on CPU:" << core << "\n";
+    };
     //boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null);
     // cd back to main directory
     boost::filesystem::path p2(old_path);
     boost::filesystem::current_path(p2);
-
   };
 
   // read fitness value contained in fort.13 file
@@ -1138,7 +1144,12 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     };
 
     // execute reac
-    system("./reac_lg > /dev/null 2>&1"); 
+    //system("./reac_lg > /dev/null 2>&1"); 
+    int status = boost::process::system("./reac_lg", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null);
+    if (WIFSIGNALED (status)) {
+      cout << "reac exited abnormaly." << endl;
+    };
+
   } else {
     write_ffield(cycle, iter, parid);
     std::ifstream fin6("reac");
@@ -1163,8 +1174,12 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     };
 
     // execute reac within each CPU.x directory
-    system("./reac > /dev/null 2>&1");
-    
+    //system("./reac > /dev/null 2>&1");
+    int status = boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null); 
+    if (WIFSIGNALED (status)) {
+      cout << "reac exited abnormaly." << endl;
+    };
+
   };
 
   // read fitness value contained in fort.13 file
@@ -1255,8 +1270,9 @@ Swarm::Swarm() {
 
 };
 
-void Swarm::read_icharg_control() {
+/*void Swarm::read_icharg_control() {
   // Read icharg value from reax control file
+  string str_core = std::to_string(core);
   std::ifstream control_file("control");
   if (control_file.fail()) {
     cout << "Unable to open control file on CPU " << core << ". \n";
@@ -1276,12 +1292,15 @@ void Swarm::read_icharg_control() {
         if (numlines == 10) {
           if (line[0] == '5') {
             fixcharges = true;
+            cout << "fixcharges on CPU" << core << "is: " << fixcharges << endl;
+            break;
           };
         };
       };
     };
   };
 };
+*/
 
 void Swarm::get_userinp(){
 #ifdef WITH_MPI
@@ -1340,15 +1359,17 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(14)) >> maxiters;
     istringstream(tempinput.at(15)) >> maxcycles;
   };  
-  // check if reaxff is set to run with fixed charges (=> require charges file)
+  // check if reaxff was set to run with fixed charges and require charges file
+  //read_icharg_control();
   boost::filesystem::ifstream charge_file("charges");
-  if (charge_file.fail()) {
-    cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
-  } else {
+  fixcharges = true;
+  //if (charge_file.fail()) {
+  //  cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
+  //} else {
     boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
       boost::filesystem::copy_option::overwrite_if_exists);
-   //fixcharges = true;
-  };
+  // fixcharges = true;
+  //};
   charge_file.close();
 
   if (lg_yn == true){
@@ -1394,7 +1415,7 @@ void Swarm::get_userinp(){
   MPI_Bcast( & maxcycles, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & perc_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & perc, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  //MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ofit, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
 #endif
@@ -1443,7 +1464,8 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(14)) >> maxiters;
     istringstream(tempinput.at(15)) >> maxcycles;
 
-  // check if reaxff runs with fixed charges (= require charges file)
+  // check if reaxff was set to run with fixed charges and require charges file
+  //read_icharg_control();
   boost::filesystem::ifstream charge_file("charges");
   if (charge_file.fail()) {
     cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
@@ -1583,18 +1605,9 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
   // ---------------------------------------------- //
 
-    // initial gbfit is INF for all processes and all swarm members
-    gbfit = numeric_limits < double > ::infinity();
-    // initial gbpos is 0.0 for all processes and all swarm members
-    gbpos.clear();
-    for (int m=0; m < dim; m++){
-      gbpos.push_back(0.0);
-    };
-
   for (int p = 0; p < NumP; p++) {
     string parID = std::to_string(p);
     string str_cycle = std::to_string(cycle);
-
     // cp geo to geo.parID so each particle works with its own geo file
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
       pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + parID,
@@ -1602,6 +1615,14 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
 
     Par NewPar;
     newSwarm.AddPar(NewPar);
+
+    // initial gbfit is INF for all processes and all swarm members
+    gbfit = numeric_limits < double > ::infinity();
+    // initial gbpos is 0.0 for all processes and all swarm members
+    gbpos.clear();
+    for (int m=0; m < dim; m++){
+      gbpos.push_back(0.0);
+    };
 
     if (core == 0) {
       // If contff == y, then take force field's current values for the position of particle 0 (others are random)
@@ -1620,7 +1641,6 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     curfit = newSwarm.GetPar(p).eval_fitness(cycle, 0, p);
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
-
     if (curfit < gbfit) {
       gbfit = curfit;
       gbpos.clear();
@@ -1632,7 +1652,6 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
     boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
   }; // done loop on members
-
   // pair struct to hold the global best fitness across processes and its core rank
   struct {
     double tmp_fit;
@@ -1688,14 +1707,6 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
   // ---------------------------------------------- //
 
-    // initial gbfit is INF
-    gbfit = numeric_limits < double > ::infinity();
-    // initial gbpos is 0.0
-    gbpos.clear();
-    for (int m=0; m < dim; m++){
-      gbpos.push_back(0.0);
-    };
-
   for (int p = 0; p < NumP; p++) {
     string parID = std::to_string(p);
     string str_cycle = std::to_string(cycle);
@@ -1707,7 +1718,15 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     
     Par NewPar;
     newSwarm.AddPar(NewPar);
-    
+
+    // initial gbfit is INF for all processes and all swarm members
+    gbfit = numeric_limits < double > ::infinity();
+    // initial gbpos is 0.0 for all processes and all swarm members
+    gbpos.clear();
+    for (int m=0; m < dim; m++){
+      gbpos.push_back(0.0);
+    };
+
     // If contff == y, then take force field's current values for the position of particle 0 (others are random)
     if (contff == true) {
       vector < double > ffpos;
@@ -1780,17 +1799,14 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     for (int p = 0; p < NumP; p++) {
       // Update velocities and positions
       newSwarm.GetPar(p).update_vel(inertiafac, confac, gbpos, iter);
-
       if (newSwarm.GetPar(p).fails > faili) {
         newSwarm.GetPar(p).update_pos_levy(gbpos, iter, inertiafac);
         newSwarm.GetPar(p).fails = 0;
       } else {
         newSwarm.GetPar(p).update_pos();
       };
-
       curfit = newSwarm.GetPar(p).eval_fitness(cycle, iter, p);
       newSwarm.GetPar(p).set_fitness(curfit);
-
       // Update personal best positions and fitness
       if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
         newSwarm.GetPar(p).update_bpos();
@@ -1815,7 +1831,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       string str_parID = std::to_string(p);
       //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
     }; // done loop over swarm members
-
     //newSwarm.get_com(newSwarm);
 
     // pair struct to hold the global best fitness across processes and its core rank
@@ -1854,7 +1869,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     cpuid_gbfit = min_vals_out[0].tmp_cpu;
     // broadcast contents of gbpos vector from rank cpuid_gbfit
     MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-
     if (ofit == true){
       if (gbfitfound == true) {
         // detect overfitting by evaluating fitness on validation set
@@ -1877,9 +1891,8 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
     };
     //newSwarm.printdisp(newSwarm, iter, cycle, freq);
-
   }; // done loop over iterations
-
+  cout << "hello 5 from CPU: " << core << endl;
   MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   if (core == 0) {
@@ -1991,10 +2004,20 @@ void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
   string str_iter = std::to_string(iter);
   string str_parID = std::to_string(par);
 
-  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID,
+  boost::filesystem::ifstream test_ffieldtmp(pwd.string() + "ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
+  if (!test_ffieldtmp.fail()) {
+    boost::filesystem::copy_file(pwd.string() + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID,
     "ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID, boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/fort.99",
-    "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  };
+  test_ffieldtmp.close();
+
+  boost::filesystem::ifstream test_fort99(pwd.string() + "/fort.99");
+  if (!test_fort99.fail()) {
+    boost::filesystem::copy_file(pwd.string() + "/fort.99",
+      "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  };
+  test_fort99.close();
+
   //boost::filesystem::copy_file(pwd.string() + "/fort.74",
     //"thermo.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   //boost::filesystem::copy_file(pwd.string() + "/fort.90",
