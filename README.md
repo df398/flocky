@@ -28,7 +28,7 @@ A user's manual can be downloaded from: [link](http://insertlink)
 ## Installation
 Requirements:
 * GCC (tested with 5.4.0 and 7.3.0)
-* OpenMPI (tested with 1.10.2) or MPICH2
+* OpenMPI (tested with 1.10.2 and 4.0.1) or MPICH2
 * Boost C++ (tested with 1.70.0)
 
 Install procedure:
