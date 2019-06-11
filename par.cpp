@@ -1270,7 +1270,7 @@ Swarm::Swarm() {
 
 };
 
-/*void Swarm::read_icharg_control() {
+void Swarm::read_icharg_control() {
   // Read icharg value from reax control file
   string str_core = std::to_string(core);
   std::ifstream control_file("control");
@@ -1292,7 +1292,6 @@ Swarm::Swarm() {
         if (numlines == 10) {
           if (line[0] == '5') {
             fixcharges = true;
-            cout << "fixcharges on CPU" << core << "is: " << fixcharges << endl;
             break;
           };
         };
@@ -1300,7 +1299,7 @@ Swarm::Swarm() {
     };
   };
 };
-*/
+
 
 void Swarm::get_userinp(){
 #ifdef WITH_MPI
@@ -1360,16 +1359,16 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(15)) >> maxcycles;
   };  
   // check if reaxff was set to run with fixed charges and require charges file
-  //read_icharg_control();
+  read_icharg_control();
   boost::filesystem::ifstream charge_file("charges");
-  fixcharges = true;
-  //if (charge_file.fail()) {
-  //  cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
-  //} else {
+  //fixcharges = true;
+  if (charge_file.fail()) {
+    cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
+  } else {
     boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
       boost::filesystem::copy_option::overwrite_if_exists);
   // fixcharges = true;
-  //};
+  };
   charge_file.close();
 
   if (lg_yn == true){
@@ -1465,7 +1464,7 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(15)) >> maxcycles;
 
   // check if reaxff was set to run with fixed charges and require charges file
-  //read_icharg_control();
+  read_icharg_control();
   boost::filesystem::ifstream charge_file("charges");
   if (charge_file.fail()) {
     cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
