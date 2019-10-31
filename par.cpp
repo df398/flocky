@@ -938,6 +938,7 @@ void Par::update_vel(double inertiaf, double CF, vector < double > globpos, doub
   double r2 = dist1(generator);
 
   for (int v = 0; v < dim; v++) {
+
     // velocity update with perturbations
     vel.at(v) = CF * (inertiaf * vel.at(v) + c1 * r1 * (bpos.at(v) - pos.at(v)) + c2 * r2 * (globpos.at(v) - pos.at(v)));
 
@@ -1289,7 +1290,7 @@ void Swarm::read_icharg_control() {
       }else{
         numlines++;
         // locate icharg line
-        if (numlines == 10) {
+        if (numlines == 12) {
           if (line[0] == '5') {
             fixcharges = true;
             break;
@@ -1362,9 +1363,12 @@ void Swarm::get_userinp(){
   read_icharg_control();
   boost::filesystem::ifstream charge_file("charges");
   //fixcharges = true;
-  if (charge_file.fail()) {
+  if (fixcharges == true && charge_file.fail()) {
     cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
-  } else {
+    charge_file.close();
+    exit(EXIT_FAILURE);
+  };
+  if (fixcharges == true) {
     boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
       boost::filesystem::copy_option::overwrite_if_exists);
   // fixcharges = true;
@@ -1891,7 +1895,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     };
     //newSwarm.printdisp(newSwarm, iter, cycle, freq);
   }; // done loop over iterations
-  cout << "hello 5 from CPU: " << core << endl;
   MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   MPI_Barrier(MPI_COMM_WORLD);
   if (core == 0) {
