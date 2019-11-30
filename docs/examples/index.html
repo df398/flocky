@@ -201,8 +201,9 @@ data points, it is usually the case that different points have wildly different 
 of a data point to the total cost function. Thus, in order to increase the influence of a specific data point, we can lower its weight and vice versa. </p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The weight controls (and is inversly proportional to) the relative contribution of the data point to the total cost function. Usually, values closer to equilibrium should be given smaller weights
-in order to make them as important as the far from equilibrium points with larger energy differences. In addition, the weights can be used to compensate for the different scales of different sections     (i.e. geometry, charges, energies, etc.)</p>
+<p>The weight controls (and is inversly proportional to) the relative contribution of the data point to the total cost function. Usually, points closer to equilibrium should be given smaller weights
+in order to make them as important as the far-from-equilibrium points that have larger energy differences. In addition, the weights can be used to compensate for the scales of different sections 
+(i.e. geometry, charges, energies, etc.)</p>
 </div>
 <p><em>geo</em> - the geometry file containing the coordinates of all the structures in our training set</p>
 <p><em>control</em> - the configuration file for ReaxFF (or ReaxFF-<em>lg</em>) executable. During training the <em>imetho</em> setting should be set to 1 (energy minimization). The target root mean square gradient, specified
