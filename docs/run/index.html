@@ -8,7 +8,7 @@
   
   
   <link rel="shortcut icon" href="../img/favicon.ico">
-  <title>Install flocky - flocky</title>
+  <title>Running flocky - flocky</title>
   <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
 
   <link rel="stylesheet" href="../css/theme.css" type="text/css" />
@@ -17,8 +17,8 @@
   
   <script>
     // Current page data
-    var mkdocs_page_name = "Install flocky";
-    var mkdocs_page_input_path = "install.md";
+    var mkdocs_page_name = "Running flocky";
+    var mkdocs_page_input_path = "run.md";
     var mkdocs_page_url = null;
   </script>
   
@@ -53,12 +53,17 @@
     <a class="" href="..">Introduction</a>
 	    </li>
           
+            <li class="toctree-l1">
+		
+    <a class="" href="../install/">Install flocky</a>
+	    </li>
+          
             <li class="toctree-l1 current">
 		
-    <a class="current" href="./">Install flocky</a>
+    <a class="current" href="./">Running flocky</a>
     <ul class="subnav">
             
-    <li class="toctree-l2"><a href="#install-flocky">Install flocky</a></li>
+    <li class="toctree-l2"><a href="#running-flocky">Running flocky</a></li>
     
         <ul>
         
@@ -70,11 +75,6 @@
     
 
     </ul>
-	    </li>
-          
-            <li class="toctree-l1">
-		
-    <a class="" href="../run/">Running flocky</a>
 	    </li>
           
             <li class="toctree-l1">
@@ -119,7 +119,7 @@
     
       
     
-    <li>Install flocky</li>
+    <li>Running flocky</li>
     <li class="wy-breadcrumbs-aside">
       
     </li>
@@ -129,8 +129,14 @@
           <div role="main">
             <div class="section">
               
-                <h1 id="install-flocky">Install flocky</h1>
+                <h1 id="running-flocky">Running flocky</h1>
 <h2 id="requirements">Requirements:</h2>
+<p>Running flocky is simple! Just launch the appropriate binary (flocky_mpi or flocky_serial).</p>
+<p>To run flocky with MPI parallelization over swarm members, use the corresponding MPI launcher (mpirun or mpiexec) in your system. 
+!!! note: N should be less than or equal to the number of swarm agents.</p>
+<p>mpiexec -np N flocky_mpi</p>
+<p>To run a serial version:</p>
+<p>flocky_serial</p>
 <ul>
 <li>GCC compiler (tested with 5.4.0 and 7.3.0)</li>
 <li>OpenMPI (tested with 1.10.2 and 4.0.1) or MPICH2</li>
@@ -166,10 +172,8 @@ export BOOST_INC_PATH="path/to/installation/prefix/include"
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../run/" class="btn btn-neutral float-right" title="Running flocky">Next <span class="icon icon-circle-arrow-right"></span></a>
       
-      
-        <a href=".." class="btn btn-neutral" title="Introduction"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../install/" class="btn btn-neutral" title="Install flocky"><span class="icon icon-circle-arrow-left"></span> Previous</a>
       
     </div>
   
@@ -195,10 +199,8 @@ export BOOST_INC_PATH="path/to/installation/prefix/include"
     <span class="rst-current-version" data-toggle="rst-current-version">
       
       
-        <span><a href=".." style="color: #fcfcfc;">&laquo; Previous</a></span>
+        <span><a href="../install/" style="color: #fcfcfc;">&laquo; Previous</a></span>
       
-      
-        <span style="margin-left: 15px"><a href="../run/" style="color: #fcfcfc">Next &raquo;</a></span>
       
     </span>
 </div>
