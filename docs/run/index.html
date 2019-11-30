@@ -69,8 +69,6 @@
         
             <li><a class="toctree-l3" href="#requirements">Requirements:</a></li>
         
-            <li><a class="toctree-l3" href="#install-procedure">Install procedure:</a></li>
-        
         </ul>
     
 
@@ -132,39 +130,14 @@
                 <h1 id="running-flocky">Running flocky</h1>
 <h2 id="requirements">Requirements:</h2>
 <p>Running flocky is simple! Just launch the appropriate binary (flocky_mpi or flocky_serial).</p>
-<p>To run flocky with MPI parallelization over swarm members, use the corresponding MPI launcher (mpirun or mpiexec) in your system. 
-!!! note: N should be less than or equal to the number of swarm agents.</p>
+<p>To run flocky with MPI parallelization over swarm members, use the corresponding MPI launcher (mpirun or mpiexec) in your system. </p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The number of MPI cores, N,  should be less than or equal to the number of swarm agents.</p>
+</div>
 <p>mpiexec -np N flocky_mpi</p>
 <p>To run a serial version:</p>
 <p>flocky_serial</p>
-<ul>
-<li>GCC compiler (tested with 5.4.0 and 7.3.0)</li>
-<li>OpenMPI (tested with 1.10.2 and 4.0.1) or MPICH2</li>
-<li>Boost C++ (tested with 1.70.0)</li>
-</ul>
-<h2 id="install-procedure">Install procedure:</h2>
-<p>(1) Install OpenMPI or MPICH for parallel execution (for a serial version, skip to step 2):</p>
-<p>To install mpich type:</p>
-<pre><code>sudo apt-get install mpich
-</code></pre>
-<p>For OpenMPI type:</p>
-<pre><code>sudo apt-get install openmpi-bin
-</code></pre>
-<p>(2) Install Boost C++ required libraries and header files:</p>
-<pre><code>cd path/to/boost_1_61_0
-./bootstrap.sh --with-libraries=system,filesystem --prefix=path/to/installation/prefix
-./b2 install link=static
-</code></pre>
-<p>(3) Set your BOOST_LIB_PATH and BOOST_INC_PATH environment variables:</p>
-<pre><code>export BOOST_LIB_PATH="path/to/installation/prefix/lib" 
-export BOOST_INC_PATH="path/to/installation/prefix/include"
-</code></pre>
-<p>(4) Finally, compile flocky (parallel version):</p>
-<pre><code>make -f Makefile.mpi
-</code></pre>
-<p>or a serial version:</p>
-<pre><code>make -f Makefile.serial
-</code></pre>
               
             </div>
           </div>
