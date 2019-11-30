@@ -53,13 +53,13 @@
     <a class="current" href=".">Introduction</a>
     <ul class="subnav">
             
-    <li class="toctree-l2"><a href="#welcome-to-mkdocs">Welcome to MkDocs</a></li>
+    <li class="toctree-l2"><a href="#welcome-to-flocky">Welcome to flocky</a></li>
     
         <ul>
         
-            <li><a class="toctree-l3" href="#commands">Commands</a></li>
+            <li><a class="toctree-l3" href="#features">Features</a></li>
         
-            <li><a class="toctree-l3" href="#project-layout">Project layout</a></li>
+            <li><a class="toctree-l3" href="#citations">Citations</a></li>
         
         </ul>
     
@@ -129,21 +129,21 @@
           <div role="main">
             <div class="section">
               
-                <h1 id="welcome-to-mkdocs">Welcome to MkDocs</h1>
-<p>For full documentation visit <a href="https://mkdocs.org">mkdocs.org</a>.</p>
-<h2 id="commands">Commands</h2>
+                <h1 id="welcome-to-flocky">Welcome to flocky</h1>
+<p>flocky is an open-source platform for development of high quality ReaxFF reactive force fields that is based on the RiPSOGM swarm intelligence algorithm for global optimization[^1].</p>
+<h2 id="features">Features</h2>
 <ul>
-<li><code>mkdocs new [dir-name]</code> - Create a new project.</li>
-<li><code>mkdocs serve</code> - Start the live-reloading docs server.</li>
-<li><code>mkdocs build</code> - Build the documentation site.</li>
-<li><code>mkdocs help</code> - Print this help message.</li>
+<li>Interfaced to a standalone Fortran implementation of tapered ReaxFF[^2]</li>
+<li>MPI support for an asynchronous parallel optimization</li>
+<li>Flexible parameter space exploration: use of fixed parameter bounds or %change from current values</li>
+<li>Implicit multi-objective fitness function evaluation by the use of relative weights</li>
+<li>Training set format supports both finite-size and periodic systems</li>
+<li>On the fly monitoring of over-fitting during optimization</li>
+<li>On the fly Bayesian errors analysis for uncertainty quantification</li>
 </ul>
-<h2 id="project-layout">Project layout</h2>
-<pre><code>mkdocs.yml    # The configuration file.
-docs/
-    index.md  # The documentation homepage.
-    ...       # Other markdown pages, images and other files.
-</code></pre>
+<h2 id="citations">Citations</h2>
+<p>[^1] David Furman, Benny Carmeli, Yehuda Zeiri and Ronnie Kosloff, "Enhanced Particle Swarm Optimization Algorithm: Efficient Training of ReaxFF Reactive Force Fields", J. Chem. Theory Comput. 2018, 14 (6), 3100–3112</p>
+<p>[^2] David Furman and David J. Wales, "Transforming the Accuracy and Numerical Stability of ReaxFF Reactive Force Fields", J. Phys. Chem. Lett. 2019, 10 (22), 7215-7223</p>
               
             </div>
           </div>
@@ -192,5 +192,5 @@ docs/
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2019-11-30 16:52:31
+Build Date UTC : 2019-11-30 17:09:25
 -->
