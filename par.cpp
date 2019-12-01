@@ -991,14 +991,14 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
   // check if ffield is LG or not. execute correct reac accordingly.
   if (lg_yn == true) {
     write_ffield_lg(cycle, iter, parid);
-    std::ifstream fin5(("CPU." + str_core + "/reac_lg").c_str());
+    std::ifstream fin5(("CPU." + str_core + "/reac").c_str());
     if (fin5.fail()) {
-      cout << "reac_lg executable not found for CPU " + str_core + ". Aborting! \n";
+      cout << "reac executable not found for CPU " + str_core + ". Aborting! \n";
       fin5.close();
       exit(EXIT_FAILURE);
     }
     fin5.close();
-    // prepare mandatory files before executing reac_lg in each CPU directory
+    // prepare mandatory files before executing reac in each CPU directory
 
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
@@ -1014,7 +1014,7 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     boost::filesystem::current_path(p);
 
     // execute reac within each CPU.x directory
-    //int status = system("./reac_lg > /dev/null 2>&1");
+    //int status = system("./reac > /dev/null 2>&1");
     int status = boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null);
     if (WIFSIGNALED (status)) {
       cout << "Program exited abnormaly on CPU:" << core << "\n";
@@ -1126,15 +1126,15 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
   // check if ffield is LG or not. execute correct reac accordingly.
   if (lg_yn == true) {
     write_ffield_lg(cycle, iter, parid);
-    std::ifstream fin5("reac_lg");
+    std::ifstream fin5("reac");
     if (fin5.fail()) {
-      cout << "reac_lg executable not found. Aborting! \n";
+      cout << "reac executable not found. Aborting! \n";
       fin5.close();
       exit(EXIT_FAILURE);
     }
     fin5.close();
 
-    // prepare mandatory files before executing reac_lg
+    // prepare mandatory files before executing reac
 
     boost::filesystem::copy_file(pwd.string() + "/ffield",
       pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
@@ -1145,8 +1145,8 @@ double Par::eval_fitness(int cycle, int iter, int parid) {
     };
 
     // execute reac
-    //system("./reac_lg > /dev/null 2>&1"); 
-    int status = boost::process::system("./reac_lg", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null);
+    //system("./reac > /dev/null 2>&1"); 
+    int status = boost::process::system("./reac", boost::process::std_out > boost::process::null, boost::process::std_err > boost::process::null);
     if (WIFSIGNALED (status)) {
       cout << "reac exited abnormaly." << endl;
     };
@@ -2101,10 +2101,10 @@ void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int 
   boost::filesystem::current_path(p);
 
   if (lg_yn == true) {
-    // execute reac or reac_lg
-    boost::filesystem::copy_file(pwd.string() + "/reac_lg", pwd.string() + "/testovfit/reac_lg",
+    // execute reac or reac
+    boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
     boost::filesystem::copy_option::overwrite_if_exists);
-    system("./reac_lg > /dev/null 2>&1");
+    system("./reac > /dev/null 2>&1");
   } else {
     boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
     boost::filesystem::copy_option::overwrite_if_exists);
@@ -2211,10 +2211,10 @@ void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int 
   boost::filesystem::path p(pwd.string() + "/testovfit");
   boost::filesystem::current_path(p);
   if (lg_yn == true) {
-    // execute reac or reac_lg
-    boost::filesystem::copy_file(pwd.string() + "/reac_lg", pwd.string() + "/testovfit/reac_lg",
+    // execute reac or reac
+    boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
     boost::filesystem::copy_option::overwrite_if_exists);
-    system("./reac_lg > /dev/null 2>&1");
+    system("./reac > /dev/null 2>&1");
   } else {
     boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
     boost::filesystem::copy_option::overwrite_if_exists);
