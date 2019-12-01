@@ -1376,7 +1376,7 @@ void Swarm::get_userinp(){
   charge_file.close();
 
   if (lg_yn == true){
-  boost::filesystem::copy_file(pwd.string() + "/reac-lg", pwd.string() + "/CPU." + str_core + "/reac-lg",
+  boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/CPU." + str_core + "/reac",
     boost::filesystem::copy_option::overwrite_if_exists);
   }else{
   boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/CPU." + str_core + "/reac",
@@ -1604,6 +1604,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     log << "Swarm generation started. Please wait." << endl;
     log.close();
   };
+  funceval = 0; // clear counter for cycles
   // ---------------------------------------------- //
   //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
   // ---------------------------------------------- //
