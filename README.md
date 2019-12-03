@@ -7,7 +7,7 @@ flocky is an open-source platform for development of high-quality ReaxFF reactiv
 
 Features:
 
-* Interfaced to the "gold standard" Fortran implementation of ReaxFF developed by Prof. Adri van Duin
+* Interfaced to the standalone Fortran implementation of tapered ReaxFF
 * MPI support for an asynchronous parallel performance
 * Flexible parameter space exploration: supports use of bounds or percentage change from current values
 * Implicit multi-objective fitness function by the use of relative weights
@@ -16,11 +16,15 @@ Features:
 * On the fly Bayesian errors analysis for uncertainty quantification
 
 
-For theoretical background behind RiPSOGM and flocky:
+For theoretical background behind tapered ReaxFF, RiPSOGM and flocky:
+
+David Furman and David J. Wales,
+[Transforming the Accuracy and Numerical Stability of ReaxFF Reactive Force Fields](https://pubs.acs.org/doi/abs/10.1021/acs.jpclett.9b02810),
+J. Phys. Chem. Lett. 2019, 10 (22)
 
 David Furman, Benny Carmeli, Yehuda Zeiri and Ronnie Kosloff,
 [Enhanced Particle Swarm Optimization Algorithm: Efficient Training of ReaxFF Reactive Force Fields](https://pubs.acs.org/doi/10.1021/acs.jctc.7b01272),
-J. Chem. Theory Comput., 2018, 14 (6)
+J. Chem. Theory Comput. 2018, 14 (6)
 
 A user's manual can be downloaded from: [link](http://insertlink)
 
