@@ -82,8 +82,8 @@ class Par { // declaration of a particle
   void read_bounds(); // read in min/max bounds of params and set min/max domain. Output dim = number of lines.
   double get_min_dim();
   void read_ffield(); // read ffield file into matrix
-  void write_ffield_lg(int cycle, int iter, int par);
-  void write_ffield(int cycle, int iter, int par);
+  void write_ffield_lg(const vector <double> &active_params,int cycle, int iter, int par);
+  void write_ffield(const vector <double> &active_params,int cycle, int iter, int par);
 
   double get_vel(int n);
   double get_pos(int k);
@@ -101,7 +101,8 @@ class Par { // declaration of a particle
 
   double get_fitness(); // get particle fitness
   void set_fitness(double fit); // set particle fitness
-  double eval_fitness(int cycle, int iter, int parid);
+  double eval_fitness(const vector <double> &active_params, int cycle, int iter, int parid); // evalulate fitness
+  vector <double> eval_numgrad(vector <double> active_params, int cycle, int iter, int parid); // evaluate numerical gradients of fitness
   double get_bfit();
   void set_bfit(double bfit);
 
@@ -124,6 +125,7 @@ class Par { // declaration of a particle
 
   double bfitness; // particle previous best fitness
   double fitness; // particle current fitness
+  vector <double> grad; // gradient wrt active params
 };
 
 class Swarm { // declaration of a Swarm
