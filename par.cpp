@@ -20,7 +20,7 @@
 std::random_device seed;
 // Mersene Twister: Good quality random number generator
 std::mt19937 generator(seed() + core);
-std::uniform_real_distribution < double > dist1(0.0, 1.0);
+std::uniform_real_distribution <double> dist1(0.0, 1.0);
 
 int    ierr, core, numcores = 0;
 int    funceval = 0;
@@ -39,7 +39,8 @@ int    parid_gbfit = 0;
 bool   fixcharges = false;
 bool   lg_yn = false;
 bool   contff = false;
-bool   regular = false;
+int    regular = 0;
+double hlambda = 0.01;
 bool   chang = false;
 bool   perc_yn = true;
 bool   ofit = false;
@@ -860,7 +861,6 @@ void Par::read_bounds() {
 
     };
 
-
   };
 };
 
@@ -915,9 +915,11 @@ vector < double > Par::get_normdir() {
 };
 
 double Par::get_levy_McCul(double iter, double maxiters) {
+  // ****************************************************** //
   // Gaussian mutation (no Levy)
-  //std::normal_distribution < double > distnorm(0.0, 1.0);
-  //double x = distnorm(generator); // + tau;
+  // std::normal_distribution < double > distnorm(0.0, 1.0);
+  // double x = distnorm(generator); // + tau;
+  // ****************************************************** //
 
   // ****************************************************** //
   // Generation of Levy symmetric distribution (beta=0) using
@@ -1071,7 +1073,6 @@ double Par::eval_fitness(const vector <double> &active_params, int cycle, int it
   // cd back to main directory
   boost::filesystem::path p2(old_path);
   boost::filesystem::current_path(p2);
-  
 
   // read fitness value contained in fort.13 file
   string str;
@@ -1109,9 +1110,6 @@ double Par::eval_fitness(const vector <double> &active_params, int cycle, int it
   //   pwd.string()+"/CPU."+str_core+"/geo." + str_cycle + "." + str_parID, 
   //     boost::filesystem::copy_option::overwrite_if_exists);
 
-  //boost::filesystem::copy_file(pwd.string()+"/CPU."+str_core+"/fort.73" ,
-    //pwd.string()+"/CPU."+str_core+"/partialE.out."+str_cycle+"."+str_iter+"."+str_parID, 
-    //boost::filesystem::copy_option::overwrite_if_exists);
 
   return fitness;
 #endif
@@ -1225,10 +1223,10 @@ vector <double> Par::eval_numgrad(vector <double> active_params, int cycle, int 
   for (int i = 0; i < dim; i++) {
      // since active_params get transformed to physical params in write_ffield we should divide diff by the factor
      // before adding it to the active_params
-     active_params.at(i) = active_params.at(i) + diff/((maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i));
+     active_params.at(i) = active_params.at(i) + (diff - mindomain.at(i))/(maxdomain.at(i) - mindomain.at(i));
      fitplus = eval_fitness(active_params, cycle, iter, parid);
      
-     active_params.at(i) = active_params.at(i) - 2.0*diff/((maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i));
+     active_params.at(i) = active_params.at(i) - 2.0*(diff - mindomain.at(i))/(maxdomain.at(i) - mindomain.at(i));
      fitminus = eval_fitness(active_params, cycle, iter, parid);
      // if current gradient is ill-defined use last saved value
      if (fitplus != numeric_limits <double> ::infinity() && fitminus != numeric_limits <double> ::infinity()) {
@@ -1269,6 +1267,33 @@ void Par::set_pos(vector < double > pos_of_best_particle) {
 void Par::set_vel(vector < double > vel_of_best_particle) {
   vel = vel_of_best_particle;
 };
+
+double Par::get_reg() {
+  double reg = 0.0;
+  // calculate L1 penalty
+  if (regular == 1) {
+    for (int i = 0; i < dim; i++) {
+      reg = reg + abs(pos.at(i))*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i);
+    };
+    reg = hlambda*reg;
+  };
+  // calculate L2 penalty
+  if (regular == 2) {
+    for (int i = 0; i < dim; i++) {
+      reg = reg + (pos.at(i)*pos.at(i))*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i);
+    };
+    reg = hlambda*reg;
+  };
+
+  if (regular != 1 || regular != 2) {
+    reg = 0.0;
+  };
+
+  return reg;
+};
+
+
+
 
 // ---------- Definitions of Swarm class member functions ---------- //
 //
@@ -1346,24 +1371,25 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(2)) >> perc_yn;
     istringstream(tempinput.at(3)) >> perc;
     istringstream(tempinput.at(4)) >> regular;
-    istringstream(tempinput.at(5)) >> ofit;
-    istringstream(tempinput.at(6)) >> uq;
-    istringstream(tempinput.at(7)) >> NumP;
+    istringstream(tempinput.at(5)) >> hlambda;
+    istringstream(tempinput.at(6)) >> ofit;
+    istringstream(tempinput.at(7)) >> uq;
+    istringstream(tempinput.at(8)) >> NumP;
     if (NumP < numcores) {
       cout << "Error: Number of swarm members should be bigger than number of allocated processors." << endl;
       exit(EXIT_FAILURE);
     } else {
       NumP = int(floor(NumP / numcores));
     };
-    istringstream(tempinput.at(8)) >> c1;
-    istringstream(tempinput.at(9)) >> c2;
-    istringstream(tempinput.at(10)) >> inertiamax;
-    istringstream(tempinput.at(11)) >> inertiamin; 
-    istringstream(tempinput.at(12)) >> faili;
-    istringstream(tempinput.at(13)) >> levyscale;
-    istringstream(tempinput.at(14)) >> freq;
-    istringstream(tempinput.at(15)) >> maxiters;
-    istringstream(tempinput.at(16)) >> maxcycles;
+    istringstream(tempinput.at(9)) >> c1;
+    istringstream(tempinput.at(10)) >> c2;
+    istringstream(tempinput.at(11)) >> inertiamax;
+    istringstream(tempinput.at(12)) >> inertiamin; 
+    istringstream(tempinput.at(13)) >> faili;
+    istringstream(tempinput.at(14)) >> levyscale;
+    istringstream(tempinput.at(15)) >> freq;
+    istringstream(tempinput.at(16)) >> maxiters;
+    istringstream(tempinput.at(17)) >> maxcycles;
   };  
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -1424,7 +1450,8 @@ void Swarm::get_userinp(){
   MPI_Bcast( & perc_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & perc, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   //MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
-  MPI_Bcast( & regular, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & regular, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & hlambda, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ofit, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
 #endif
@@ -1461,18 +1488,19 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(2)) >> perc_yn;
     istringstream(tempinput.at(3)) >> perc;
     istringstream(tempinput.at(4)) >> regular;
-    istringstream(tempinput.at(5)) >> ofit;
-    istringstream(tempinput.at(6)) >> uq;
-    istringstream(tempinput.at(7)) >> NumP;
-    istringstream(tempinput.at(8)) >> c1;
-    istringstream(tempinput.at(9)) >> c2;
-    istringstream(tempinput.at(10)) >> inertiamax;
-    istringstream(tempinput.at(11)) >> inertiamin;
-    istringstream(tempinput.at(12)) >> faili;
-    istringstream(tempinput.at(13)) >> levyscale;
-    istringstream(tempinput.at(14)) >> freq;
-    istringstream(tempinput.at(15)) >> maxiters;
-    istringstream(tempinput.at(16)) >> maxcycles;
+    istringstream(tempinput.at(5)) >> hlambda;
+    istringstream(tempinput.at(6)) >> ofit;
+    istringstream(tempinput.at(7)) >> uq;
+    istringstream(tempinput.at(8)) >> NumP;
+    istringstream(tempinput.at(9)) >> c1;
+    istringstream(tempinput.at(10)) >> c2;
+    istringstream(tempinput.at(11)) >> inertiamax;
+    istringstream(tempinput.at(12)) >> inertiamin;
+    istringstream(tempinput.at(13)) >> faili;
+    istringstream(tempinput.at(14)) >> levyscale;
+    istringstream(tempinput.at(15)) >> freq;
+    istringstream(tempinput.at(16)) >> maxiters;
+    istringstream(tempinput.at(17)) >> maxcycles;
 
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -1496,15 +1524,6 @@ void Swarm::get_userinp(){
 #endif
 };
 
-double Swarm::L1norm(Swarm newSwarm) {
-  double l1norm = 0.0;
-  // calculate L1 norm based on physical params
-  for (int i = 0; i < dim; i++) {
-    l1norm = l1norm + abs(newSwarm.GetPar(cpuid_gbfit).get_pos(i))*
-       (newSwarm.GetPar(cpuid_gbfit).maxdomain.at(i) - newSwarm.GetPar(cpuid_gbfit).mindomain.at(i)) + newSwarm.GetPar(cpuid_gbfit).mindomain.at(i);
-  };
-  return l1norm;
-};
 
 vector <double> Swarm::get_com(Swarm newSwarm) {
  vector <double> swarmcom(dim, 0.0);
@@ -1665,9 +1684,9 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     };
 
     // evaluate fitness and set bfit = curfit
-    // add L1 regularization if needed
+    // add regularization if needed
     if (regular == true) {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p) + L1norm(newSwarm);
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p) + newSwarm.GetPar(p).get_reg();
     } else {
        curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p);
     };
@@ -1807,9 +1826,9 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     contff = false;
 
     // evaluate fitness and set bfit = curfit
-    // add L1 regularization if needed
+    // add regularization if needed
     if (regular == true) {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p) + L1norm(newSwarm);
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p) + newSwarm.GetPar(p).get_reg();
     } else {
        curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p);
     };
@@ -1878,9 +1897,9 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       } else {
         newSwarm.GetPar(p).update_pos();
       };
-      // add L1 regularization if needed
+      // add regularization if needed
       if (regular == true) {
-         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p) + L1norm(newSwarm);
+         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p) + newSwarm.GetPar(p).get_reg();
       } else {
          curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p);
       };
@@ -2026,9 +2045,9 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
         newSwarm.GetPar(p).update_pos();
       };
 
-      // add L1 regularization if needed
+      // add regularization if needed
       if (regular == true) {
-         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p) + L1norm(newSwarm);
+         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p) + newSwarm.GetPar(p).get_reg();
       else {
          curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p);
       };

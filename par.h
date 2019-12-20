@@ -53,7 +53,8 @@ extern bool chang;
 extern bool lg_yn;
 extern bool contff;
 extern bool fixcharges;
-extern bool regular;
+extern int regular;
+extern double hlambda;
 extern bool ofit;
 extern bool uq;
 extern bool gbfitfound;
@@ -118,6 +119,9 @@ class Par { // declaration of a particle
   //vector <double> maxpos;							// max position value during optimization
   int fails; // number of trials particle did not improve personal fitness
 
+  double get_reg(); // calculate regularization
+  double reg;
+
   private:
 
   vector < double > pos; // vector of position components of a particle
@@ -155,7 +159,6 @@ class Swarm { // declaration of a Swarm
   vector < double > get_gbpos();
   vector <double> get_com(Swarm newSwarm);
   double get_disp(Swarm newSwarm); 
-  double L1norm(Swarm newSwarm);
   void update_gbpos(Par & newPar);
   double get_gbfit();
   void set_gbfit(double bfit);
