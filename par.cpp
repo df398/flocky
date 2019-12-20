@@ -39,6 +39,7 @@ int    parid_gbfit = 0;
 bool   fixcharges = false;
 bool   lg_yn = false;
 bool   contff = false;
+bool   regular = false;
 bool   chang = false;
 bool   perc_yn = true;
 bool   ofit = false;
@@ -1206,17 +1207,21 @@ vector <double> Par::eval_numgrad(vector <double> active_params, int cycle, int 
   string str_iter = std::to_string(iter);
 
   // count total # func evaluations
-  funceval = funceval + 1;
+  funceval = funceval + 2;
   double diff = 0.0001;
   double fitplus;
   double fitminus;
   vector <double> numgrad;
+  vector <double> oldnumgrad;
 
   // save fort.4 before writing new ffield
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.4",
     pwd.string() + "/CPU." + str_core + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
 
   // perform central finite difference
+  // save last gradient
+  oldnumgrad = numgrad;
+  numgrad.clear();
   for (int i = 0; i < dim; i++) {
      // since active_params get transformed to physical params in write_ffield we should divide diff by the factor
      // before adding it to the active_params
@@ -1225,8 +1230,12 @@ vector <double> Par::eval_numgrad(vector <double> active_params, int cycle, int 
      
      active_params.at(i) = active_params.at(i) - 2.0*diff/((maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i));
      fitminus = eval_fitness(active_params, cycle, iter, parid);
-     
-     numgrad.push_back( (fitplus - fitminus) / 2.0*diff  );
+     // if current gradient is ill-defined use last saved value
+     if (fitplus != numeric_limits <double> ::infinity() && fitminus != numeric_limits <double> ::infinity()) {
+        numgrad.push_back( (fitplus - fitminus) / 2.0*diff  );
+     } else {
+        numgrad.push_back(oldnumgrad.at(i));
+     };
   };
 
   // retrive back saved ffield
@@ -1336,24 +1345,25 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(1)) >> contff;
     istringstream(tempinput.at(2)) >> perc_yn;
     istringstream(tempinput.at(3)) >> perc;
-    istringstream(tempinput.at(4)) >> ofit;
-    istringstream(tempinput.at(5)) >> uq;
-    istringstream(tempinput.at(6)) >> NumP;
+    istringstream(tempinput.at(4)) >> regular;
+    istringstream(tempinput.at(5)) >> ofit;
+    istringstream(tempinput.at(6)) >> uq;
+    istringstream(tempinput.at(7)) >> NumP;
     if (NumP < numcores) {
       cout << "Error: Number of swarm members should be bigger than number of allocated processors." << endl;
       exit(EXIT_FAILURE);
     } else {
       NumP = int(floor(NumP / numcores));
     };
-    istringstream(tempinput.at(7)) >> c1;
-    istringstream(tempinput.at(8)) >> c2;
-    istringstream(tempinput.at(9)) >> inertiamax;
-    istringstream(tempinput.at(10)) >> inertiamin; 
-    istringstream(tempinput.at(11)) >> faili;
-    istringstream(tempinput.at(12)) >> levyscale;
-    istringstream(tempinput.at(13)) >> freq;
-    istringstream(tempinput.at(14)) >> maxiters;
-    istringstream(tempinput.at(15)) >> maxcycles;
+    istringstream(tempinput.at(8)) >> c1;
+    istringstream(tempinput.at(9)) >> c2;
+    istringstream(tempinput.at(10)) >> inertiamax;
+    istringstream(tempinput.at(11)) >> inertiamin; 
+    istringstream(tempinput.at(12)) >> faili;
+    istringstream(tempinput.at(13)) >> levyscale;
+    istringstream(tempinput.at(14)) >> freq;
+    istringstream(tempinput.at(15)) >> maxiters;
+    istringstream(tempinput.at(16)) >> maxcycles;
   };  
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -1414,6 +1424,7 @@ void Swarm::get_userinp(){
   MPI_Bcast( & perc_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & perc, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   //MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & regular, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ofit, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
 #endif
@@ -1449,18 +1460,19 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(1)) >> contff;
     istringstream(tempinput.at(2)) >> perc_yn;
     istringstream(tempinput.at(3)) >> perc;
-    istringstream(tempinput.at(4)) >> ofit;
-    istringstream(tempinput.at(5)) >> uq;
-    istringstream(tempinput.at(6)) >> NumP;
-    istringstream(tempinput.at(7)) >> c1;
-    istringstream(tempinput.at(8)) >> c2;
-    istringstream(tempinput.at(9)) >> inertiamax;
-    istringstream(tempinput.at(10)) >> inertiamin;
-    istringstream(tempinput.at(11)) >> faili;
-    istringstream(tempinput.at(12)) >> levyscale;
-    istringstream(tempinput.at(13)) >> freq;
-    istringstream(tempinput.at(14)) >> maxiters;
-    istringstream(tempinput.at(15)) >> maxcycles;
+    istringstream(tempinput.at(4)) >> regular;
+    istringstream(tempinput.at(5)) >> ofit;
+    istringstream(tempinput.at(6)) >> uq;
+    istringstream(tempinput.at(7)) >> NumP;
+    istringstream(tempinput.at(8)) >> c1;
+    istringstream(tempinput.at(9)) >> c2;
+    istringstream(tempinput.at(10)) >> inertiamax;
+    istringstream(tempinput.at(11)) >> inertiamin;
+    istringstream(tempinput.at(12)) >> faili;
+    istringstream(tempinput.at(13)) >> levyscale;
+    istringstream(tempinput.at(14)) >> freq;
+    istringstream(tempinput.at(15)) >> maxiters;
+    istringstream(tempinput.at(16)) >> maxcycles;
 
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -1482,6 +1494,16 @@ void Swarm::get_userinp(){
   fort35_file.close();
 
 #endif
+};
+
+double Swarm::L1norm(Swarm newSwarm) {
+  double l1norm = 0.0;
+  // calculate L1 norm based on physical params
+  for (int i = 0; i < dim; i++) {
+    l1norm = l1norm + abs(newSwarm.GetPar(cpuid_gbfit).get_pos(i))*
+       (newSwarm.GetPar(cpuid_gbfit).maxdomain.at(i) - newSwarm.GetPar(cpuid_gbfit).mindomain.at(i)) + newSwarm.GetPar(cpuid_gbfit).mindomain.at(i);
+  };
+  return l1norm;
 };
 
 vector <double> Swarm::get_com(Swarm newSwarm) {
@@ -1643,10 +1665,17 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     };
 
     // evaluate fitness and set bfit = curfit
-    curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p);
+    // add L1 regularization if needed
+    if (regular == true) {
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p) + L1norm(newSwarm);
+    } else {
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p);
+    };
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
     if (curfit < gbfit) {
+      gbfitfound = true;
+      parid_gbfit = p;
       gbfit = curfit;
       gbpos.clear();
       gbpos = newSwarm.GetPar(p).get_pos_vec();
@@ -1657,6 +1686,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
     boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
   }; // done loop on members
+
   // pair struct to hold the global best fitness across processes and its core rank
   struct {
     double tmp_fit;
@@ -1675,10 +1705,27 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   // broadcast contents of gbpos vector from rank cpuid_gbfit
   MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
 
+
+  // pair struct to hold the global best fitness across processes and its parID
+   // The parID is required in detection of overfitting to cp the correct ffield.gbest file
+   struct {
+     double tmp_fit2;
+     int tmp_parid;
+   } min_vals_in2[1], min_vals_out2[1];
+
+   // store current fit on each process
+   min_vals_in2[0].tmp_fit2 = gbfit;
+   // store par id of that current process
+   min_vals_in2[0].tmp_parid = parid_gbfit;
+   // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
+   MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+   // parid of the gbfit
+   parid_gbfit = min_vals_out2[0].tmp_parid;
+
   // evaluate numerical gradients for global best member
   if (core == cpuid_gbfit) {
      boost::filesystem::ofstream log("log.flocky", ofstream::app);
-     grad = newSwarm.GetPar(cpuid_gbfit).eval_numgrad(newSwarm.GetPar(cpuid_gbfit).get_pos_vec(),cycle,0,cpuid_gbfit);
+     grad = newSwarm.GetPar(parid_gbfit).eval_numgrad(newSwarm.GetPar(parid_gbfit).get_pos_vec(),cycle,0,parid_gbfit);
      log << "numerical gradients are: " << endl;
      for (int i=0; i<dim; i++){
          log << boost::format("%12.7f") %grad.at(i) << endl;
@@ -1760,7 +1807,12 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     contff = false;
 
     // evaluate fitness and set bfit = curfit
-    curfit = newSwarm.GetPar(p).eval_fitness(pos,cycle, 0, p);
+    // add L1 regularization if needed
+    if (regular == true) {
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p) + L1norm(newSwarm);
+    } else {
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, 0, p);
+    };
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
 
@@ -1826,7 +1878,12 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       } else {
         newSwarm.GetPar(p).update_pos();
       };
-      curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p);
+      // add L1 regularization if needed
+      if (regular == true) {
+         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p) + L1norm(newSwarm);
+      } else {
+         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p);
+      };
       newSwarm.GetPar(p).set_fitness(curfit);
       // Update personal best positions and fitness
       if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
@@ -1890,6 +1947,17 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     cpuid_gbfit = min_vals_out[0].tmp_cpu;
     // broadcast contents of gbpos vector from rank cpuid_gbfit
     MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
+
+    // evaluate numerical gradients for global best member
+    if (core == cpuid_gbfit) {
+       boost::filesystem::ofstream log("log.flocky", ofstream::app);
+       grad = newSwarm.GetPar(parid_gbfit).eval_numgrad(newSwarm.GetPar(parid_gbfit).get_pos_vec(),cycle,0,parid_gbfit);
+       log << "numerical gradients are: " << endl;
+       for (int i=0; i<dim; i++){
+           log << boost::format("%12.7f") %grad.at(i) << endl;
+       };
+    };
+
     if (ofit == true){
       if (gbfitfound == true) {
         // detect overfitting by evaluating fitness on validation set
@@ -1957,7 +2025,13 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       } else {
         newSwarm.GetPar(p).update_pos();
       };
-      curfit = newSwarm.GetPar(p).eval_fitness(pos,cycle, iter, p);
+
+      // add L1 regularization if needed
+      if (regular == true) {
+         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p) + L1norm(newSwarm);
+      else {
+         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(),cycle, iter, p);
+      };
       newSwarm.GetPar(p).set_fitness(curfit);
 
       // Update personal best positions and fitness

@@ -53,6 +53,7 @@ extern bool chang;
 extern bool lg_yn;
 extern bool contff;
 extern bool fixcharges;
+extern bool regular;
 extern bool ofit;
 extern bool uq;
 extern bool gbfitfound;
@@ -154,6 +155,7 @@ class Swarm { // declaration of a Swarm
   vector < double > get_gbpos();
   vector <double> get_com(Swarm newSwarm);
   double get_disp(Swarm newSwarm); 
+  double L1norm(Swarm newSwarm);
   void update_gbpos(Par & newPar);
   double get_gbfit();
   void set_gbfit(double bfit);
