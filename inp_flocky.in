@@ -2,11 +2,13 @@
  
 0     ! 0: ffield belongs to ReaxFF function 1: ffield belongs to ReaxFF-lg function
 1     ! 0: randomize initial positions 1: use current ffield as initial positions
-1     ! 0: take position bounds from params.mod file 1: set %change from current ffield positions
-0.3   ! percent change from current ffield positions (in case above choice is 1)
+0     ! 0: take position bounds from params.mod file 1: set %change from current ffield positions
+0.9   ! percent change from current ffield positions (in case above choice is 1)
+1     ! 0: no regularization 1: add L1 regularization to fitness 2: add L2 regularization to fitness
+1.0   ! hlambda scaling parameter for regularization
 0     ! 0: do not detect overfitting 1: detect overfitting
 0     ! 0: do not perform UQ 1: perform UQ
-20    ! swarm size (integer)
+2     ! swarm size (integer)
 2.0   ! c1 parameter
 2.0   ! c2 parameter
 0.9   ! w1 parameter
@@ -14,5 +16,5 @@
 1     ! fail_i parameter
 0.01  ! gamma parameter
 1     ! frequency of output
-100   ! Max number of optimization iterations per cycle
+1000  ! Max number of optimization iterations per cycle
 1     ! Max number of training cycles
