@@ -122,7 +122,7 @@ boost::filesystem::ofstream log("log.flocky", ofstream::trunc);
     avgdiff = sumdiff / numcores;
     if (core == 0) {
       boost::filesystem::ofstream log("log.flocky", ofstream::app);
-      log << "Total CPU time: " << avgdiff << " seconds" << endl;
+      log << "Total CPU time: " << boost::format("%6.1f") %avgdiff << " seconds" << endl;
       log.close();
     };
     // ------------------------------------------------------------------------//
