@@ -40,7 +40,6 @@ int    parid_gbfit = 0;
 int    localmin = 0;
 int    lm_iter_max = 10;
 double lm_err_tol = 1.0E-6;
-bool   lm_vals_bound = 0;
 bool   fixcharges = false;
 bool   lg_yn = false;
 bool   contff = false;
@@ -1144,7 +1143,11 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
       fitness = numeric_limits < double > ::infinity();
     } else {
       // convert to double
-      fitness = stod(str);
+      if (regular == 1 || regular == 2 ) {
+        fitness = stod(str) + get_reg();
+      }else{
+        fitness = stod(str);
+      };
       file13.close();
     };
     boost::filesystem::remove( "CPU." + str_core + "/fort.13" );
@@ -1268,9 +1271,12 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
       if (str.at(0) == '*') {
           fitness = numeric_limits < double > ::infinity();
       } else {
-          // convert to double
-          fitness = stod(str);
-      };
+          if (regular == 1 || regular == 2) {
+             // convert to double
+             fitness = stod(str) + get_reg();
+          } else {
+             fitness = stod(str);
+          };
       file13.close();
       boost::filesystem::remove("fort.13");
   };
@@ -1420,12 +1426,12 @@ double Par::get_reg() {
   // calculate L2 penalty
   if (regular == 2) {
     for (int i = 0; i < dim; i++) {
-      reg = reg + (pos.at(i)*pos.at(i))*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i);
+      reg = reg + pow((pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i)),2);
     };
     reg = hlambda*reg;
   };
 
-  if (regular != 1 || regular != 2) {
+  if (regular != 1 && regular != 2) {
     reg = 0.0;
   };
 
@@ -1514,27 +1520,26 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(4)) >> localmin;
     istringstream(tempinput.at(5)) >> lm_iter_max;
     istringstream(tempinput.at(6)) >> lm_err_tol;
-    istringstream(tempinput.at(7)) >> lm_vals_bound;
-    istringstream(tempinput.at(8)) >> regular;
-    istringstream(tempinput.at(9)) >> hlambda;
-    istringstream(tempinput.at(10)) >> ofit;
-    istringstream(tempinput.at(11)) >> uq;
-    istringstream(tempinput.at(12)) >> NumP;
+    istringstream(tempinput.at(7)) >> regular;
+    istringstream(tempinput.at(8)) >> hlambda;
+    istringstream(tempinput.at(9)) >> ofit;
+    istringstream(tempinput.at(10)) >> uq;
+    istringstream(tempinput.at(11)) >> NumP;
     if (NumP < numcores) {
       cout << "Error: Number of swarm members should be bigger than number of allocated processors." << endl;
       exit(EXIT_FAILURE);
     } else {
       NumP = int(floor(NumP / numcores));
     };
-    istringstream(tempinput.at(13)) >> c1;
-    istringstream(tempinput.at(14)) >> c2;
-    istringstream(tempinput.at(15)) >> inertiamax;
-    istringstream(tempinput.at(16)) >> inertiamin; 
-    istringstream(tempinput.at(17)) >> faili;
-    istringstream(tempinput.at(18)) >> levyscale;
-    istringstream(tempinput.at(19)) >> freq;
-    istringstream(tempinput.at(20)) >> maxiters;
-    istringstream(tempinput.at(21)) >> maxcycles;
+    istringstream(tempinput.at(12)) >> c1;
+    istringstream(tempinput.at(13)) >> c2;
+    istringstream(tempinput.at(14)) >> inertiamax;
+    istringstream(tempinput.at(15)) >> inertiamin; 
+    istringstream(tempinput.at(16)) >> faili;
+    istringstream(tempinput.at(17)) >> levyscale;
+    istringstream(tempinput.at(18)) >> freq;
+    istringstream(tempinput.at(19)) >> maxiters;
+    istringstream(tempinput.at(20)) >> maxcycles;
   };  
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -1598,7 +1603,6 @@ void Swarm::get_userinp(){
   MPI_Bcast( & localmin, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & lm_iter_max, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & lm_err_tol, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
-  MPI_Bcast( & lm_vals_bound, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   //MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & regular, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & hlambda, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -1640,21 +1644,20 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(4)) >> localmin;
     istringstream(tempinput.at(5)) >> lm_iter_max;
     istringstream(tempinput.at(6)) >> lm_err_tol;
-    istringstream(tempinput.at(7)) >> lm_vals_bound;
-    istringstream(tempinput.at(8)) >> regular;
-    istringstream(tempinput.at(9)) >> hlambda;
-    istringstream(tempinput.at(10)) >> ofit;
-    istringstream(tempinput.at(11)) >> uq;
-    istringstream(tempinput.at(12)) >> NumP;
-    istringstream(tempinput.at(13)) >> c1;
-    istringstream(tempinput.at(14)) >> c2;
-    istringstream(tempinput.at(15)) >> inertiamax;
-    istringstream(tempinput.at(16)) >> inertiamin;
-    istringstream(tempinput.at(17)) >> faili;
-    istringstream(tempinput.at(18)) >> levyscale;
-    istringstream(tempinput.at(19)) >> freq;
-    istringstream(tempinput.at(20)) >> maxiters;
-    istringstream(tempinput.at(21)) >> maxcycles;
+    istringstream(tempinput.at(7)) >> regular;
+    istringstream(tempinput.at(8)) >> hlambda;
+    istringstream(tempinput.at(9)) >> ofit;
+    istringstream(tempinput.at(10)) >> uq;
+    istringstream(tempinput.at(11)) >> NumP;
+    istringstream(tempinput.at(12)) >> c1;
+    istringstream(tempinput.at(13)) >> c2;
+    istringstream(tempinput.at(14)) >> inertiamax;
+    istringstream(tempinput.at(15)) >> inertiamin;
+    istringstream(tempinput.at(16)) >> faili;
+    istringstream(tempinput.at(17)) >> levyscale;
+    istringstream(tempinput.at(18)) >> freq;
+    istringstream(tempinput.at(19)) >> maxiters;
+    istringstream(tempinput.at(20)) >> maxcycles;
 
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -1839,11 +1842,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     };
     // evaluate fitness and set bfit = curfit
     // add regularization if needed
-    if (regular == true) {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p) + newSwarm.GetPar(p).get_reg();
-    } else {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
-    };
+    curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
 
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
@@ -1971,11 +1970,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
 
     // evaluate fitness and set bfit = curfit
     // add regularization if needed (no local minimization case)
-    if (regular == true && (localmin != 1 && localmin != 2)) {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p) + newSwarm.GetPar(p).get_reg();
-    } else {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
-    };
+    curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
 
     /* local minimization part */
     if (localmin == 1 || localmin == 2) {
@@ -1989,7 +1984,6 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
        optim::algo_settings_t localmin_settings;
        localmin_settings.iter_max=lm_iter_max;
        localmin_settings.err_tol=lm_err_tol;
-       localmin_settings.vals_bound=lm_vals_bound;
 
        if (localmin == 1) {
            // LBFGS local minimization
@@ -2128,11 +2122,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
         newSwarm.GetPar(p).update_pos();
       };
       // add regularization if needed (no local minimization case)
-      if (regular == true && (localmin != 1 && localmin != 2)) {
-         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p) + newSwarm.GetPar(p).get_reg();
-      } else {
-         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
-      };
+      curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
 
       /* local minimization part */
       if (localmin == 1 || localmin == 2) {
@@ -2146,7 +2136,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
          optim::algo_settings_t localmin_settings;
          localmin_settings.iter_max=lm_iter_max;
          localmin_settings.err_tol=lm_err_tol;
-         localmin_settings.vals_bound=lm_vals_bound;
 
          if (localmin == 1) {
              // LBFGS local minimization
@@ -2365,11 +2354,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       };
 
       // add regularization if needed
-      if (regular == true) {
-         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p) + newSwarm.GetPar(p).get_reg();
-      } else {
-         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
-      };
+      curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
 
       /* local minimization part */
       if (localmin == 1 || localmin == 2) {
@@ -2381,7 +2366,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
          optim::algo_settings_t localmin_settings;
          localmin_settings.iter_max=lm_iter_max;
          localmin_settings.err_tol=lm_err_tol;
-         localmin_settings.vals_bound=lm_vals_bound;
 
          if (localmin == 1) {
              // LBFGS local minimization
