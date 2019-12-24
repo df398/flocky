@@ -184,7 +184,7 @@ boost::filesystem::ofstream log("log.flocky", ofstream::trunc);
 
     boost::filesystem::ofstream log("log.flocky", ofstream::app);
     log << " " << endl;
-    log << "Total CPU time: " << chrono::duration_cast<sec>(diff).count() << " seconds " << endl;
+    log << "Total CPU time: " << chrono::duration_cast<sec>(diff).count() << " seconds" << endl;
     MySwarm = Swarm();
     log.close();
   };

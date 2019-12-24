@@ -1,18 +1,19 @@
 AR = ar rcus
 CXX = mpicxx
 CC  = mpicc
-CXXFLAGS = -O3 -std=c++0x -Wno-unused-result
+CXXFLAGS = -O3 -std=c++0x -Wno-unused-result -Wno-write-strings
 CFLAGS   = -O3
 DEPS = par.h 
 OBJ = par.o main.o
 LIB = -L$(PWD) -L$(BOOST_LIB_PATH)
 INC = -I$(PWD) -I$(BOOST_INC_PATH)
 BOOST= -lboost_filesystem -lboost_system
+OPTIM= -I/usr/people/ronnie/davidf/optim-lbfgs-lib/include/optim -L/usr/people/ronnie/davidf/optim-lbfgs-lib/lib -I/usr/people/ronnie/davidf/armadillo-install/include -L/usr/people/ronnie/davidf/armadillo-install/lib -loptim -larmadillo -lblas -llapack
 
 %.o: %.cpp $(DEPS)
-	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST)
+	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST) $(OPTIM)
 
 flocky_serial: $(OBJ)
-	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^ $(BOOST)
+	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^ $(BOOST) $(OPTIM)
 clean:
 	rm -f *.o flocky_serial

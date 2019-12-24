@@ -1179,7 +1179,7 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
   if (lg_yn == true) {
       write_ffield_lg(active_params,cycle, iter, parid);
   } else {
-      write_ffield(active_params,,cycle,iter,parid);
+      write_ffield(active_params,cycle,iter,parid);
   };
   // check if reac is present
   std::ifstream fin5("reac");
@@ -1332,6 +1332,50 @@ arma::vec Par::eval_numgrad(const arma::vec &active_params, int cycle, int iter,
   // retrive back saved ffield
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.4.save",
     pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  return numgrad;
+#endif
+#ifndef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
+  string str_parID = std::to_string(parid);
+  string str_core = std::to_string(core);
+  string str_cycle = std::to_string(cycle);
+  string str_iter = std::to_string(iter);
+
+  double diff = 0.0001;
+  double fitplus;
+  double fitminus;
+  arma::vec numgrad(dim);
+  arma::vec local_params(dim);
+  local_params = active_params;
+
+  // save fort.4 before writing new ffield
+  boost::filesystem::copy_file(pwd.string() + "/fort.4",
+    pwd.string() + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
+
+  // perform central finite difference
+  for (int i = 0; i < dim; i++) {
+     local_params(i) = active_params.at(i) + diff;
+     fitplus = eval_fitness(local_params, cycle, iter, parid);
+
+     local_params(i) = active_params.at(i) - 2.0*diff;
+     fitminus = eval_fitness(local_params, cycle, iter, parid);
+
+     local_params(i) = active_params.at(i) + diff;
+
+     // if current gradient is ill-defined use last saved value
+     if (fitplus != numeric_limits <double> ::infinity() && fitminus != numeric_limits <double> ::infinity()) {
+         numgrad(i) = (fitplus - fitminus)/2.0*diff;
+     } else {
+        numgrad(i) = 0.0;
+     };
+  };
+
+  // count total # func evaluations
+  funceval = funceval + 2*dim;
+
+  // retrive back saved ffield
+  boost::filesystem::copy_file(pwd.string() + "/fort.4.save",
+    pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   return numgrad;
 #endif
 };
@@ -1796,100 +1840,11 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     // evaluate fitness and set bfit = curfit
     // add regularization if needed
     if (regular == true) {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p) + newSwarm.GetPar(p).get_reg();
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p) + newSwarm.GetPar(p).get_reg();
     } else {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
     };
 
-    /*
-    // local minimization part //
-    if (localmin == 1 || localmin == 2) {
-       double localminfit;
-       arma::vec active_params;
-       active_params = newSwarm.GetPar(p).get_pos_vec();
-       //cout << "active_params before optim::lbgfs:" << endl;
-       //cout << active_params << endl;
-
-       // local minimization settings
-       optim::algo_settings_t localmin_settings;
-       localmin_settings.iter_max=lm_iter_max;
-       localmin_settings.err_tol=lm_err_tol;
-       localmin_settings.vals_bound=lm_vals_bound;
-
-       if (localmin == 1) {
-           // LBFGS local minimization
-           bool success = optim::lbfgs(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
-             if (grad_out) {
-                  *grad_out = newSwarm.GetPar(p).eval_numgrad(active_params, cycle, 0, p);
-                  //cout << "numerical gradients within optim (NM) for CPU:" << core << endl;
-                  //cout << *grad_out << endl;
-             };
-
-             localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, 0, p);
-
-             //cout << "objfunc from within optim (LBFGS) for CPU:" << core << endl;
-             //cout << localminfit << endl;
-             //cout << "active_params within optim (LBFGS) for CPU:" << core << endl;
-             //cout << active_params << endl;
-
-             return localminfit; },
-         nullptr, localmin_settings);
-
-         if (success) {
-             //cout << "local minimization completed successfully for CPU:" << core << endl;
-             // set params that belong to local minimum to new position
-             for (int i = 0; i < dim; i++) {
-                 newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                 gbpos.at(i) = active_params(i);
-             };
-             newSwarm.GetPar(p).set_fitness(localminfit);
-             gbfit = localminfit;
-         } else {
-             //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
-         };
-         //cout << "solution:\n" << active_params << endl;
-       };
-
-       if (localmin == 2) {
-           // Nelder-Mead local minimization
-           bool success = optim::nm(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
-
-             if (grad_out) {
-                 arma::vec empty;
-                 *grad_out = empty;
-                 //cout << "numerical gradients within optim (LBFGS) for CPU:" << core << endl;
-                 //cout << *grad_out << endl;
-                };
-
-             localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, 0, p);
-
-             //cout << "objfunc from within optim (NM) for CPU:" << core << endl;
-             //cout << localminfit << endl;
-             //cout << "active_params within optim (NM) for CPU:" << core << endl;
-             //cout << active_params << endl;
-
-             return localminfit; },
-         nullptr, localmin_settings);
-
-         if (success) {
-             //cout << "local minimization completed successfully for CPU:" << core << endl;
-             // set params that belong to local minimum to new position
-             for (int i = 0; i < dim; i++) {
-                 newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                 gbpos.at(i) = active_params(i);
-             };
-             newSwarm.GetPar(p).set_fitness(localminfit);
-             gbfit = localminfit;
-         } else {
-             //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
-         };
-         //cout << "solution:\n" << active_params << endl;
-       };
-       
-       curfit = localminfit;
-       // end local minimization part //
-    }; */
-    
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
     if (curfit < gbfit) {
@@ -2017,9 +1972,9 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     // evaluate fitness and set bfit = curfit
     // add regularization if needed (no local minimization case)
     if (regular == true && (localmin != 1 && localmin != 2)) {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, parid) + newSwarm.GetPar(p).get_reg();
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p) + newSwarm.GetPar(p).get_reg();
     } else {
-       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, parid);
+       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
     };
 
     /* local minimization part */
@@ -2078,14 +2033,13 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
                  //cout << "numerical gradients within optim:" << endl;
                  //cout << *grad_out << endl;
                 };
-             };
 
-           localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, 0, p);
+             localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, 0, p);
 
-           //cout << "objfunc from within optim::lbfgs for CPU:" << core << endl;
-           //cout << localminfit << endl;
-           //cout << "active_params within optim::lbfgs for CPU:" << core << endl;
-           //cout << active_params << endl;
+             //cout << "objfunc from within optim::lbfgs for CPU:" << core << endl;
+             //cout << localminfit << endl;
+             //cout << "active_params within optim::lbfgs for CPU:" << core << endl;
+             //cout << active_params << endl;
 
            return localminfit; },
          nullptr, localmin_settings);
@@ -2104,7 +2058,6 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
          //cout << "solution:\n" << active_params << endl;
        };
        
-
        curfit = localminfit;
        /* end local minimization part */
     };
@@ -2134,11 +2087,11 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
   };
 
   newSwarm.printopt(newSwarm, 0, cycle, 1);
-  //boost::filesystem::ofstream log("log.flocky", ofstream::app);
-  log << "\nSwarm generation completed." << endl;
-  log << "Initial global best fit: " << boost::format("%18.4f") %gbfit << endl;
-  log << "flocky optimization started!" << endl;
-  log.close();
+  boost::filesystem::ofstream log2("log.flocky", ofstream::app);
+  log2 << "\nSwarm generation completed." << endl;
+  log2 << "Initial global best fit: " << boost::format("%18.4f") %gbfit << endl;
+  log2 << "flocky optimization started!" << endl;
+  log2.close();
 
   //newSwarm.printdisp(newSwarm, 0, cycle, 1);
   newSwarm.printpos(newSwarm, 0, cycle, 1);
@@ -2212,6 +2165,19 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 
                return localminfit; },
            nullptr, localmin_settings);
+           if (success) {
+               //cout << "local minimization completed successfully." << endl;
+               // set params that belong to local minimum to new position
+               for (int i = 0; i < dim; i++) {
+                   newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                   gbpos.at(i) = active_params(i);
+               };
+               newSwarm.GetPar(p).set_fitness(localminfit);
+               gbfit = localminfit;
+           } else {
+               //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
+           }
+           //cout << "solution:\n" << active_params << endl;
          };
 
          if (localmin == 2) {
@@ -2400,10 +2366,93 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 
       // add regularization if needed
       if (regular == true) {
-         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, parid) + newSwarm.GetPar(p).get_reg();
-      else {
-         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, parid);
+         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p) + newSwarm.GetPar(p).get_reg();
+      } else {
+         curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
       };
+
+      /* local minimization part */
+      if (localmin == 1 || localmin == 2) {
+         double localminfit;
+         arma::vec active_params;
+         active_params = newSwarm.GetPar(p).get_pos_vec();
+
+         // local minimization settings
+         optim::algo_settings_t localmin_settings;
+         localmin_settings.iter_max=lm_iter_max;
+         localmin_settings.err_tol=lm_err_tol;
+         localmin_settings.vals_bound=lm_vals_bound;
+
+         if (localmin == 1) {
+             // LBFGS local minimization
+             bool success = optim::lbfgs(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
+               if (grad_out) {
+                    *grad_out = newSwarm.GetPar(p).eval_numgrad(active_params, cycle, iter, p);
+                    //cout << "numerical gradients within optim:" << endl;
+                    //cout << *grad_out << endl;
+               };
+               localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
+
+               //cout << "objfunc from within optim::lbfgs:"  << endl;
+               //cout << localminfit << endl;
+               //cout << "active_params within optim::lbfgs:" << endl;
+               //cout << active_params << endl;
+
+               return localminfit; },
+           nullptr, localmin_settings);
+           if (success) {
+               //cout << "local minimization completed successfully." << endl;
+               // set params that belong to local minimum to new position
+               for (int i = 0; i < dim; i++) {
+                   newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                   gbpos.at(i) = active_params(i);
+               };
+               newSwarm.GetPar(p).set_fitness(localminfit);
+               gbfit = localminfit;
+           } else {
+               //cout << "local minimization completed unsuccessfully." << endl;
+           }
+           //cout << "solution:\n" << active_params << endl;
+         };
+
+         if (localmin == 2) {
+             // Nelder-Mead local minimization
+             bool success = optim::nm(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
+               if (grad_out) {
+                   arma::vec empty;
+                   *grad_out = empty;
+                   //cout << "numerical gradients within optim:" << endl;
+                   //cout << *grad_out << endl;
+                  };
+
+             localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
+
+             //cout << "objfunc from within optim::lbfgs:" << endl;
+             //cout << localminfit << endl;
+             //cout << "active_params within optim::lbfgs:" << endl;
+             //cout << active_params << endl;
+
+             return localminfit; },
+           nullptr, localmin_settings);
+           if (success) {
+               //cout << "local minimization completed successfully." << endl;
+               // set params that belong to local minimum to new position
+               for (int i = 0; i < dim; i++) {
+                   newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                   gbpos.at(i) = active_params(i);
+               };
+               newSwarm.GetPar(p).set_fitness(localminfit);
+               gbfit = localminfit;
+           } else {
+               //cout << "local minimization completed unsuccessfully." << endl;
+           }
+           //cout << "solution:\n" << active_params << endl;
+         };
+         
+         curfit = localminfit;
+         /* end local minimization part */
+      };
+
       newSwarm.GetPar(p).set_fitness(curfit);
 
       // Update personal best positions and fitness
@@ -2450,21 +2499,21 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
     //newSwarm.printdisp(newSwarm, iter, cycle, freq);
   }; // done loop over iterations
 
-   double temphys;
-   boost::filesystem::ofstream log("log.flocky", ofstream::app);
-   log << "\nTraining completed successfuly!\n";
-   log << "Total ReaxFF calls: " << funceval << endl;
-   log << "Global best ReaxFF fit: " << newSwarm.get_gbfit() << endl;
-   log << "Global best ReaxFF parameters:" << endl;
-   log << "[ "; 
-   for (int m = 0; m < dim; m++) {
-     temphys = newSwarm.get_gbpos().at(m)*(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)) + newSwarm.GetPar(0).mindomain.at(m);
-     // physical gbest position
-     // standardized gbest position
-     log << temphys << " ";
-   };
-   log << "]" << endl;
-   log.close();
+  double temphys;
+  boost::filesystem::ofstream log("log.flocky", ofstream::app);
+  log << "\n\nTraining completed successfuly!\n";
+  log << "Total ReaxFF calls: " << funceval << endl;
+  log << "\nGlobal best ReaxFF fit: " << boost::format("%18.4f") %newSwarm.get_gbfit() << endl;
+  log << "Global best ReaxFF parameters:" << endl;
+  log << "[ "; 
+  for (int m = 0; m < dim; m++) {
+    temphys = newSwarm.get_gbpos().at(m)*(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)) + newSwarm.GetPar(0).mindomain.at(m);
+    // physical gbest position
+    // standardized gbest position
+    log << boost::format("%8.4f") %temphys << " ";
+  };
+  log << "]" << endl;
+  log.close();
 
 #endif
 };
@@ -2557,7 +2606,55 @@ void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int 
   // execute reac
   boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
   boost::filesystem::copy_option::overwrite_if_exists);
-  system("./reac > /dev/null 2>&1");
+  //arguments for reac, will run: reac                                                                                                                                  
+  char *args[3] = { "./reac", "", NULL} ;
+  pid_t c_pid, pid;
+  int status;
+
+  /* create a child process */
+  c_pid = fork();
+
+  if (c_pid == 0){
+    /* CHILD */
+    char *filename  = "run.log";
+    int outfile = open(filename, O_CREAT | O_WRONLY, S_IRWXU);
+    if (outfile == -1){
+          fprintf(stderr, "Error: failed to create file %s\n", filename);
+    }else{
+          /* redirect the standard output from this process to the file. */
+          if(dup2(outfile, STDOUT_FILENO) != STDOUT_FILENO){
+            fprintf(stderr, "Error: failed to redirect standard output\n");
+          }
+          /* redirect reac stdout to outfile*/
+          dup2 (outfile, STDOUT_FILENO);
+          /* redirect reac stderr to /dev/null */
+          dup2(open("/dev/null", 0), 2);
+
+        /* printf("Child: executing args\n"); */
+        // execute args                                                                                                                                                               
+        execvp( args[0], args);
+        // only get here if exec failed                                                                                                                                             
+        perror("execve failed");
+        wait(&status);
+    };
+  }else if (c_pid > 0){
+    /* PARENT */
+
+    if( (pid = wait(&status)) < 0){
+      perror("wait");
+      _exit(1);
+    };
+    //printf("Parent: finished\n");
+
+  }else{
+    perror("fork failed");
+    _exit(1);
+  };
+
+  if (WIFSIGNALED (status)) {
+    cout << "reac exited abnormaly on CPU:" << core << "\n";
+    exit(EXIT_FAILURE);
+  };
 
   // cd back to main directory
   boost::filesystem::path p2(old_path);
@@ -2658,10 +2755,59 @@ void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int 
   string old_path = pwd.string();
   boost::filesystem::path p(pwd.string() + "/testovfit");
   boost::filesystem::current_path(p);
+
   // execute reac
   boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
   boost::filesystem::copy_option::overwrite_if_exists);
-  system("./reac > /dev/null 2>&1");
+  //arguments for reac, will run: reac                                                                                                                                  
+  char *args[3] = { "./reac", "", NULL} ;
+  pid_t c_pid, pid;
+  int status;
+
+  /* create a child process */
+  c_pid = fork();
+
+  if (c_pid == 0){
+    /* CHILD */
+    char *filename  = "run.log";
+    int outfile = open(filename, O_CREAT | O_WRONLY, S_IRWXU);
+    if (outfile == -1){
+          fprintf(stderr, "Error: failed to create file %s\n", filename);
+    }else{
+          /* redirect the standard output from this process to the file. */
+          if(dup2(outfile, STDOUT_FILENO) != STDOUT_FILENO){
+            fprintf(stderr, "Error: failed to redirect standard output\n");
+          }
+          /* redirect reac stdout to outfile*/
+          dup2 (outfile, STDOUT_FILENO);
+          /* redirect reac stderr to /dev/null */
+          dup2(open("/dev/null", 0), 2);
+
+        /* printf("Child: executing args\n"); */
+        // execute args                                                                                                                                                               
+        execvp( args[0], args);
+        // only get here if exec failed                                                                                                                                             
+        perror("execve failed");
+        wait(&status);
+    };
+  }else if (c_pid > 0){
+    /* PARENT */
+
+    if( (pid = wait(&status)) < 0){
+      perror("wait");
+      _exit(1);
+    };
+    //printf("Parent: finished\n");
+
+  }else{
+    perror("fork failed");
+    _exit(1);
+  };
+
+  if (WIFSIGNALED (status)) {
+    cout << "reac exited abnormaly on CPU:" << core << "\n";
+    exit(EXIT_FAILURE);
+  };
 
   // cd back to main directory
   boost::filesystem::path p2(old_path);
