@@ -5,15 +5,18 @@ CXXFLAGS = -O3 -std=c++0x -DWITH_MPI -Wno-unused-result -Wno-write-strings -Wno-
 CFLAGS   = -O3
 DEPS = par.h 
 OBJ = par.o main.o
-LIB = -L$(PWD) -L$(BOOST_LIB_PATH)
-INC = -I$(PWD) -I$(BOOST_INC_PATH)
+LIB = -L$(PWD) -L$(BOOST_LIB_PATH) -L$(OPTIM_PATH)/lib -L$(ARMA_PATH)/lib -L$(OBLAS_LIB_PATH)
+INC = -I$(PWD) -I$(BOOST_INC_PATH) -I$(OPTIM_PATH)/include/optim -I$(ARMA_PATH)/include -I$(OBLAS_INC_PATH)
+BLAS = -lblas
+LAPACK = -llapack
 BOOST= -lboost_filesystem -lboost_system
-OPTIM= -I/usr/people/ronnie/davidf/optim-lbfgs-lib/include/optim -L/usr/people/ronnie/davidf/optim-lbfgs-lib/lib -I/usr/people/ronnie/davidf/armadillo-install/include -L/usr/people/ronnie/davidf/armadillo-install/lib -loptim -larmadillo -lblas -llapack
+OPTIM = -loptim
+
 
 %.o: %.cpp $(DEPS)
-	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST) ${OPTIM}
+	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST) $(OPTIM) $(BLAS) $(LAPACK)
 
 flocky_mpi: $(OBJ)
-	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^ $(BOOST) ${OPTIM}
+	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^  $(BOOST) $(OPTIM) $(BLAS) $(LAPACK)
 clean:
 	rm -f *.o flocky_mpi

@@ -3093,7 +3093,7 @@ void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
   ofstream outfilepos(path + std::to_string(cycle), ofstream::app);
 #endif
   if (mod(iter, fr) == 0.0) {
-    outfilepos << "#Timestep: " << iter << endl;
+    outfilepos << "#iter: " << iter << endl;
     stringstream ss1;
     stringstream ss2;
     stringstream ss3;
