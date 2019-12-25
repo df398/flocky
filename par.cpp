@@ -2162,7 +2162,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                    gbpos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
-               gbfit = localminfit;
            } else {
                //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
            }
@@ -2196,7 +2195,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                    gbpos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
-               gbfit = localminfit;
            } else {
                //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
            }
@@ -2392,7 +2390,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                    gbpos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
-               gbfit = localminfit;
            } else {
                //cout << "local minimization completed unsuccessfully." << endl;
            }
@@ -2426,7 +2423,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                    gbpos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
-               gbfit = localminfit;
            } else {
                //cout << "local minimization completed unsuccessfully." << endl;
            }

@@ -1,7 +1,7 @@
 AR = ar rcus
 CXX = mpicxx
 CC  = mpicc
-CXXFLAGS = -O3 -std=c++0x -Wno-unused-result -Wno-write-strings
+CXXFLAGS = -fopenmp -O3 -std=c++0x -Wno-unused-result -Wno-write-strings
 CFLAGS   = -O3
 DEPS = par.h 
 OBJ = par.o main.o
