@@ -924,8 +924,8 @@ vector < double > Par::get_normdir() {
 double Par::get_levy_McCul(double iter, double maxiters) {
   // ****************************************************** //
   // Gaussian mutation (no Levy)
-  // std::normal_distribution < double > distnorm(0.0, 1.0);
-  // double x = distnorm(generator); // + tau;
+   std::normal_distribution < double > distnorm(0.0, 1.0);
+   double x = distnorm(generator); // + tau;
   // ****************************************************** //
 
   // ****************************************************** //
@@ -934,19 +934,19 @@ double Par::get_levy_McCul(double iter, double maxiters) {
   // When alpha approaches 2, the distribution becomes Gaussian with mean tau
   // and variance 2 * c ^ 2, and beta has no effect.
 
-  std::uniform_real_distribution <double> dist1(0.0,1.0);
-  // generate variable from exponential distribution
-  double w = -log(dist1(generator));
-  // generate variable from uniform distribution
-  double phi = (dist1(generator) - 0.5)*pi;
-  //double alpha_init = 1.0;
-  //double alpha_fin = 2.0;
-  double alpha = 1.5; // alpha_init + iter * (alpha_fin - alpha_init) / maxiters; //min(2.0,exp(log(2.0)/10000.0*time)); // alpha_init + time * (alpha_fin - alpha_init) / maxiters;
-  double c = 1.0; // 0.01 - (0.01 - 1e-50)*iter / maxiters; // 0.0003*l2_norm(space_range) - 0.0066; // 0.0003*l2_norm(space_range) - 0.0069; // 0.1 - (0.1 - 0.001)*(iter / maxiters);														// scaling parameter
-  //cout << 0.0003*l2_norm(space_range) - 0.0066  << endl;
-  double tau = 0.0;														// location parameter
-  double x = c*pow((cos((1.0 - alpha)*phi)) / w, 1.0 / alpha - 1.0)*(sin(alpha*phi)) / pow(cos(phi), 1.0 / alpha) + tau;
-  //cout << 0.0003*l2_norm(space_range) << endl;
+  //std::uniform_real_distribution <double> dist1(0.0,1.0);
+  //// generate variable from exponential distribution
+  //double w = -log(dist1(generator));
+  //// generate variable from uniform distribution
+  //double phi = (dist1(generator) - 0.5)*pi;
+  ////double alpha_init = 1.0;
+  ////double alpha_fin = 2.0;
+  //double alpha = 1.5; // alpha_init + iter * (alpha_fin - alpha_init) / maxiters; //min(2.0,exp(log(2.0)/10000.0*time)); // alpha_init + time * (alpha_fin - alpha_init) / maxiters;
+  //double c = 1.0; // 0.01 - (0.01 - 1e-50)*iter / maxiters; // 0.0003*l2_norm(space_range) - 0.0066; // 0.0003*l2_norm(space_range) - 0.0069; // 0.1 - (0.1 - 0.001)*(iter / maxiters);														// scaling parameter
+  ////cout << 0.0003*l2_norm(space_range) - 0.0066  << endl;
+  //double tau = 0.0;														// location parameter
+  //double x = c*pow((cos((1.0 - alpha)*phi)) / w, 1.0 / alpha - 1.0)*(sin(alpha*phi)) / pow(cos(phi), 1.0 / alpha) + tau;
+  ////cout << 0.0003*l2_norm(space_range) << endl;
   // ***************************************************** //
   return x;
 };
