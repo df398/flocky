@@ -31,9 +31,10 @@ Click [here](https://df398.github.io/flocky/) for documentation and usage exampl
 
 ## Installation
 Requirements:
-* GCC (tested with 5.4.0 and 7.3.0)
-* OpenMPI (tested with 1.10.2 and 4.0.1) or MPICH2
-* Boost C++ (tested with 1.70.0)
+* Any recent version of GCC
+* OpenMPI (tested with 1.10.2 and 4.0.1) or MPICH2 for parallel flocky
+* [Boost C++](https://www.boost.org/) (tested with 1.70.0)
+* [OptimLib](https://www.kthohr.com/optimlib.html#installation-method-1-shared-library) and its prerequisites: [Armadillo](http://arma.sourceforge.net/download.html)
 
 Install procedure:
 
@@ -62,7 +63,16 @@ export BOOST_LIB_PATH="path/to/installation/prefix/lib"
 export BOOST_INC_PATH="path/to/installation/prefix/include"
 ```
 
-(4) Finally, compile flocky:
+(4) Install OptimLib as a shared library:
+```bash
+export ARMA_INCLUDE_PATH=/path/to/armadillo
+./configure -i "/path/to/install-dir" -p -m "-lblas"
+make
+make install
+```
+For full OpenMP support, consider using OpenBLAS (i.e. replace "-lblas" with "-lopenblas")
+
+(5) Finally, compile flocky:
 ```bash
 make -f Makefile.mpi
 ```
