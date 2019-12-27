@@ -1027,6 +1027,7 @@ void Par::update_pos_levy(vector < double > globpos, double iter, double inertia
   };
 };
 
+
 double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, int parid) {
 #ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
@@ -1279,8 +1280,8 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
           };
       file13.close();
       boost::filesystem::remove("fort.13");
+      };
   };
-
     // Note: do not update the geometry file during iterations. Each member should use one geo file throughout
     // the training. Assuming we start with DFT_optimized (or sensible structures), and that we use some small
     // number of structural minimizations (3-10), the sensible structures won't change much, so no need to
@@ -1602,7 +1603,7 @@ void Swarm::get_userinp(){
   MPI_Bcast( & perc, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast( & localmin, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & lm_iter_max, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast( & lm_err_tol, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & lm_err_tol, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   //MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & regular, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & hlambda, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -1841,7 +1842,6 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
       contff = false;
     };
     // evaluate fitness and set bfit = curfit
-    // add regularization if needed
     curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
 
     newSwarm.GetPar(p).set_fitness(curfit);
@@ -1969,92 +1969,7 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     contff = false;
 
     // evaluate fitness and set bfit = curfit
-    // add regularization if needed (no local minimization case)
     curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
-
-    /* local minimization part */
-    if (localmin == 1 || localmin == 2) {
-       double localminfit;
-       arma::vec active_params;
-       active_params = newSwarm.GetPar(p).get_pos_vec();
-       //cout << "active_params before optim::lbgfs:" << endl;
-       //cout << active_params << endl;
-
-       // local minimization settings
-       optim::algo_settings_t localmin_settings;
-       localmin_settings.iter_max=lm_iter_max;
-       localmin_settings.err_tol=lm_err_tol;
-
-       if (localmin == 1) {
-           // LBFGS local minimization
-           bool success = optim::lbfgs(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
-             if (grad_out) {
-                  *grad_out = newSwarm.GetPar(p).eval_numgrad(active_params, cycle, 0, p);
-                  //cout << "numerical gradients within optim:" << endl;
-                  //cout << *grad_out << endl;
-             };
-
-           localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, 0, p);
-
-           //cout << "objfunc from within optim::lbfgs for CPU:" << core << endl;
-           //cout << localminfit << endl;
-           //cout << "active_params within optim::lbfgs for CPU:" << core << endl;
-           //cout << active_params << endl;
-
-           return localminfit; },
-         nullptr, localmin_settings);
-         if (success) {
-             //cout << "local minimization completed successfully for CPU:" << core << endl;
-             // set params that belong to local minimum to new position
-             for (int i = 0; i < dim; i++) {
-                 newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                 gbpos.at(i) = active_params(i);
-             };
-             newSwarm.GetPar(p).set_fitness(localminfit);
-             gbfit = localminfit;
-         } else {
-             //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
-         }
-         //cout << "solution:\n" << active_params << endl;
-       };
-
-       if (localmin == 2) {
-           // Nelder-Mead local minimization
-           bool success = optim::nm(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
-             if (grad_out) {
-                 arma::vec empty;
-                 *grad_out = empty;
-                 //cout << "numerical gradients within optim:" << endl;
-                 //cout << *grad_out << endl;
-                };
-
-             localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, 0, p);
-
-             //cout << "objfunc from within optim::lbfgs for CPU:" << core << endl;
-             //cout << localminfit << endl;
-             //cout << "active_params within optim::lbfgs for CPU:" << core << endl;
-             //cout << active_params << endl;
-
-           return localminfit; },
-         nullptr, localmin_settings);
-         if (success) {
-             //cout << "local minimization completed successfully for CPU:" << core << endl;
-             // set params that belong to local minimum to new position
-             for (int i = 0; i < dim; i++) {
-                 newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                 gbpos.at(i) = active_params(i);
-             };
-             newSwarm.GetPar(p).set_fitness(localminfit);
-             gbfit = localminfit;
-         } else {
-             //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
-         }
-         //cout << "solution:\n" << active_params << endl;
-       };
-       
-       curfit = localminfit;
-       /* end local minimization part */
-    };
 
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
@@ -2121,7 +2036,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       } else {
         newSwarm.GetPar(p).update_pos();
       };
-      // add regularization if needed (no local minimization case)
       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
 
       /* local minimization part */
@@ -2139,23 +2053,24 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 
          if (localmin == 1) {
              // LBFGS local minimization
+             //cout << "initial position before local min for CPU " << core << "is: " << active_params << endl;
              bool success = optim::lbfgs(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
                if (grad_out) {
                     *grad_out = newSwarm.GetPar(p).eval_numgrad(active_params, cycle, iter, p);
-                    //cout << "numerical gradients within optim:" << endl;
+                    //cout << "numerical gradients within optim::lbfgs for CPU:" << core << endl;
                     //cout << *grad_out << endl;
                };
                localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
 
                //cout << "objfunc from within optim::lbfgs for CPU:" << core << endl;
                //cout << localminfit << endl;
-               //cout << "active_params within optim::lbfgs for CPU:" << core << endl;
+               //cout << "final position after local min for CPU:" << core << endl;
                //cout << active_params << endl;
 
                return localminfit; },
            nullptr, localmin_settings);
            if (success) {
-               //cout << "local minimization completed successfully." << endl;
+               //cout << "local minimization completed successfully for CPU: " << core << endl;
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
@@ -2201,7 +2116,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
            //cout << "solution:\n" << active_params << endl;
          };
          
-
          curfit = localminfit;
          /* end local minimization part */
       };

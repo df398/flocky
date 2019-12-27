@@ -1,19 +1,21 @@
-AR = ar rcus
+AR  = ar rcus
 CXX = mpicxx
-CC  = mpicc
-CXXFLAGS = -fopenmp -O3 -std=c++0x -Wno-unused-result -Wno-write-strings
+CC  = picc
+CXXFLAGS = -O3 -std=c++17 -Wno-unused-result -Wno-write-strings -Wno-write-strings
 CFLAGS   = -O3
 DEPS = par.h 
 OBJ = par.o main.o
-LIB = -L$(PWD) -L$(BOOST_LIB_PATH) -L$(OPTIM_PATH)/lib -L$(ARMA_PATH)/lib -L$(OBLAS_LIB_PATH)
-INC = -I$(PWD) -I$(BOOST_INC_PATH) -I$(OPTIM_PATH)/include/optim -I$(ARMA_PATH)/include -I$(OBLAS_INC_PATH)
+LIB = -L$(PWD) -L$(BOOST_LIB_PATH) -L$(OPTIM_PATH)/lib -L$(ARMA_PATH)/lib
+INC = -I$(PWD) -I$(BOOST_INC_PATH) -I$(OPTIM_PATH)/include/optim -I$(ARMA_PATH)/include
 BLAS = -lblas
 LAPACK = -llapack
 BOOST= -lboost_filesystem -lboost_system
 OPTIM = -loptim
 
+
 %.o: %.cpp $(DEPS)
 	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST) $(OPTIM) $(BLAS) $(LAPACK)
+
 flocky_serial: $(OBJ)
 	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^  $(BOOST) $(OPTIM) $(BLAS) $(LAPACK)
 clean:

@@ -39,10 +39,11 @@
 # undef BOOST_NO_CXX11_SCOPED_ENUMS
 #include <regex>
 #ifdef WITH_MPI
-#include <mpi.h>
+#include "mpi.h"
 #endif
-
 using namespace std;
+
+
 extern int ierr, core, numcores;
 extern int dim;
 extern int NumP;
