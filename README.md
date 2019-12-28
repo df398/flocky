@@ -2,8 +2,6 @@
   <img src="https://github.com/df398/flocky/blob/master/flocky-logo.jpg">
 </p>
 
-Copyright (c) 2019 David Furman
-
 flocky is an open-source platform for development of high-quality ReaxFF reactive force fields for reactive molecular dynamics simulations. flocky is based on the RiPSOGM swarm intelligence algorithm for meta-heuristic global optimization.
 
 Features:
@@ -98,6 +96,7 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 ## License
 flocky is distributed under the terms of the [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/) license.
+Copyright © 2019 David Furman, University of Cambridge.
 
 ## Citations
 If you find flocky useful, please consider citing:
