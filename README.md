@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="460" height="300" src="https://github.com/df398/flocky/blob/master/flocky-logo.jpg">
+  <img src="https://github.com/df398/flocky/blob/master/flocky-logo.jpg">
 </p>
 
 Copyright (c) 2019 David Furman
