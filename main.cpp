@@ -51,7 +51,7 @@ boost::filesystem::ofstream log("log.flocky", ofstream::trunc);
     log << "*                                                                   *\n";
     log << "*                David Furman, PhD ; df398@cam.ac.uk                *\n";
     log << "*                       University of Cambridge                     *\n";
-    log << "*                  Copyright (C) 2018-2019 LGPL-3.0                 *\n";
+    log << "*                  Copyright (C) 2018-2019  GPL-3.0                 *\n";
     log << "*                                                                   *\n";
     log << "*       Publications using flocky are requested to cite:            *\n";
     log << "*       Furman, David; Carmeli, Benny; Zeiri, Yehuda;               *\n";
