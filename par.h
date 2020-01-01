@@ -112,7 +112,6 @@ class Par { // declaration of a particle
   void set_fitness(double fit); // set particle fitness
   double eval_fitness(const arma::vec &active_params, int cycle, int iter, int parid); // evalulate fitness
   arma::vec eval_numgrad(const arma::vec &active_params, int cycle, int iter, int parid); // evaluate numerical gradients of fitness
-  //double cost_fn(const arma::vec& vals_inp, arma::vec* numgrad, struct opt_data_struct opt_data);
   double get_bfit();
   void set_bfit(double bfit);
 

@@ -2036,6 +2036,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       } else {
         newSwarm.GetPar(p).update_pos();
       };
+
       curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
 
       /* local minimization part */
@@ -2074,7 +2075,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                   gbpos.at(i) = active_params(i);
+                   pos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
            } else {
@@ -2107,7 +2108,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                   gbpos.at(i) = active_params(i);
+                   pos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
            } else {
@@ -2301,7 +2302,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                   gbpos.at(i) = active_params(i);
+                   pos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
            } else {
@@ -2334,7 +2335,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                   gbpos.at(i) = active_params(i);
+                   pos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
            } else {
