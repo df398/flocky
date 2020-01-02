@@ -491,9 +491,14 @@ void Par::write_ffield_lg(const arma::vec &active_params, int cycle, int iter, i
   // current ffield file stream
   ifstream ffield_file;
   string comment;
-
+#ifdef WITH_MPI
   output_file.open("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, ios::out);
   ffield_file.open("CPU." + str_core + "/ffield", ios:: in );
+#endif
+#ifndef WITH_MPI
+  output_file.open("ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID, ios::out);
+  ffield_file.open("ffield", ios:: in );
+#endif
   // read all ffield file into vector of lines to use it next 
   // to write comments/header lines
   vector < string > ffield_lines;
