@@ -467,23 +467,23 @@ void Par::write_ffield_lg(const arma::vec &active_params, int cycle, int iter, i
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
   string str_parID = std::to_string(parid);
-
   // update particle ffield
   int index = 0;
-  // for each line value in ffline and corresponding column value in ffcol 
-  // cp corresponding pos value into ffieldmat. Range-based for statement 
-  // following: https://msdn.microsoft.com/en-us/library/jj203382.aspx
+  double tempphys;
+  // for each line value in ffline and corresponding column value
+  // in ffcol cp corresponding pos value into ffieldmat. Range-based for
+  // statement --> Following: https://msdn.microsoft.com/en-us/library/jj203382.aspx
   for (int line: ffline) {
     // buffer for sprintf
     char buffer[50];
     double n;
     // transform back to physical positions before writing ffield
-    pos.at(index) = pos.at(index)*(maxdomain.at(index) - mindomain.at(index)) + mindomain.at(index);
+    //tempphys = pos.at(index)*(maxdomain.at(index) - mindomain.at(index)) + mindomain.at(index);
+    tempphys = active_params.at(index)*(maxdomain.at(index) - mindomain.at(index)) + mindomain.at(index);
     // use physical positions
-    n = sprintf(buffer, "%9.4f", pos.at(index));
+    n = sprintf(buffer, "%9.4f", tempphys);
     ffieldmat[line][ffcol.at(index)] = buffer;
     index = index + 1;
-
   };
   string str_core = std::to_string(core);
   // write updated ffield to ffield file (ffield.tmp.cycle.iter.parid)
@@ -2075,7 +2075,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                   pos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
            } else {
@@ -2108,7 +2107,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                   pos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
            } else {
@@ -2302,7 +2300,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                   pos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
            } else {
@@ -2335,7 +2332,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                // set params that belong to local minimum to new position
                for (int i = 0; i < dim; i++) {
                    newSwarm.GetPar(p).set_posdim(i, active_params(i));
-                   pos.at(i) = active_params(i);
                };
                newSwarm.GetPar(p).set_fitness(localminfit);
            } else {
