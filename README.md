@@ -30,11 +30,13 @@ Click [here](https://df398.github.io/flocky/) for documentation and usage exampl
 
 ## Installation
 Requirements:
-* Any recent version of GCC that supports the C++17 standard
+
+* Any recent version of GCC that supports the C++11 standard
 * OpenMPI or MPICH2 for parallel flocky
 * [Boost C++](https://www.boost.org/)
-* [OptimLib](https://www.kthohr.com/optimlib.html#installation-method-1-shared-library) and its prerequisites: [Armadillo](http://arma.sourceforge.net/download.html)
-* [BLAS](http://www.netlib.org/blas/) and [LAPACK](http://www.netlib.org/lapack/) (or [OpenBLAS](https://github.com/xianyi/OpenBLAS)) are required for Armadillo
+* [BLAS](http://www.netlib.org/blas/) and [LAPACK](http://www.netlib.org/lapack/) (or optionally [OpenBLAS](https://github.com/xianyi/OpenBLAS))
+* [Armadillo](http://arma.sourceforge.net/download.html)
+* [OptimLib](https://www.kthohr.com/optimlib.html#installation-method-1-shared-library)
 
 Install procedure:
 
@@ -64,14 +66,14 @@ export BOOST_INC_PATH=path/to/installation/prefix/include
 ```
 
 (4) Install OptimLib as a shared library:
-For full OpenMP support, consider using OpenBLAS (i.e. replace "-lblas -llapack" with "-lopenblas -L/path/to/OpenBLAS-install/lib")
+If using OpenBLAS, replace "-lblas -llapack" below with "-lopenblas -L/path/to/OpenBLAS-install/lib"
 ```bash
 export ARMA_INCLUDE_PATH=/path/to/armadillo
 ./configure -i "/path/to/install-dir" -p -m "-lblas -llapack"
 make
 make install
 ```
-If the above install command generates an error, please manually add:
+If the above install command generates an error, please manually add the line:
 ```bash @mkdir -p $(INSTALL_PATH)/lib```
 to Makefile.in just after line 85 and try again.
 
@@ -79,11 +81,12 @@ to Makefile.in just after line 85 and try again.
 ```bash
 export OPTIM_PATH=/path/to/optimlib-install
 export ARMA_PATH=/path/to/armadillo-install
+
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/armadillo-install/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/optimlib-install/lib
 ```
 
-(6) Finally, compile flocky:
+(6) Finally, compile flocky (if using OpenBLAS add the $(OBLAS) variable to the two linker lines in the Makefile):
 ```bash
 make -f Makefile.mpi
 ```
@@ -94,7 +97,7 @@ make -f Makefile.serial
 for a serial version.
 
 ## Usage
-To run flocky in parallel mode, use the corresponding MPI command. Note: N should be less than or equal to the number of swarm agents.
+To run flocky in parallel mode, use the corresponding MPI command.
 ```bash
 mpiexec -np N flocky_mpi
 ```
