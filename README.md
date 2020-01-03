@@ -30,10 +30,11 @@ Click [here](https://df398.github.io/flocky/) for documentation and usage exampl
 
 ## Installation
 Requirements:
-* Any recent version of GCC
-* OpenMPI (tested with 1.10.2 and 4.0.1) or MPICH2 for parallel flocky
-* [Boost C++](https://www.boost.org/) (tested with 1.70.0)
+* Any recent version of GCC that supports the C++17 standard
+* OpenMPI or MPICH2 for parallel flocky
+* [Boost C++](https://www.boost.org/)
 * [OptimLib](https://www.kthohr.com/optimlib.html#installation-method-1-shared-library) and its prerequisites: [Armadillo](http://arma.sourceforge.net/download.html)
+* [BLAS](http://www.netlib.org/blas/) and [LAPACK](http://www.netlib.org/lapack/) (or [OpenBLAS](https://github.com/xianyi/OpenBLAS)) are required for Armadillo
 
 Install procedure:
 
@@ -63,15 +64,23 @@ export BOOST_INC_PATH="path/to/installation/prefix/include"
 ```
 
 (4) Install OptimLib as a shared library:
+For full OpenMP support, consider using OpenBLAS (i.e. replace "-lblas -llapack" with "-lopenblas")
 ```bash
 export ARMA_INCLUDE_PATH=/path/to/armadillo
-./configure -i "/path/to/install-dir" -p -m "-lblas"
+./configure -i "/path/to/install-dir" -p -m "-lblas -llapack"
 make
 make install
 ```
-For full OpenMP support, consider using OpenBLAS (i.e. replace "-lblas" with "-lopenblas")
 
-(5) Finally, compile flocky:
+(5) Set your OPTIM_PATH ARMA_PATH envrionment variables:
+```bash
+export OPTIM_PATH="/path/to/optimlib-install"
+export ARMA_PATH="/path/to/armadillo-install"
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/armadillo-install/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/optimlib-install/lib
+```
+
+(6) Finally, compile flocky:
 ```bash
 make -f Makefile.mpi
 ```
