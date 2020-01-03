@@ -59,8 +59,8 @@ cd path/to/boost_1_61_0
 
 (3) Set your BOOST_LIB_PATH and BOOST_INC_PATH environment variables:
 ```bash
-export BOOST_LIB_PATH="path/to/installation/prefix/lib" 
-export BOOST_INC_PATH="path/to/installation/prefix/include"
+export BOOST_LIB_PATH=path/to/installation/prefix/lib
+export BOOST_INC_PATH=path/to/installation/prefix/include
 ```
 
 (4) Install OptimLib as a shared library:
@@ -77,10 +77,10 @@ to Makefile.in just after line 85 and try again.
 
 (5) Set your OPTIM_PATH and ARMA_PATH envrionment variables:
 ```bash
-export OPTIM_PATH="/path/to/optimlib-install"
-export ARMA_PATH="/path/to/armadillo-install"
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/path/to/armadillo-install/lib"
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/path/to/optimlib-install/lib"
+export OPTIM_PATH=/path/to/optimlib-install
+export ARMA_PATH=/path/to/armadillo-install
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/armadillo-install/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/optimlib-install/lib
 ```
 
 (6) Finally, compile flocky:
