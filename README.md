@@ -64,7 +64,7 @@ export BOOST_INC_PATH=path/to/installation/prefix/include
 ```
 
 (4) Install OptimLib as a shared library:
-For full OpenMP support, consider using OpenBLAS (i.e. replace "-lblas -llapack" with "-lopenblas")
+For full OpenMP support, consider using OpenBLAS (i.e. replace "-lblas -llapack" with "-lopenblas -L/path/to/OpenBLAS-install/lib")
 ```bash
 export ARMA_INCLUDE_PATH=/path/to/armadillo
 ./configure -i "/path/to/install-dir" -p -m "-lblas -llapack"
