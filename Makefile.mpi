@@ -1,14 +1,15 @@
 AR  = ar rcus
 CXX = mpicxx
 CC  = mpicc
-CXXFLAGS = -O3 -std=c++17 -DWITH_MPI -Wno-unused-result -Wno-write-strings -Wno-write-strings
+CXXFLAGS = -O3 -fopenmp -std=c++11 -DWITH_MPI -Wno-unused-result -Wno-write-strings -Wno-write-strings
 CFLAGS   = -O3
 DEPS = par.h 
 OBJ = par.o main.o
-LIB = -L$(PWD) -L$(BOOST_LIB_PATH) -L$(OPTIM_PATH)/lib -L$(ARMA_PATH)/lib
+LIB = -L$(PWD) -L$(BOOST_LIB_PATH) -L$(OPTIM_PATH)/lib -L$(ARMA_PATH)/lib -L$(OBLAS_PATH)/lib
 INC = -I$(PWD) -I$(BOOST_INC_PATH) -I$(OPTIM_PATH)/include/optim -I$(ARMA_PATH)/include 
 BLAS = -lblas
 LAPACK = -llapack
+OBLAS = -lopenblas
 BOOST= -lboost_filesystem -lboost_system
 OPTIM = -loptim
 

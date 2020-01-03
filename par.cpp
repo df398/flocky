@@ -127,12 +127,14 @@ void Par::read_ffield() {
   if (fin.fail()) {
 #ifdef WITH_MPI
     cout << "Error: unable to open 'ffield' file on CPU" << core << " \n";
+    fin.close();
+    MPI_Abort(MPI_COMM_WORLD,1);
 #endif
 #ifndef WITH_MPI
     cout << "Unable to open 'ffield' file \n"; 
-#endif
     fin.close();
     exit(EXIT_FAILURE);
+#endif
   } else {
     std::string line;
     int numlines = 0;
@@ -823,9 +825,16 @@ void Par::read_bounds() {
   string str_core = std::to_string(core);
   std::ifstream fin("params.mod");
   if (fin.fail()) {
-    cout << "Unable to open parameters file 'params.mod' on CPU " << core << ". \n";
+#ifdef WITH_MPI
+    cout << "Error: Unable to open parameters file 'params.mod' on CPU " << core << ". \n";
+    fin.close();
+    MPI_Abort(MPI_COMM_WORLD,2);
+#endif
+#ifndef WITH_MPI
+    cout << "Error: Unable to open parameters file 'params.mod' on CPU " << core << ". \n";
     fin.close();
     exit(EXIT_FAILURE);
+#endif
   } else {
     std::string line;
     int numlines = 0;
@@ -1058,7 +1067,7 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
   if (fin5.fail()) {
      cout << "reac executable not found for CPU " + str_core + ". Aborting! \n";
      fin5.close();
-     exit(EXIT_FAILURE);
+     MPI_Abort(MPI_COMM_WORLD,3);
   };
   fin5.close();
 
@@ -1122,7 +1131,7 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
 
   if (WIFSIGNALED (status)) {
     cout << "reac exited abnormaly on CPU:" << core << "\n";
-    exit(EXIT_FAILURE);
+    MPI_Abort(MPI_COMM_WORLD,4);
   };
 
   // cd back to main directory
@@ -1153,6 +1162,7 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
         fitness = stod(str) + get_reg();
       }else{
         fitness = stod(str);
+        cout << "fitness on CPU: " << core << " is: " << fitness << endl;
       };
       file13.close();
     };
@@ -1282,6 +1292,7 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
              fitness = stod(str) + get_reg();
           } else {
              fitness = stod(str);
+             cout << "fitness on CPU: " << core << " is: " << fitness << endl;
           };
       file13.close();
       boost::filesystem::remove("fort.13");
@@ -1437,10 +1448,6 @@ double Par::get_reg() {
     reg = hlambda*reg;
   };
 
-  if (regular != 1 && regular != 2) {
-    reg = 0.0;
-  };
-
   return reg;
 };
 
@@ -1460,9 +1467,16 @@ void Swarm::read_icharg_control() {
   string str_core = std::to_string(core);
   std::ifstream control_file("control");
   if (control_file.fail()) {
+#ifdef WITH_MPI
     cout << "Unable to open control file on CPU " << core << ". \n";
     control_file.close();
+    MPI_Abort(MPI_COMM_WORLD,5);
+#endif
+#ifndef WITH_MPI
+    cout << "Unable to open control file. \n";
+    control_file.close();
     exit(EXIT_FAILURE);
+#endif
   } else{
     std::string line;
     int numlines = 0;
@@ -1496,9 +1510,9 @@ void Swarm::get_userinp(){
     vector <string> tempinput;
     std::ifstream fin("inp_flocky.in");
     if (fin.fail()) {
-      cout << "Unable to open 'inp_flocky.in' file \n";
+      cout << "Error: Unable to open 'inp_flocky.in' file \n";
       fin.close();
-      exit(EXIT_FAILURE);
+      MPI_Abort(MPI_COMM_WORLD,6);
     } else {
       std::string line;
       // for each line
@@ -1533,7 +1547,7 @@ void Swarm::get_userinp(){
     istringstream(tempinput.at(11)) >> NumP;
     if (NumP < numcores) {
       cout << "Error: Number of swarm members should be bigger than number of allocated processors." << endl;
-      exit(EXIT_FAILURE);
+      MPI_Abort(MPI_COMM_WORLD,7);
     } else {
       NumP = int(floor(NumP / numcores));
     };
@@ -1554,7 +1568,7 @@ void Swarm::get_userinp(){
   if (fixcharges == true && charge_file.fail()) {
     cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
     charge_file.close();
-    exit(EXIT_FAILURE);
+    MPI_Abort(MPI_COMM_WORLD,8);
   };
   charge_file.close();
 
@@ -1620,7 +1634,7 @@ void Swarm::get_userinp(){
     vector <string> tempinput;
     std::ifstream fin("inp_flocky.in");
     if (fin.fail()) {
-      cout << "Unable to open 'inp_flocky.in' file \n";
+      cout << "Error: Unable to open 'inp_flocky.in' file \n";
       fin.close();
       exit(EXIT_FAILURE);
     } else {
@@ -1669,7 +1683,7 @@ void Swarm::get_userinp(){
   read_icharg_control();
   boost::filesystem::ifstream charge_file("charges");
   if (charge_file.fail()) {
-    cout << "'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
+    cout << "Error: 'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
     charge_file.close();
     exit(EXIT_FAILURE);
   };
@@ -2042,8 +2056,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
         newSwarm.GetPar(p).update_pos();
       };
 
-      curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
-
       /* local minimization part */
       if (localmin == 1 || localmin == 2) {
          double localminfit;
@@ -2056,36 +2068,40 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
          optim::algo_settings_t localmin_settings;
          localmin_settings.iter_max=lm_iter_max;
          localmin_settings.err_tol=lm_err_tol;
+         localmin_settings.vals_bound = true;
+         vector <double> ones(dim, 1.0);
+         vector <double> zeros(dim, 0.0);
+         localmin_settings.upper_bounds = ones;
+         localmin_settings.lower_bounds = zeros;
+         if (core == 0) {localmin_settings.verbose_print_level=2;};
 
          if (localmin == 1) {
              // LBFGS local minimization
-             //cout << "initial position before local min for CPU " << core << "is: " << active_params << endl;
              bool success = optim::lbfgs(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
                if (grad_out) {
                     *grad_out = newSwarm.GetPar(p).eval_numgrad(active_params, cycle, iter, p);
-                    //cout << "numerical gradients within optim::lbfgs for CPU:" << core << endl;
-                    //cout << *grad_out << endl;
                };
                localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
+               if (isnan(localminfit)) {localminfit = 1.0E23;};
+               return localminfit; }, nullptr, localmin_settings);
 
-               //cout << "objfunc from within optim::lbfgs for CPU:" << core << endl;
-               //cout << localminfit << endl;
-               //cout << "final position after local min for CPU:" << core << endl;
-               //cout << active_params << endl;
-
-               return localminfit; },
-           nullptr, localmin_settings);
-           if (success) {
-               //cout << "local minimization completed successfully for CPU: " << core << endl;
-               // set params that belong to local minimum to new position
-               for (int i = 0; i < dim; i++) {
-                   newSwarm.GetPar(p).set_posdim(i, active_params(i));
-               };
-               newSwarm.GetPar(p).set_fitness(localminfit);
-           } else {
-               //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
-           }
-           //cout << "solution:\n" << active_params << endl;
+               if (success) {
+                   //cout << "local minimization completed successfully for CPU:" << core << " with fitness: " << localminfit << endl;
+                   // set final params that belong to local minimum to new position
+                   for (int i = 0; i < dim; i++) {
+                       newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                   };
+                   // set final obtained fitness of the local minimum as current fitness
+                   curfit = localminfit;
+               } else {
+                   //cout << ">>> local failure for CPU:" << core << " with fitness: " << localminfit << endl;
+                   // set final params (not local minimum) to new position
+                   for (int i = 0; i < dim; i++) {
+                       newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                   };
+                   // set final obtained fitness as current fitness
+                   curfit = localminfit;
+               }; /* end localmin == 1 */
          };
 
          if (localmin == 2) {
@@ -2094,37 +2110,38 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                if (grad_out) {
                    arma::vec empty;
                    *grad_out = empty;
-                   //cout << "numerical gradients within optim:" << endl;
-                   //cout << *grad_out << endl;
-                  };
-
-             localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
-
-             //cout << "objfunc from within optim::lbfgs for CPU:" << core << endl;
-             //cout << localminfit << endl;
-             //cout << "active_params within optim::lbfgs for CPU:" << core << endl;
-             //cout << active_params << endl;
-
-             return localminfit; },
-           nullptr, localmin_settings);
-           if (success) {
-               //cout << "local minimization completed successfully for CPU:" << core << endl;
-               // set params that belong to local minimum to new position
-               for (int i = 0; i < dim; i++) {
-                   newSwarm.GetPar(p).set_posdim(i, active_params(i));
                };
-               newSwarm.GetPar(p).set_fitness(localminfit);
-           } else {
-               //cout << "local minimization completed unsuccessfully for CPU:" << core << endl;
-           }
-           //cout << "solution:\n" << active_params << endl;
-         };
-         
-         curfit = localminfit;
-         /* end local minimization part */
+               localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
+               if (isnan(localminfit)) {localminfit = 1.0E23;};
+             return localminfit; },nullptr, localmin_settings);
+             
+             if (success) {
+                 //cout << "local minimization completed successfully for CPU:" << core << " with fitness: " << localminfit << endl;
+                 // set final params that belong to local minimum to new position
+                 for (int i = 0; i < dim; i++) {
+                     newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                 };
+                 // set final obtained fitness of the local minimum as current fitness
+                 curfit = localminfit;
+             } else {
+                 //cout << ">>> local failure for CPU:" << core << " with fitness: " << localminfit << endl;
+                 // set final params (not local minimum) to new position
+                 for (int i = 0; i < dim; i++) {
+                     newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                 };
+                 // set final obtained fitness as current fitness
+                 curfit = localminfit;
+             };
+         }; /* end localmin == 2 */
+
+      } else {
+          // no local minimization
+          curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
       };
 
-       newSwarm.GetPar(p).set_fitness(curfit);
+      // update fitness of each member
+      newSwarm.GetPar(p).set_fitness(curfit);
+
       // Update personal best positions and fitness
       if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
         newSwarm.GetPar(p).update_bpos();
@@ -2148,8 +2165,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
       string str_iter = std::to_string(iter);
       string str_parID = std::to_string(p);
       //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
-
-
 
     }; // done loop over swarm members
     //newSwarm.get_com(newSwarm);
@@ -2269,8 +2284,6 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
         newSwarm.GetPar(p).update_pos();
       };
 
-      // add regularization if needed
-      curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
 
       /* local minimization part */
       if (localmin == 1 || localmin == 2) {
@@ -2282,35 +2295,39 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
          optim::algo_settings_t localmin_settings;
          localmin_settings.iter_max=lm_iter_max;
          localmin_settings.err_tol=lm_err_tol;
+         localmin_settings.vals_bound = true;
+         vector <double> ones(dim, 1.0);
+         vector <double> zeros(dim, 0.0);
+         localmin_settings.upper_bounds = ones; 
+         localmin_settings.lower_bounds = zeros;
 
          if (localmin == 1) {
              // LBFGS local minimization
              bool success = optim::lbfgs(active_params, [&](const arma::vec& active_params, arma::vec* grad_out, void* opt_data) {
                if (grad_out) {
                     *grad_out = newSwarm.GetPar(p).eval_numgrad(active_params, cycle, iter, p);
-                    //cout << "numerical gradients within optim:" << endl;
-                    //cout << *grad_out << endl;
                };
                localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
+               if (isnan(localminfit)) {localminfit = 1.0E23;};
+               return localminfit; }, nullptr, localmin_settings);
 
-               //cout << "objfunc from within optim::lbfgs:"  << endl;
-               //cout << localminfit << endl;
-               //cout << "active_params within optim::lbfgs:" << endl;
-               //cout << active_params << endl;
-
-               return localminfit; },
-           nullptr, localmin_settings);
-           if (success) {
-               //cout << "local minimization completed successfully." << endl;
-               // set params that belong to local minimum to new position
-               for (int i = 0; i < dim; i++) {
-                   newSwarm.GetPar(p).set_posdim(i, active_params(i));
-               };
-               newSwarm.GetPar(p).set_fitness(localminfit);
-           } else {
-               //cout << "local minimization completed unsuccessfully." << endl;
-           }
-           //cout << "solution:\n" << active_params << endl;
+               if (success) {
+                   //cout << "local minimization completed successfully with fitness: " << localminfit << endl;
+                   // set final params that belong to local minimum to new position
+                   for (int i = 0; i < dim; i++) {
+                       newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                   };
+                   // set final obtained fitness of the local minimum as current fitness
+                   curfit = localminfit;
+               } else {
+                   //cout << ">>> local failure with fitness: " << localminfit << endl;
+                   // set final params (not local minimum) to new position
+                   for (int i = 0; i < dim; i++) {
+                       newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                   };
+                   // set final obtained fitness as current fitness
+                   curfit = localminfit;
+               }; /* end localmin == 1 */
          };
 
          if (localmin == 2) {
@@ -2319,36 +2336,36 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
                if (grad_out) {
                    arma::vec empty;
                    *grad_out = empty;
-                   //cout << "numerical gradients within optim:" << endl;
-                   //cout << *grad_out << endl;
-                  };
-
-             localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
-
-             //cout << "objfunc from within optim::lbfgs:" << endl;
-             //cout << localminfit << endl;
-             //cout << "active_params within optim::lbfgs:" << endl;
-             //cout << active_params << endl;
-
-             return localminfit; },
-           nullptr, localmin_settings);
-           if (success) {
-               //cout << "local minimization completed successfully." << endl;
-               // set params that belong to local minimum to new position
-               for (int i = 0; i < dim; i++) {
-                   newSwarm.GetPar(p).set_posdim(i, active_params(i));
                };
-               newSwarm.GetPar(p).set_fitness(localminfit);
-           } else {
-               //cout << "local minimization completed unsuccessfully." << endl;
-           }
-           //cout << "solution:\n" << active_params << endl;
-         };
-         
-         curfit = localminfit;
-         /* end local minimization part */
+               localminfit = newSwarm.GetPar(p).eval_fitness(active_params, cycle, iter, p);
+               if (isnan(localminfit)) {localminfit = 1.0E23;};
+             return localminfit; },nullptr, localmin_settings);
+             
+             if (success) {
+                 //cout << "local minimization completed successfully with fitness: " << localminfit << endl;
+                 // set final params that belong to local minimum to new position
+                 for (int i = 0; i < dim; i++) {
+                     newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                 };
+                 // set final obtained fitness of the local minimum as current fitness
+                 curfit = localminfit;
+             } else {
+                 //cout << ">>> local failure with fitness: " << localminfit << endl;
+                 // set final params (not local minimum) to new position
+                 for (int i = 0; i < dim; i++) {
+                     newSwarm.GetPar(p).set_posdim(i, active_params(i));
+                 };
+                 // set final obtained fitness as current fitness
+                 curfit = localminfit;
+             };
+         }; /* end localmin == 2 */
+
+      } else {
+          // no local minimization
+          curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, iter, p);
       };
 
+      // update fitness of each member
       newSwarm.GetPar(p).set_fitness(curfit);
 
       // Update personal best positions and fitness
@@ -2548,8 +2565,8 @@ void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int 
   };
 
   if (WIFSIGNALED (status)) {
-    cout << "reac exited abnormaly on CPU:" << core << "\n";
-    exit(EXIT_FAILURE);
+    cout << "Error: reac exited abnormaly on CPU:" << core << "\n";
+    MPI_Abort(MPI_COMM_WORLD,4); 
   };
 
   // cd back to main directory
@@ -2701,7 +2718,7 @@ void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int 
   };
 
   if (WIFSIGNALED (status)) {
-    cout << "reac exited abnormaly on CPU:" << core << "\n";
+    cout << "Error: reac exited abnormaly on CPU:" << core << "\n";
     exit(EXIT_FAILURE);
   };
 
