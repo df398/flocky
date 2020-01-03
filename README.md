@@ -71,8 +71,11 @@ export ARMA_INCLUDE_PATH=/path/to/armadillo
 make
 make install
 ```
+If the above install command generates an error, please manually add:
+```bash @mkdir -p $(INSTALL_PATH)/lib```
+to Makefile.in just after line 85 and try again.
 
-(5) Set your OPTIM_PATH ARMA_PATH envrionment variables:
+(5) Set your OPTIM_PATH and ARMA_PATH envrionment variables:
 ```bash
 export OPTIM_PATH="/path/to/optimlib-install"
 export ARMA_PATH="/path/to/armadillo-install"
