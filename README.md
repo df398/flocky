@@ -79,8 +79,8 @@ to Makefile.in just after line 85 and try again.
 ```bash
 export OPTIM_PATH="/path/to/optimlib-install"
 export ARMA_PATH="/path/to/armadillo-install"
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/armadillo-install/lib
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/optimlib-install/lib
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/path/to/armadillo-install/lib"
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/path/to/optimlib-install/lib"
 ```
 
 (6) Finally, compile flocky:
