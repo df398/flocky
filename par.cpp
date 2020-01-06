@@ -1167,6 +1167,11 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
       file13.close();
     };
     boost::filesystem::remove( "CPU." + str_core + "/fort.13" );
+    boost::filesystem::remove( "CPU." + str_core + "/xmolout" );
+    boost::filesystem::remove( "CPU." + str_core + "/fort.73" );
+    boost::filesystem::remove( "CPU." + str_core + "/molfra.out" );
+    boost::filesystem::remove( "CPU." + str_core + "/dipole.out" );
+    boost::filesystem::remove( "CPU." + str_core + "/fort.71" );
   };
 
   // Note: do not update the geometry file during iterations. Each member should use one geo file throughout
@@ -1296,6 +1301,11 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
           };
       file13.close();
       boost::filesystem::remove("fort.13");
+      boost::filesystem::remove( "xmolout" );
+      boost::filesystem::remove( "fort.73" );
+      boost::filesystem::remove( "molfra.out" );
+      boost::filesystem::remove( "dipole.out" );
+      boost::filesystem::remove( "fort.71" );
       };
   };
     // Note: do not update the geometry file during iterations. Each member should use one geo file throughout
@@ -2073,7 +2083,7 @@ void Swarm::Propagate(Swarm & newSwarm, int cycle) {
          vector <double> zeros(dim, 0.0);
          localmin_settings.upper_bounds = ones;
          localmin_settings.lower_bounds = zeros;
-         if (core == 0) {localmin_settings.verbose_print_level=2;};
+         //if (core == 0) {localmin_settings.verbose_print_level=2;};
 
          if (localmin == 1) {
              // LBFGS local minimization
