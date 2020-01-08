@@ -19,7 +19,12 @@
 // initialize non-determinstic seed
 std::random_device seed;
 // Mersene Twister: Good quality random number generator
+#ifdef WITH_MPI
 std::mt19937 generator(seed() + core);
+#endif
+#ifndef WITH_MPI
+std::mt19937 generator(seed());
+#endif
 std::uniform_real_distribution <double> dist1(0.0, 1.0);
 
 int    ierr, core, numcores = 0;
@@ -70,6 +75,7 @@ int    faili = 1;
 // --------------------------------------------------------------- //
 
 
+
 // define int of modulo
 int mod(int x, int m) {
   return (x % m + m) % m;
@@ -90,7 +96,6 @@ double l2_norm(vector < double > const & u) {
 
 
 Par::Par() {
-
   // read ffield file into matrix ffieldmat. split by each entry.
   read_ffield();
 
@@ -1162,7 +1167,7 @@ double Par::eval_fitness(const arma::vec &active_params, int cycle, int iter, in
         fitness = stod(str) + get_reg();
       }else{
         fitness = stod(str);
-        cout << "fitness on CPU: " << core << " is: " << fitness << endl;
+        //cout << "fitness on CPU: " << core << " is: " << fitness << endl;
       };
       file13.close();
     };
