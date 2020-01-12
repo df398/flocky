@@ -69,6 +69,24 @@ double levyscale = 1.0;
 double confac = 1.0;
 int    faili = 1;
 
+/* define global variables for start
+   and end lines of ffield sections
+   -------------------------------- */
+int    numel = 1;
+int    max_line_atompar = 1;
+int    numbty = 1;
+int    max_line_bondpar = 1;
+int    numodty = 1;
+int    max_line_offdpar = 1;
+int    numaty = 1;
+int    max_line_angles = 1;
+int    numtoty = 1;
+int    max_line_tors = 1;
+int    numhbty = 1;
+int    max_line_hbs = 1;
+vector <vector <int>> inversep;
+/* -------------------------------- */
+
 
 // --------------------------------------------------------------- //
 //             General functions definitions                       //
@@ -91,6 +109,73 @@ double l2_norm(vector < double > const & u) {
   return sqrt(accum);
 };
 
+void get_inversep() {
+  vector <int> temp;
+
+  // add line number of inverse parameter from general section
+  // p_boc2
+  temp = {4, 1};
+  inversep.push_back(temp);
+
+  // add line numbers of inverse parameters from atom section
+  // r0_sigma
+  for (int i = 1; i < max_line_atompar+1 ; i++) {
+    temp = {numel +4*i, 2};
+    inversep.push_back(temp);
+  };
+  // r0_pi
+  for (int i = 1; i < max_line_atompar+1 ; i++) {
+    temp = {numel + 4*i, 8};
+    inversep.push_back(temp);
+  };
+  // r0_pipi
+  for (int i = 1; i < max_line_atompar+1 ; i++) {
+    temp = {numel + 6*i, 1};
+    inversep.push_back(temp);
+  };
+  // rvdw
+  for (int i = 1; i < max_line_atompar+1 ; i++) {
+    temp = {numel + 4*i, 5};
+    inversep.push_back(temp);
+  };
+  // gammaw
+  for (int i = 1; i < max_line_atompar+1 ; i++) {
+    temp = {numel + 5*i, 2};
+    inversep.push_back(temp);
+  };
+  // gammaij
+  for (int i = 1; i < max_line_atompar+1 ; i++) {
+    temp = {numel + 4*i, 7};
+    inversep.push_back(temp);
+  };
+
+  // add line numbers of inverse parameters from off-diagonal section
+  // Ro
+  for (int i = 1; i < max_line_offdpar+1 ; i++) {
+    temp = {numodty + i, 4};
+    inversep.push_back(temp);
+  };
+  // rsigma
+  for (int i = 1; i < max_line_offdpar+1 ; i++) {
+    temp = {numodty + i, 8};
+    inversep.push_back(temp);
+  };
+  // rpi
+  for (int i = 1; i < max_line_offdpar+1 ; i++) {
+    temp = {numodty + i, 7};
+    inversep.push_back(temp);
+  };
+  // rpipi
+  for (int i = 1; i < max_line_offdpar+1 ; i++) {
+    temp = {numodty + i, 6};
+    inversep.push_back(temp);
+  };
+  // add line numbers of inverse parameters from hbond section
+  for (int i = 1; i < max_line_hbs+1 ; i++) {
+    temp = {numhbty + i, 4};
+    inversep.push_back(temp);
+  };
+};
 
 // --------------- End general functions definitions -------------- //
 
@@ -245,8 +330,8 @@ void Par::write_ffield(const arma::vec &active_params, int cycle, int iter, int 
   vector < string > results;
   boost::trim(numel_line);
   boost::split(results, numel_line, is_any_of("\t "));
-  int numel = stoi(results.at(0));
-  int max_line_atompar = 4 * numel + 45;
+  numel = stoi(results.at(0));
+  max_line_atompar = 4 * numel + 45;
   /* -------------------------------------
    * WRITE ATOM PARAMS SECTION
    * -------------------------------------
@@ -290,8 +375,8 @@ void Par::write_ffield(const arma::vec &active_params, int cycle, int iter, int 
   vector < string > results_bonds;
   boost::trim(numbty_line);
   boost::split(results_bonds, numbty_line, is_any_of("\t "));
-  int numbty = stoi(results_bonds.at(0));
-  int max_line_bondpar = 2 * numbty + max_line_atompar;
+  numbty = stoi(results_bonds.at(0));
+  max_line_bondpar = 2 * numbty + max_line_atompar;
 
   /* ------------------------------------
    * WRITE BONDS PARAMS SECTION
@@ -338,8 +423,8 @@ void Par::write_ffield(const arma::vec &active_params, int cycle, int iter, int 
   vector < string > results_offdiag;
   boost::trim(numodty_line);
   boost::split(results_offdiag, numodty_line, is_any_of("\t "));
-  int numodty = stoi(results_offdiag.at(0));
-  int max_line_offdpar = max_line_bondpar + 3 + numodty;
+  numodty = stoi(results_offdiag.at(0));
+  max_line_offdpar = max_line_bondpar + 3 + numodty;
 
   for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
     // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
@@ -373,8 +458,8 @@ void Par::write_ffield(const arma::vec &active_params, int cycle, int iter, int 
   vector < string > results_angle;
   boost::trim(numaty_line);
   boost::split(results_angle, numaty_line, is_any_of("\t "));
-  int numaty = stoi(results_angle.at(0));
-  int max_line_angles = max_line_offdpar + 1 + numaty;
+  numaty = stoi(results_angle.at(0));
+  max_line_angles = max_line_offdpar + 1 + numaty;
 
   for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
     boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
@@ -406,8 +491,8 @@ void Par::write_ffield(const arma::vec &active_params, int cycle, int iter, int 
   vector < string > results_tors;
   boost::trim(numtoty_line);
   boost::split(results_tors, numtoty_line, is_any_of("\t "));
-  int numtoty = stoi(results_tors.at(0));
-  int max_line_tors = max_line_angles + 1 + numtoty;
+  numtoty = stoi(results_tors.at(0));
+  max_line_tors = max_line_angles + 1 + numtoty;
 
   for (int m = max_line_angles + 1; m < max_line_tors; m++) {
     boost::format f("  %i  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
@@ -439,8 +524,8 @@ void Par::write_ffield(const arma::vec &active_params, int cycle, int iter, int 
   vector < string > results_hb;
   boost::trim(numhbty_line);
   boost::split(results_hb, numhbty_line, is_any_of("\t "));
-  int numhbty = stoi(results_hb.at(0));
-  int max_line_hbs = max_line_tors + 1 + numhbty;
+  numhbty = stoi(results_hb.at(0));
+  max_line_hbs = max_line_tors + 1 + numhbty;
 
   for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
     boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f");
@@ -555,8 +640,8 @@ void Par::write_ffield_lg(const arma::vec &active_params, int cycle, int iter, i
   vector < string > results;
   boost::trim(numel_line);
   boost::split(results, numel_line, is_any_of("\t "));
-  int numel = stoi(results.at(0));
-  int max_line_atompar = 5 * numel + 45;
+  numel = stoi(results.at(0));
+  max_line_atompar = 5 * numel + 45;
 
   /* -------------------------------------
    * WRITE ATOM PARAMS SECTION
@@ -618,8 +703,8 @@ void Par::write_ffield_lg(const arma::vec &active_params, int cycle, int iter, i
   vector < string > results_bonds;
   boost::trim(numbty_line);
   boost::split(results_bonds, numbty_line, is_any_of("\t "));
-  int numbty = stoi(results_bonds.at(0));
-  int max_line_bondpar = 2 * numbty + max_line_atompar;
+  numbty = stoi(results_bonds.at(0));
+  max_line_bondpar = 2 * numbty + max_line_atompar;
 
   /* ------------------------------------
    * WRITE BONDS PARAMS SECTION
@@ -672,8 +757,8 @@ void Par::write_ffield_lg(const arma::vec &active_params, int cycle, int iter, i
   vector < string > results_offdiag; 
   boost::trim(numodty_line);
   boost::split(results_offdiag, numodty_line, is_any_of("\t "));
-  int numodty = stoi(results_offdiag.at(0));
-  int max_line_offdpar = max_line_bondpar + 3 + numodty;
+  numodty = stoi(results_offdiag.at(0));
+  max_line_offdpar = max_line_bondpar + 3 + numodty;
 
   for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
     // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
@@ -713,8 +798,8 @@ void Par::write_ffield_lg(const arma::vec &active_params, int cycle, int iter, i
   vector < string > results_angle;
   boost::trim(numaty_line);
   boost::split(results_angle, numaty_line, is_any_of("\t "));
-  int numaty = stoi(results_angle.at(0));
-  int max_line_angles = max_line_offdpar + 1 + numaty;
+  numaty = stoi(results_angle.at(0));
+  max_line_angles = max_line_offdpar + 1 + numaty;
 
   for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
     boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
@@ -752,8 +837,8 @@ void Par::write_ffield_lg(const arma::vec &active_params, int cycle, int iter, i
   vector < string > results_tors;
   boost::trim(numtoty_line);
   boost::split(results_tors, numtoty_line, is_any_of("\t "));
-  int numtoty = stoi(results_tors.at(0));
-  int max_line_tors = max_line_angles + 1 + numtoty;
+  numtoty = stoi(results_tors.at(0));
+  max_line_tors = max_line_angles + 1 + numtoty;
 
   for (int m = max_line_angles + 1; m < max_line_tors; m++) {
     boost::format f("  %i  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
@@ -790,8 +875,8 @@ void Par::write_ffield_lg(const arma::vec &active_params, int cycle, int iter, i
   vector < string > results_hb;
   boost::trim(numhbty_line);
   boost::split(results_hb, numhbty_line, is_any_of("\t "));
-  int numhbty = stoi(results_hb.at(0));
-  int max_line_hbs = max_line_tors + 1 + numhbty;
+  numhbty = stoi(results_hb.at(0));
+  max_line_hbs = max_line_tors + 1 + numhbty;
 
   for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
     boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f");
@@ -870,8 +955,10 @@ void Par::read_bounds() {
         maxdomain.push_back(allData[i][6]);
         // read line number of parameter from modified params file
         ffline.push_back(allData[i][0]-1);
+        cout << "ffline = " << ffline.at(i) << endl;
         // read column number of parameter from modified params file
         ffcol.push_back(allData[i][1]-1);
+        cout << "ffcol = " << ffcol.at(i) << endl;
       };
     } else {
       for (int i=0; i<dim; i++){
@@ -1446,26 +1533,41 @@ void Par::set_vel(vector < double > vel_of_best_particle) {
   vel = vel_of_best_particle;
 };
 
+
 double Par::get_reg() {
   double reg = 0.0;
+
+  // vector to store the positions that will be converted below to their inverses to use in regularization
+  vector <double> pos_for_reg(dim ,0.0);
+
+  // if position belongs to the subset of positions that are used as inverses by ReaxFF (i.e. 1/parameter),
+  // use the inverse of that parameter into the sum of regularization
+  for (int i = 0; i < ffline.size(); i++) {
+      if ( (ffline.at(i)+1 == inversep.at(i).at(0)) && (ffcol.at(i)+1 == inversep.at(i).at(1)) ) {
+         pos_for_reg.at(i) = 1.0/(pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i));
+      }else {
+         pos_for_reg.at(i) = pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i);
+      };
+  };
+
   // calculate L1 penalty
   if (regular == 1) {
     for (int i = 0; i < dim; i++) {
-      reg = reg + abs(pos.at(i))*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i);
+        reg = reg + abs( pos_for_reg.at(i) );
     };
     reg = hlambda*reg;
   };
+
   // calculate L2 penalty
   if (regular == 2) {
     for (int i = 0; i < dim; i++) {
-      reg = reg + pow((pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i)),2);
+      reg = reg + pow(pos_for_reg.at(i),2);
     };
     reg = hlambda*reg;
   };
 
   return reg;
 };
-
 
 
 
@@ -1589,17 +1691,45 @@ void Swarm::get_userinp(){
 
   // prepare dirs for each CPU process
   boost::filesystem::create_directory("CPU." + str_core);
+  if (boost::filesystem::exists(pwd.string() + "/reac")) {
+      boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/CPU." + str_core + "/reac",
+          boost::filesystem::copy_option::overwrite_if_exists);
+  }else {
+       cout << "Error: can't find reac executable" << endl;
+       MPI_Abort(MPI_COMM_WORLD,3);
+  };
 
-  boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/CPU." + str_core + "/reac",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/ffield", pwd.string() + "/CPU." + str_core + "/ffield",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/control", pwd.string() + "/CPU." + str_core + "/control",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/geo", pwd.string() + "/CPU." + str_core + "/geo",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/trainset.in", pwd.string() + "/CPU." + str_core + "/trainset.in",
-      boost::filesystem::copy_option::overwrite_if_exists);
+  if (boost::filesystem::exists(pwd.string() + "/ffield")) {
+     boost::filesystem::copy_file(pwd.string() + "/ffield", pwd.string() + "/CPU." + str_core + "/ffield",
+         boost::filesystem::copy_option::overwrite_if_exists);
+  }else {
+       cout << "Error: can't find ffield" << endl;
+       MPI_Abort(MPI_COMM_WORLD,3);
+  };
+
+  if (boost::filesystem::exists(pwd.string() + "/control")) {
+     boost::filesystem::copy_file(pwd.string() + "/control", pwd.string() + "/CPU." + str_core + "/control",
+         boost::filesystem::copy_option::overwrite_if_exists);
+  }else {
+       cout << "Error: can't find control" << endl;
+       MPI_Abort(MPI_COMM_WORLD,3);
+  };
+
+  if (boost::filesystem::exists(pwd.string() + "/geo")) {
+     boost::filesystem::copy_file(pwd.string() + "/geo", pwd.string() + "/CPU." + str_core + "/geo",
+         boost::filesystem::copy_option::overwrite_if_exists);
+  }else {
+       cout << "Error: can't find geo" << endl;
+       MPI_Abort(MPI_COMM_WORLD,3);
+  };
+
+  if (boost::filesystem::exists(pwd.string() + "/trainset.in")) {
+     boost::filesystem::copy_file(pwd.string() + "/trainset.in", pwd.string() + "/CPU." + str_core + "/trainset.in",
+         boost::filesystem::copy_option::overwrite_if_exists);
+  }else {
+       cout << "Error: can't find trainset.in" << endl;
+       MPI_Abort(MPI_COMM_WORLD,3);
+  };
 
   if (fixcharges == true) {
     boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
@@ -1834,6 +1964,12 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     log.close();
   };
   funceval = 0; // clear counter for cycles
+
+  // find inverse parameters and store them in inversep
+  if (regular == 1 || regular == 2) {
+     get_inversep();
+  };
+
   // ---------------------------------------------- //
   //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
   // ---------------------------------------------- //
@@ -1877,7 +2013,6 @@ void Swarm::Populate(Swarm & newSwarm, int cycle) {
     };
     // evaluate fitness and set bfit = curfit
     curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), cycle, 0, p);
-
     newSwarm.GetPar(p).set_fitness(curfit);
     newSwarm.GetPar(p).set_bfit(curfit);
     if (curfit < gbfit) {

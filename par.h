@@ -78,6 +78,19 @@ extern double lm_err_tol;
 extern bool lm_vals_bound;
 const long double pi = 3.14159265358979323846;
 const long double econst = 2.71828182845904523536;
+extern int    numel;
+extern int    max_line_atompar;
+extern int    numbty;
+extern int    max_line_bondpar;
+extern int    numodty;
+extern int    max_line_offdpar;
+extern int    numaty;
+extern int    max_line_angles;
+extern int    numtoty;
+extern int    max_line_tors;
+extern int    numhbty;
+extern int    max_line_hbs;
+extern vector <vector <int >> inversep; // stores inverse params
 
 class Par { // declaration of a particle
   public:
