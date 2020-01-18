@@ -69,13 +69,10 @@ export BOOST_INC_PATH=path/to/installation/prefix/include
 cmake -DCMAKE_INSTALL_PREFIX=path/to/preferred/installdir
 make
 make install
-```
-(5) Append your LD_LIBRARY_PATH environment variable:
-```bash
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:path/to/preferred/installdir/lib
 ```
 
-(6) Finally, compile flocky with the appropriate makefile:
+(5) Finally, compile flocky with the appropriate makefile:
 ```bash
 make -f Makefile.mpi
 ```
