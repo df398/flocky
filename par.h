@@ -33,18 +33,28 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/process.hpp>
 #include <boost/process/async_system.hpp>
-#include <optim.hpp>
+#include <nlopt.hpp>
 # define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 # undef BOOST_NO_CXX11_SCOPED_ENUMS
 #include <regex>
 #ifdef WITH_MPI
-#include "mpi.h"
+#include <mpi.h>
 #endif
 using namespace std;
 
-
 extern int ierr, core, numcores;
+extern int mycore_swarmcore;
+extern int size_swarmcores;
+extern int mycore_reaxffcore;
+extern int size_reaxffcores;
+
+extern int ptrainset;
+extern vector <int> swarmcores;
+extern int swarmcores_size;
+extern vector <int> reaxffcores;
+extern int reaxffcores_size;
+extern int totmembers;
 extern int dim;
 extern int NumP;
 extern double c1;
@@ -52,6 +62,7 @@ extern double c2;
 extern double inertiamax;
 extern double inertiamin;
 extern bool chang;
+extern bool verbose;
 extern bool lg_yn;
 extern bool contff;
 extern bool fixcharges;
@@ -78,6 +89,7 @@ extern double lm_err_tol;
 extern bool lm_vals_bound;
 const long double pi = 3.14159265358979323846;
 const long double econst = 2.71828182845904523536;
+
 extern int    numel;
 extern int    max_line_atompar;
 extern int    numbty;
@@ -100,11 +112,18 @@ class Par { // declaration of a particle
 
   };
 
+  struct {
+   int cycle;
+   int iter;
+   int parid;
+  } state;
+
   void read_bounds(); // read in min/max bounds of params and set min/max domain. Output dim = number of lines.
   double get_min_dim();
   void read_ffield(); // read ffield file into matrix
-  void write_ffield_lg(const arma::vec &active_params, int cycle, int iter, int parid);
-  void write_ffield(const arma::vec &active_params, int cycle, int iter, int parid);
+  void write_trainset();
+  void write_ffield_lg(const vector <double> &active_params, int cycle, int iter, int parid);
+  void write_ffield(const vector <double> &active_params, int cycle, int iter, int parid);
 
   double get_vel(int n);
   double get_pos(int k);
@@ -123,8 +142,11 @@ class Par { // declaration of a particle
 
   double get_fitness(); // get particle fitness
   void set_fitness(double fit); // set particle fitness
-  double eval_fitness(const arma::vec &active_params, int cycle, int iter, int parid); // evalulate fitness
-  arma::vec eval_numgrad(const arma::vec &active_params, int cycle, int iter, int parid); // evaluate numerical gradients of fitness
+  double eval_fitness(const vector <double> &active_params, vector <double> &grad, void *mydata); // evalulate fitness
+  int iterate(int maxiter);
+  double minf;
+  vector <double> x;
+  vector <double> eval_numgrad(const vector <double> &active_params, void *mydata); // evaluate numerical gradients of fitness
   double get_bfit();
   void set_bfit(double bfit);
 
@@ -141,9 +163,8 @@ class Par { // declaration of a particle
 
   double get_reg(); // calculate regularization
   double reg;
-  arma::vec numgrad;
+  vector <double> numgrad;
 
-  private:
 
   vector < double > pos; // vector of position components of a particle
   vector < double > vel; // vector of velocity components of a particle
@@ -151,6 +172,7 @@ class Par { // declaration of a particle
 
   double bfitness; // particle previous best fitness
   double fitness; // particle current fitness
+  double pfitness; // particle temporary fitness when parallelizing training set
 };
 
 class Swarm { // declaration of a Swarm
@@ -163,6 +185,8 @@ class Swarm { // declaration of a Swarm
 
   Par & GetPar(int ParID);
   void get_userinp();
+  //void MPI_Split();
+  //void MPI_Free();
   void read_icharg_control();
   void AddPar(Par & newPar);
   void Populate(Swarm & newSwarm, int iter);

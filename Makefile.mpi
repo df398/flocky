@@ -1,23 +1,21 @@
 AR  = ar rcus
 CXX = mpicxx
 CC  = mpicc
-CXXFLAGS = -O3 -fopenmp -std=c++11 -DWITH_MPI -Wno-unused-result -Wno-write-strings
+CXXFLAGS = -O3 -std=c++11 -DWITH_MPI -Wno-unused-result -Wno-write-strings
 CFLAGS   = -O3
 DEPS = par.h 
 OBJ = par.o main.o
-LIB = -L$(PWD) -L$(BOOST_LIB_PATH) -L$(OPTIM_PATH)/lib -L$(ARMA_PATH)/lib -L$(OBLAS_PATH)/lib
-INC = -I$(PWD) -I$(BOOST_INC_PATH) -I$(OPTIM_PATH)/include/optim -I$(ARMA_PATH)/include -I$(OBLAS_PATH)/include
-BLAS = -lblas
-LAPACK = -llapack
-OBLAS = -lopenblas
+LIB = -L$(PWD) -L$(BOOST_LIB_PATH) -L$(NLOPT_PATH)/lib
+INC = -I$(PWD) -I$(BOOST_INC_PATH) -I$(NLOPT_PATH)/include
 BOOST= -lboost_filesystem -lboost_system
-OPTIM = -loptim
-
+NLOPT= -lnlopt -lm
 
 %.o: %.cpp $(DEPS)
-	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST) $(OPTIM) $(BLAS) $(LAPACK)
+	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -c -o $@ $< $(BOOST) $(NLOPT)
 
 flocky_mpi: $(OBJ)
-	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^  $(BOOST) $(OPTIM) $(BLAS) $(LAPACK)
+	$(CXX) $(LIB) $(INC) $(CXXFLAGS) -o $@ $^ $(BOOST) $(NLOPT)
+
+.PHONY: clean
 clean:
 	rm -f *.o flocky_mpi

@@ -28,7 +28,7 @@ using sec = chrono::seconds;
 using namespace std;
 
 int main(int argc, char * argv[]) {
-boost::filesystem::ofstream log("log.flocky", ofstream::trunc);
+  boost::filesystem::ofstream log("log.flocky", ofstream::trunc);
 #ifdef WITH_MPI
   ierr = MPI_Init( & argc, & argv);
   ierr = MPI_Comm_rank(MPI_COMM_WORLD, & core);
@@ -51,7 +51,7 @@ boost::filesystem::ofstream log("log.flocky", ofstream::trunc);
     log << "*                                                                   *\n";
     log << "*                David Furman, PhD ; df398@cam.ac.uk                *\n";
     log << "*                       University of Cambridge                     *\n";
-    log << "*                  Copyright (C) 2018-2019  GPL-3.0                 *\n";
+    log << "*                  Copyright (C) 2018-2019 GPL-3.0                  *\n";
     log << "*                                                                   *\n";
     log << "*       Publications using flocky are requested to cite:            *\n";
     log << "*       Furman, David; Carmeli, Benny; Zeiri, Yehuda;               *\n";
@@ -153,7 +153,7 @@ boost::filesystem::ofstream log("log.flocky", ofstream::trunc);
     log << "*                                                                   *\n";
     log << "*                David Furman, PhD ; df398@cam.ac.uk                *\n";
     log << "*                       University of Cambridge                     *\n";
-    log << "*                  Copyright (C) 2018-2019 LGPL-3.0                 *\n";
+    log << "*                  Copyright (C) 2018-2019 GPL-3.0                  *\n";
     log << "*                                                                   *\n";
     log << "*       Publications using flocky are requested to cite:            *\n";
     log << "*       Furman, David; Carmeli, Benny; Zeiri, Yehuda;               *\n";
