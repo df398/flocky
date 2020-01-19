@@ -2766,6 +2766,13 @@ if (verbose == true) {
   log << "Swarm generation started. Please wait." << endl;
   log.close();
 
+  funceval = 0; // clear counter for cycles
+
+  // find inverse parameters and store them in inversep
+  if (regular == 1 || regular == 2) {
+     get_inversep();
+  };
+
   // ---------------------------------------------- //
   //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
   // ---------------------------------------------- //
