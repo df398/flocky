@@ -201,7 +201,7 @@ double fitness_wrapper(const vector <double> &x, vector <double> &numgrad, void 
   //cout << "WRAPPER x in CPU: " << core << " is: " << x[0] << ", " << x[1] << endl;
   //cout << "WRAPPER minfunc in CPU: " << core << " is: " << minfunc << endl;
   //cout << "WRAPPER gradients in CPU: " << core << " is: " << numgrad.at(0) << ", " << numgrad.at(1) << endl;
-  cout << endl;
+  //cout << endl;
   return minfunc;
 };
 
@@ -1310,7 +1310,12 @@ void Par::read_bounds() {
         };
 
     };
-
+if (core == 0 && verbose == true && perc_yn == false) {
+    cout << "parameters to train with their bounds:" << endl;
+    for (int i = 0; i < dim; i++) {
+        cout << ffline.at(i) << " " << ffcol.at(i) << " " << mindomain.at(i) << " " << maxdomain.at(i) << " " << endl;
+    };
+};
   };
 };
 
@@ -1471,7 +1476,7 @@ void Par::update_pos_levy(vector < double > globpos, double iter, double inertia
 };
 
 
-int Par::iterate(int maxiter) {
+int Par::iterate(int lm_maxit) {
  if (localmin == 2) {
    nlopt::opt opt(nlopt::LN_SBPLX, dim);
    opt.set_min_objective(fitness_wrapper, this);
@@ -1480,18 +1485,18 @@ int Par::iterate(int maxiter) {
    opt.set_lower_bounds(standard_mindomain);
    opt.set_upper_bounds(standard_maxdomain);
    opt.set_ftol_rel(lm_err_tol);
-   opt.set_maxeval(maxiter);
+   opt.set_maxeval(lm_maxit);
    x = pos;
 
    try{
        nlopt::result result = opt.optimize(x, minf);
-       std::cout << "Found minimum for CPU: " << core << "! first two dimensions --> f(" << x[0] << "," << x[1] << ") = "
-           << std::setprecision(4) << minf << std::endl;
+       cout << "Found minimum for CPU: " << core << "! first two dimensions --> f(" << x[0] << "," << x[1] << ") = "
+           << std::setprecision(4) << minf << endl;
        pos = x;
        fitness = minf;
    }
    catch(std::exception &e) {
-       std::cout << "Warning: nlopt failed for CPU: " << core << "--> " << e.what() << ". Maybe your params in initial ffield fall outside specified bounds in params.mod?" << std::endl;
+       cout << "Warning: local minimization failed for CPU " << core << "--> " << e.what() << endl;
    };
  };
 
@@ -1504,28 +1509,26 @@ int Par::iterate(int maxiter) {
    opt.set_lower_bounds(standard_mindomain);
    opt.set_upper_bounds(standard_maxdomain);
    opt.set_ftol_rel(lm_err_tol);
-   opt.set_maxeval(maxiter);
+   opt.set_maxeval(lm_maxit);
    x = pos;
 
    try{
        nlopt::result result = opt.optimize(x, minf);
-       std::cout << "Found minimum for CPU: " << core << "! first two dimensions --> f(" << x[0] << "," << x[1] << ") = "
-           << std::setprecision(4) << minf << std::endl;
+       cout << "Found minimum for CPU: " << core << "! first two dimensions --> f(" << x[0] << "," << x[1] << ") = "
+           << std::setprecision(4) << minf << endl;
        pos = x;
        fitness = minf;
    }
    catch(std::exception &e) {
-       std::cout << "Warning: nlopt failed for CPU: " << core << "--> " << e.what() << ". Maybe your params in initial ffield fall outside specified bounds in params.mod?" << std::endl;
+       std::cout << "Warning: local minimization failed for CPU " << core << "--> " << e.what() << endl;
    };
  };
-
 
    return 0;
 };
 
 double Par::eval_fitness(const vector <double> &active_params, vector<double> &grad_out, void *my_func_data) {
 #ifdef WITH_MPI
-  
   int cycle;
   int iter;
   int parid;
@@ -1546,6 +1549,10 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
+  // dropout
+  if (regular == 3) {
+     dropout(0.5);
+  };
   // check if ffield is LG or not. execute correct reac accordingly
   if (lg_yn == true) {
       write_ffield_lg(active_params, cycle, iter, parid);
@@ -1561,7 +1568,6 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
      MPI_Abort(MPI_COMM_WORLD,3);
   };
   fin5.close();
-
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   if (fixcharges == true){
@@ -1592,7 +1598,6 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
      // generate trainset subsets
      write_trainset();
   };
-
   //arguments for reac, will run: reac                                                                                                                                  
   char *args[3] = { "./reac", "", NULL} ;
   pid_t c_pid, pid;
@@ -1626,23 +1631,19 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
     };
   }else if (c_pid > 0){
     /* PARENT */
-
     if( (pid = wait(&status)) < 0){
       perror("wait");
       _exit(1);
     };
     //printf("Parent: finished\n");
-
   }else{
     perror("fork failed");
     _exit(1);
   };
-
   if (WIFSIGNALED (status)) {
     cout << "reac exited abnormaly on CPU:" << core << "\n";
     MPI_Abort(MPI_COMM_WORLD,4);
   };
-
   // cd back to main directory
   boost::filesystem::path p2(old_path);
   boost::filesystem::current_path(p2);
@@ -1681,13 +1682,13 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
     };
     boost::filesystem::remove( "CPU." + str_core + "/fort.13" );
   };
-
   // If we parallelize the training set, each reaxffcore adds its fitness to the fitness of its swarmcore
   // Note: The following MPI_Send/Recv logic of assigning swarmcore and reaxffcore ranks is equivalent to
   // the logic implemented in the top of this function
   // that exploits the fact that number of cores in reaxffcores that belong to a swarmcore, is half the 
   // total number of reaxffcores. 
   if (ptrainset > 0) {
+
      int j = 1;
      int swarmcore;
 
@@ -1713,6 +1714,7 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
          };
      };
   };
+
 //MPI_Barrier(MPI_COMM_WORLD);
   // Note: do not update the geometry file during iterations. Each member should use one geo file throughout
   // the training. Assuming we start with DFT_optimized (or sensible structures), and that we use some small
@@ -1752,6 +1754,11 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   // prepare fort.3 files
   boost::filesystem::copy_file(pwd.string() + "/geo." + str_cycle + "." + str_parID,
     pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+
+  // dropout
+  if (regular == 3) {
+     newSwarm.GetPar(p).dropout(0.5);
+  };
 
   // check if ffield is LG or not. execute correct reac accordingly
   if (lg_yn == true) {
@@ -2031,6 +2038,15 @@ void Par::set_posdim(int i, double posx){
 
 void Par::set_vel(vector < double > vel_of_best_particle) {
   vel = vel_of_best_particle;
+};
+
+void Par::dropout (double dropprobability) {
+  std::uniform_real_distribution < double > unidist(0.0, 1.0);
+  if (unidist(generator) < dropprobability) {
+     for (int i=0; i < dim; i++) {
+        pos.at(i) = 0.001*pos.at(i);
+     };
+  };
 };
 
 double Par::get_reg() {
@@ -2523,8 +2539,8 @@ if (core == 0 && verbose == true) {
     gbpos.clear();
     for (int m=0; m < dim; m++){
       gbpos.push_back(0.0);
-    };
 
+    };
     if (core == 0) {
       // If contff == y, then take force field's current values for the position of particle 0 (others are random)
       if (contff == true) {
@@ -2543,8 +2559,8 @@ if (core == 0 && verbose == true) {
       };
       contff = false;
     };
+
     // evaluate fitness and set bfit = curfit
-    vector <double> numgrad;
     newSwarm.GetPar(p).state.cycle = cycle;
     newSwarm.GetPar(p).state.iter = 0;
     newSwarm.GetPar(p).state.parid = p;
@@ -2568,12 +2584,21 @@ if (core == 0 && verbose == true) {
        // generate trainset subsets
        newSwarm.GetPar(p).write_trainset();
     };
-    curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
+
+    // evaluate fitness 
+    vector <double> numgrad;
+    newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
+
+    // local minimization
+    if (localmin == 1 || localmin == 2) {
+       newSwarm.GetPar(p).iterate(lm_iter_max);
+    };
+
     // if we parallelize the training set, update gbfit and gbpos only among swarmcores
     if (ptrainset > 0) {
        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-          newSwarm.GetPar(p).set_fitness(curfit);
-          newSwarm.GetPar(p).set_bfit(curfit);
+          newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
+          newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
           if (curfit < gbfit) {
             gbfitfound = true;
             parid_gbfit = p;
@@ -2587,12 +2612,12 @@ if (core == 0 && verbose == true) {
           boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
        };
     }else {
-      newSwarm.GetPar(p).set_fitness(curfit);
-      newSwarm.GetPar(p).set_bfit(curfit);
-      if (curfit < gbfit) {
+      newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
+      newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
+      if (newSwarm.GetPar(p).get_fitness() < gbfit) {
         gbfitfound = true;
         parid_gbfit = p;
-        gbfit = curfit;
+        gbfit = newSwarm.GetPar(p).get_fitness();
         gbpos.clear();
         gbpos = newSwarm.GetPar(p).get_pos_vec();
         write_ffield_gbest(core, cycle, iter, p);
@@ -2600,10 +2625,6 @@ if (core == 0 && verbose == true) {
       // cleaning ffield.tmp.* files after write_ffield_gbest already
       // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
       boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
-    };
-    // local minimization before leaving Populate 
-    if (localmin == 1 || localmin == 2) {
-       newSwarm.GetPar(p).iterate(lm_iter_max);
     };
 
   }; // done loop on members
@@ -2624,9 +2645,9 @@ if (core == 0 && verbose == true) {
            MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
         };
         // global best fitness across all processes
-        gbfit =  gbfit = min_vals_out[0].tmp_fit;
+        gbfit = min_vals_out[0].tmp_fit;
         // core rank the above fitness came from
-        cpuid_gbfit =  cpuid_gbfit = min_vals_out[0].tmp_cpu;
+        cpuid_gbfit = min_vals_out[0].tmp_cpu;
         // broadcast contents of gbpos vector from rank cpuid_gbfit
         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
            MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, ACTIVESWARM);
@@ -2820,14 +2841,20 @@ if (verbose == true) {
     newSwarm.GetPar(p).state.iter = 0;
     newSwarm.GetPar(p).state.parid = p;
 
-    // evaluate fitness and set bfit = curfit
-    curfit = newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
+    // evaluate fitness
+    vector <double> numgrad;
+    newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
 
-    newSwarm.GetPar(p).set_fitness(curfit);
-    newSwarm.GetPar(p).set_bfit(curfit);
+    // local minimization
+    if (localmin == 1 || localmin == 2) {
+       newSwarm.GetPar(p).iterate(lm_iter_max);
+    };
 
-    if (curfit < gbfit) {
-      gbfit = curfit;
+    newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
+    newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
+
+    if (newSwarm.GetPar(p).get_fitness() < gbfit) {
+      gbfit = newSwarm.GetPar(p).get_fitness();
       gbpos.clear();
       gbpos = newSwarm.GetPar(p).get_pos_vec();
       write_ffield_gbest(0, cycle, 0, p);
@@ -2836,6 +2863,9 @@ if (verbose == true) {
     // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
     boost::filesystem::remove("ffield.tmp." + str_cycle + ".0." + "." + parID);
   }; // done loop over members
+if (verbose == true) {
+   cout << "Swarm done loop on members!" << endl;
+};
 
   //initial_disp = newSwarm.get_disp(newSwarm);
 
@@ -2861,7 +2891,7 @@ if (verbose == true) {
     newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
   };
 
-if (core == 0 && verbose == true) {
+if (verbose == true) {
    cout << "Swarm left Populate!" << endl;
 };
 #endif
@@ -2930,6 +2960,8 @@ if (core == 0 && verbose == true) {
           newSwarm.GetPar(p).state.iter = iter;
           newSwarm.GetPar(p).state.parid = p;
 
+          // evaluate fitness. if doing localmin with ptrainset > 0, the generation of trainset subsets
+          // is performed inside eval_fitness. If not doing localmin, generation of trainset subsets is performed here.
           if (localmin == 1 || localmin == 2) {
              newSwarm.GetPar(p).iterate(lm_iter_max);
           } else {
@@ -3986,7 +4018,7 @@ if (core == 0 && verbose == true) {
 };
 #endif
 #ifndef WITH_MPI
-if (core == 0 && verbose == true) {
+if (verbose == true) {
    cout << "Swarm entered printpos!" << endl;
 };
 
@@ -4022,7 +4054,7 @@ if (core == 0 && verbose == true) {
   outfilepos.close();
 #endif
 
-if (core == 0 && verbose == true) {
+if (verbose == true) {
    cout << "Swarm left printpos!" << endl;
 };
 };

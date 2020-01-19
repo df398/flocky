@@ -163,6 +163,7 @@ class Par { // declaration of a particle
 
   double get_reg(); // calculate regularization
   double reg;
+  void dropout(double dropprobability);
   vector <double> numgrad;
 
 
