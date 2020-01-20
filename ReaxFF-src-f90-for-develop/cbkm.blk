@@ -1,6 +1,0 @@
-    common &
-    /cbkm/   xvelec(neem,neem), &
-    xvelect(neem,neem), &
-    xvt(nat,neem), &
-    xmortr(neem,neem),chgold(nat)
-!**********************************************************************

@@ -1,7 +1,0 @@
-ReaxFF version 2.0
-Compiled on:        Mon Sep 27 19:42:48 EDT 2010
- Warning: scale factor in dispersion too small:   0.0000000000000000     
- dispscale is zero or ffield is not lg. Assuming no lg correction is needed
-Geometry identifier: C60_b1_0.50                             
-Geometry identifier: C60_b1_0.60                             
- Normal end of MD-simulation
