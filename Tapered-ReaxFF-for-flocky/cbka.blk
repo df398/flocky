@@ -1,0 +1,190 @@
+    implicit double precision (a-h,o-z),integer(i-n)
+    parameter (nat=4000)     !Max number of atoms
+    parameter (neem=4000)    !Max number of atoms for EEM method
+    parameter (na1mx3=3*nat) !3*max number of atoms
+    parameter (navib=50)     !for 2nd derivatives
+    parameter (nsort=20)    !Max number of atom types
+    parameter (nbotym=500)   !Max number of bond types
+    parameter (nvatym=500)   !Max number of valency angle types
+    parameter (ntotym=500)   !Max number of torsion angle types
+    parameter (nhbtym=500)   !Max number of hydrogen bond types
+    parameter (nodmtym=500)   !Max number of off-diagonal Morse types
+    parameter (nbomax=25000)  !Max number of bonds
+    parameter (nhbmax=250000)  !Max number of  hydrogen bonds
+    parameter (nvamax=250000)  !Max number of valency angles
+    parameter (nopmax=00010)  !Max number of out of plane angles
+    parameter (ntomax=200000)  !Max number of torsion angles
+    parameter (npamax=50)  !Max number of general parameters in force field
+    parameter (nmolmax=2000)  !Max number of molecules in system
+    parameter (nmolset=3500)  !Max number of molecules in training set
+    parameter (mbond=120)     !Max number of bonds connected to one atom
+    parameter (mrestra=080)     !Max number of restraints
+    parameter (maxsrest=020)     !Max number of atoms defined in symmetry restraint
+    parameter (mtreg=100)     !Max number of temperature regimes
+    parameter (mtzone=5)     !Max number of temperature zones
+    parameter (mvreg=100)     !Max number of volume regimes
+    parameter (mvzone=6)     !Max number of volume zones
+    parameter (mereg=100)     !Max number of electric field regimes
+    parameter (mezone=3)     !Max number of electric field zones
+    parameter (mpist=100)     !Max number of piston regimes
+    character(1) :: qr,qrset,qresi2
+    character(2) :: qa,qas,qaset,qadd
+    character(3) :: qresi1
+    character(5) :: qvtype,qetype,qptype
+    character(5) :: qlabel,qffty,qbgfaxes,qbgfsgn,qresi3
+    character(6) :: qrstras
+    character(30) :: qkeyw
+    character(30) :: qfile
+    character(40) :: qffield,qformat,qruid,qstrana2
+    character(80) :: qmol,qremark,qremset,qmolset
+    character(200) :: qstrana1
+    character(30), dimension(nmolset)  :: trainset_structs
+    common &
+    /cbka/ suml1en, duml1en, dbondc(nbomax,3,2*mbond),dbodc(nbomax,3,2), &
+    dbosidc(nbomax,3,2),dbosindc(nbomax,3,2*mbond), &
+    dbopindc(nbomax,3,2*mbond),drdc(nbomax,3,2), &
+    dbopi2ndc(nbomax,3,2*mbond),dbopi2dc(nbomax,3,2), &
+    dargtdc(ntomax,3,4),dcell(3,nat,27), &
+    dbopidc(nbomax,3,2),dhdc(nvamax,3,3),cset(nmolset,nat,3), &
+    dhbdc(nhbmax,3,3),chaset(nmolset,nat),cp(nat,3), &
+    cadd(nat,3),d2(3*navib,3*navib), &
+    c(nat,3),d(3,nat),accel(3,nat),rrstraset(nmolset,mrestra), &
+    vkrstrset(nmolset,mrestra),vkrst2set(nmolset,mrestra), &
+    rrchaset(nmolset,mrestra),vkrtset(nmolset,mrestra), &
+    vkr2tset(nmolset,mrestra),trstraset(nmolset,mrestra), &
+    vrstraset(nmolset,mrestra),vkrvset(nmolset,mrestra), &
+    vkr2vset(nmolset,mrestra),cmo(nat,3),veladd(3,nat), &
+    aold(3,nat),vel(3,nat),dic(3,nat),pvdw1(nsort,nsort), &
+    rcore(nsort,nsort),ecore(nsort,nsort),acore(nsort,nsort), &
+    pvdw2(nsort,nsort),angimp(nat,6),axisset(nmolset,3), &
+    anglesset(nmolset,3),formolset(nmolset),vvolset(nmolset), &
+    yt(na1mx3),pt(na1mx3),gi(na1mx3),enmolset(nmolset), &
+    enmolend(nmolset),formolend(nmolset),endposet(nmolset), &
+    ai(na1mx3),bi(na1mx3),yi(na1mx3),pn(na1mx3),tbo(nat), &
+    dvlpdsbo(nat),chgbgf(nat),estrain(nat), &
+    abo(nat),abo2(nat),bor4(nat),xmasat(nat),vlp(nat),ch(nat), &
+    eldef(nat),rbo(nbomax),bos(nbomax),vradic(nat),vmo1(nat), &
+    vmo2(nat),bopi(nbomax),bopi2(nbomax),bosi(nbomax), &
+    bo(nbomax),ro(nbomax),dbodr(nbomax),dbondr(nbomax), &
+    dbosidr(nbomax),dbopidr(nbomax),hhb(nhbmax),thgo(nopmax), &
+    dbopi2dr(nbomax),h(nvamax),thg(ntomax),elmol(nmolmax), &
+    elmol2(nmolmax),rob1(nsort,nsort),rob2(nsort,nsort), &
+    rob3(nsort,nsort),dispc6(nsort,nsort),dispre(nsort,nsort), &
+    dispscale, &
+    p1co(nsort,nsort),p2co(nsort,nsort),p3co(nsort,nsort), &
+    gamwco(nsort,nsort),gamcco(nsort,nsort), &
+    tsettreg(mtreg,mtzone),tdamptreg(mtreg,mtzone), &
+    dttreg(mtreg,mtzone),dvvreg(mvreg,mvzone), &
+    ereg(mereg,mezone), &
+    edeep2(mpist),rdeep2(mpist),pshft2(mpist),rcut2(mpist), &
+    speedp2(mpist), &
+    vpar(npamax),rat(nsort),aval(nsort),amas(nsort), &
+    elaf(nsort),vpq(nsort),vnq(nsort), &
+    rvdw(nsort),alf(nsort),eps(nsort),chat(nsort),gam(nsort), &
+    rapt(nsort),stlp(nsort),vlp1(nsort),vlp2(nsort), &
+    valf(nsort),valp1(nsort),valp2(nsort),vincr(nsort), &
+    vovun(nsort),vval1(nsort),vval2(nvatym),vval3(nsort), &
+    vval4(nsort), &
+    de1(nbotym),de2(nbotym),de3(nbotym),psi(nbotym), &
+    pdo(nbotym),v13cor(nbotym),psp(nbotym),pdp(nbotym), &
+    ptp(nbotym),bop1(nbotym),bop2(nbotym),bom(nbotym), &
+    popi(nbotym),vover(nbotym),vuncor(nbotym), &
+    ovc(nbotym),vop(nsort),chi(nsort),eta(nsort), &
+    bo131(nsort),bo132(nsort),bo133(nsort),sigqeq(nsort), &
+    vka(nvatym),vka3(nvatym),vka8(nvatym),vkac(nvatym), &
+    vkap(nvatym), &
+    v1(ntotym),v2(ntotym),v3(ntotym),th0(nvatym), &
+    rhb(nhbtym),dehb(nhbtym),vhb1(nhbtym),vhb2(nhbtym), &
+    rrstra(mrestra),vkrstr(mrestra),vkrst2(mrestra), &
+    rrcha(mrestra),vkrt(mrestra),vkr2t(mrestra), &
+    trstra(mrestra),vrstra(mrestra),vkrv(mrestra), &
+    rmstra1(mrestra),rmstra2(mrestra),rmstra3(mrestra), &
+    rmstrax(mrestra),rmstray(mrestra),rmstraz(mrestra), &
+    rmcha(mrestra),vkeqd1(mrestra),vkeqd2(mrestra), &
+    vkr2v(mrestra),rtcha(mrestra),rvcha(mrestra), &
+    dismacen(mrestra),vmcha(nmolmax), &
+    vksym1(mrestra),vksym2(mrestra),sysdissum(mrestra), &
+    v4(ntotym),vconj(ntotym),v2bo(ntotym),v3bo(ntotym), &
+    axis(3),axiss(3),deda(3), &
+    angle(3),angles(3),eb,ecoa,eradbo,ehb,aaxh,baxh,caxh, &
+    ea,emol,ev,epen,et,eco,tm11,tm21,tm31,tm22,tm32,tm33, &
+    ew,ep,elp,eel,pi,rdndgr,fctor,eoop,ech,eres,elr,efi, &
+    efix,efiy,efiz,exfx,exfy,exfz,epist, &
+    virial,virx,viry,virz,presx2,presy2,presz2,volcha, &
+    dgrrdn,cutoff,ekin,tempmd,convmd,ts2,ts22,xjouca,tset2, &
+    enmol,formol,vvol,vlbora,tpnrad,syscha,chisys,vfieldx, &
+    vfieldy,vfieldz,delvib,vpresopt,vprestax,vprestay, &
+    vprestaz,edeep,rdeep,pshft,rcut, &
+    caljou,rgasc,taut,taut2,taup,tset,tsetor,tincr,xmasmd, &
+    cutof2,cutof3,tstep,gdicmax,parc1,parc2,sumelec,vrange, &
+    xinh,fsnh,vqnh,snh,ham,errnh,avognr,pset,sumhe,range, &
+    sw,sw1,swa,swb,swb2,swc0,swc1,swc2,swc3,swc4,swc5,swc6, &
+    swc7,ft,dftdBO,d2ftdBO2,dft3dBO3,fij,dfijdBOij,d2fijdBO2ij, &
+    d3fijdBO3ij,fik,dfikdBOik,d2fikdBO2ik,d3fikdBO3ik,fjl,dfjldBOjl, &
+    d2fjldBO2jl, d3fjldBO3jl, pressu,presx, fHB, dfHBdBO, d2fHBdBO2, &
+    d3fHBdBO3, frHB, dfrHBdr, d2frHBdr2, d3frHBdr3, presy,presz,plr, &
+    endpo2,ccpar,dseed, c1,c4,estrc,estrmin,zero,half,one,two,three, &
+    endpo,accincr, endpoold,axis1,axis2,axis3,xadd,yadd,zadd,addist, &
+    taddmol, dcentm, angle1,angle2,angle3,cutmol1,cutmol2,cutmol3,cutmol4, &
+    cutmol5,tstep0,dtmax,tottime, &
+    starttime,ustime,systime, Hug_E0, Hug_P0, Hug_V0, &
+    xImpVcm, shock_vel,shock_z_sep,convg,vmamin,vmami2, junique, trainset_structs
+    common &
+    /cbka/ nubon(nat,nat),nubon1(nat,mbond),nubon2(nat,mbond), &
+    nmolat(nmolmax,nat),nmolat2(nmolmax,nat), &
+    ia(nat,mbond+3),idbo(nbomax,2*mbond),iagold(nat,mbond+3), &
+    iag(nat,mbond+3),ib(nbomax,3),iv(nvamax,6),it(ntomax,8), &
+    ioop(nopmax,9),ihb(nhbmax,8),nhbs(nhbtym,3),id(nat,3), &
+    nbs(nbotym,2),nts(ntotym,4),nvs(nvatym,3),ijk(nat,4), &
+    irap(50),irdo(50,2),irstraset(nmolset,mrestra,2), &
+    irstratset(nmolset,mrestra,4), &
+    irstravset(nmolset,mrestra,3),irstrav(mrestra,3), &
+    irstra(mrestra,2),irstrat(mrestra,4),irstram(mrestra,5), &
+    irstras(mrestra,1+maxsrest),ieqdis(mrestra,4), &
+    ia1treg(mtreg,mtzone),ia2treg(mtreg,mtzone), &
+    ivsca(mvreg,mvzone),nmpx(nat,nat),nmpy(nat,nat), &
+    nmpz(nat,nat), &
+    nvl1(nat*nat),nvl2(nat*nat),nvlx(nat*nat),nvly(nat*nat), &
+    nvlz(nat*nat),nvlbo(nat*nat),ibsym(nbomax),ityadd(nat), &
+    imove(nat),itstart(mrestra),itend(mrestra), &
+    nmoloo(nat),iradic(nat),idef(nsort),nasort(nsort), &
+    nphb(nsort),ibgr1(nat),ibgr2(nat),idupc(6), &
+    imolsta(nat),idbo1(nbomax),nrestraset(nmolset), &
+    nrestratset(nmolset),nrestravset(nmolset),naset(nmolset), &
+    kxset(nmolset),kyset(nmolset),kzset(nmolset), &
+    ncellset(nmolset),icelo2lset(nmolset),icgeopt(nmolset), &
+    ifreqset(nmolset), &
+    iexcoset(nmolset),nfcset(nmolset),nmmaxset(nmolset), &
+    iruidset(nmolset),icellset(nmolset),ibityset(nmolset), &
+    iat1mc(nmolmax),iat2mc(nmolmax),nitvc(mvreg),nnvreg(mvreg), &
+    nitec(mereg),nnereg(mereg),nitpist(mpist), &
+    iredoset(nmolset),nittc(mtreg),nntreg(mtreg), &
+    ncent2(nbomax),irads,nrdd,nrddf,nbiolab,ngeofor,nuge, &
+    nbon2,npar,nodmty,nmethod,ngnh,ncha,irac,nincrop, &
+    nchaud,na,nbon,nval,nhb,ntor,nso,nboty,nvaty,ntoty,mdstep, &
+    nsav,nreac,nrestra,nrestrat,nrestram,ncha2,ntrc,nsurp, &
+    nbonop,icelo2,nmcharge,ifieldx,ifieldy,ifieldz,nvrc,nerc, &
+    npist,iaddfreq,iveladd,invt,namov,ignore,ipolar,ignotr, &
+    noop,ndtau,nrestrav,imorph,nprevrun,ndebug,nhbty,nrestras, &
+    nelc3,nfc,nsav2,nsbma2,nmmax,irun,ibh2,napp,ivels,ncons, &
+    nmmaxold,nfcold,icellold,imodfile,icentr,itrans,itrout, &
+    icelo2old,inmov1,inmov2,nchaold,itstep,naa,nadattempt, &
+    nrand,ncontrol,maxstp,nequi,nrep1,nvel,ntscale,iadj, &
+    ntest,nsbmax,nmolo,nmolo5,noutpt,nmm,nzero,none,ntwo, &
+    nmolo5o,nthree,nradcount,nsav3,nhop2,nmollset,iflga, &
+    iortho,iperiod,ibgfversion,iremark,ixmolo,inpt,iconne, &
+    imolde,kx,ky,kz,iexco,iruid,ianaly,ibity,nvlist,nvpair, &
+    nvlself,ioldchg,ityrad,iredo,iexx,iexy,iexz,ncellopt, &
+    ndata2,nboty2,nprob,nit,i5758,icell,ingeo,nmoloold,itemp, &
+    icgeo,ifreq,ishock_type,icpres,ipresm,isymm,ilavel,ipdir, &
+    ikeep,ireflx,irefly,ireflz,imfreq,iflext,icentp,ipropt, &
+    neqdis,icobo,iremov,ibocha,ivdwty,icolab, &
+    qaset(nmolset,nat),qvtype(mvreg,mvzone), &
+    qptype(mpist), &
+    qetype(mereg,mezone),qrset(nmolset),qmolset(nmolset), &
+    qkeyw(nmolset),qfile(nmolset),qremset(nmolset), &
+    qa(nat),qadd(nat),qlabel(nat),qffty(nat),qresi1(nat), &
+    qresi2(nat),qresi3(nat),qas(nsort),qrstras(mrestra), &
+    qremark(20),qformat(20),qruid,qmol,qr,qffield, &
+    qstrana1,qstrana2
+!**********************************************************************

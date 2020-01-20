@@ -33,6 +33,7 @@ Click [here](https://df398.github.io/flocky/) for additional documentation and u
 Requirements:
 
 * A recent C++ compiler that supports the C++11 standard
+* A fortran compiler (for Tapered ReaxFF)
 * [OpenMPI](https://www.open-mpi.org/) or [MPICH2](https://www.mpich.org/) for parallel performance (highly recommended)
 * [Boost C++](https://www.boost.org/)
 * [NLopt](https://github.com/stevengj/nlopt)
