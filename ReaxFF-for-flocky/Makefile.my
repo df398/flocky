@@ -1,0 +1,27 @@
+#
+#SUFFIX= -c 
+SUFFIX= -c -O3 -mcmodel=medium
+#LIBS = -static 
+#SUFFIX= -c -fpe2
+FSALGEM= reac.my.f90 poten.my.f90 ffopt.my.f90 shanno.my.f90 version.f90 vibra.f90 blas.f
+OBJECT= reac.my.o poten.my.o ffopt.my.o shanno.my.o version.o vibra.o blas.o
+INCLUD= cbka.blk cbkm.blk opt.blk 
+#
+
+reac:$(UPDATE) $(OBJECT) $(INCLUD) 
+	gfortran -o $@ $(OBJECT) $(LIBS)
+	date >> compile.log
+reac.my.o: reac.my.f90 $(INCLUD) 
+	gfortran $(SUFFIX) reac.my.f90
+poten.my.o: poten.my.f90 $(INCLUD) 
+	gfortran $(SUFFIX) poten.my.f90
+ffopt.my.o: ffopt.my.f90 $(INCLUD) 
+	gfortran $(SUFFIX) ffopt.my.f90
+shanno.my.o: shanno.my.f90 $(INCLUD) 
+	gfortran $(SUFFIX) shanno.my.f90
+version.o: version.f90 $(INCLUD) 
+	gfortran $(SUFFIX) version.f90
+vibra.o: vibra.f90 $(INCLUD)
+	gfortran $(SUFFIX) vibra.f90
+blas.o: blas.f $(INCLUD)
+	gfortran $(SUFFIX) blas.f
