@@ -1476,7 +1476,7 @@ void Par::update_pos_levy(vector < double > globpos, double iter, double inertia
 };
 
 
-int Par::iterate(int lm_maxit) {
+int Par::iterate() {
  if (localmin == 2) {
    nlopt::opt opt(nlopt::LN_SBPLX, dim);
    opt.set_min_objective(fitness_wrapper, this);
@@ -1485,7 +1485,7 @@ int Par::iterate(int lm_maxit) {
    opt.set_lower_bounds(standard_mindomain);
    opt.set_upper_bounds(standard_maxdomain);
    opt.set_ftol_rel(lm_err_tol);
-   opt.set_maxeval(lm_maxit);
+   opt.set_maxeval(lm_iter_max);
    x = pos;
 
    try{
@@ -1509,7 +1509,7 @@ int Par::iterate(int lm_maxit) {
    opt.set_lower_bounds(standard_mindomain);
    opt.set_upper_bounds(standard_maxdomain);
    opt.set_ftol_rel(lm_err_tol);
-   opt.set_maxeval(lm_maxit);
+   opt.set_maxeval(lm_iter_max);
    x = pos;
 
    try{
@@ -1574,7 +1574,6 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
      boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/charges",
        pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
   };
-
   // cd to each CPU.x directory
   string old_path = pwd.string();
   boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
@@ -1644,6 +1643,7 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
     cout << "reac exited abnormaly on CPU:" << core << "\n";
     MPI_Abort(MPI_COMM_WORLD,4);
   };
+
   // cd back to main directory
   boost::filesystem::path p2(old_path);
   boost::filesystem::current_path(p2);
@@ -1688,7 +1688,6 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   // that exploits the fact that number of cores in reaxffcores that belong to a swarmcore, is half the 
   // total number of reaxffcores. 
   if (ptrainset > 0) {
-
      int j = 1;
      int swarmcore;
 
@@ -2053,16 +2052,19 @@ double Par::get_reg() {
   double reg = 0.0;
 
   // vector to store the positions that will be converted below to their inverses to use in regularization
-  vector <double> pos_for_reg(dim ,0.0);
+  vector <double> pos_for_reg;
+  pos_for_reg.clear();
 
   // if position belongs to the subset of positions that are used as inverses by ReaxFF (i.e. 1/parameter),
   // use the inverse of that parameter into the sum of regularization
-  for (int i = 0; i < ffline.size(); i++) {
-      if ( (ffline.at(i)+1 == inversep.at(i).at(0)) && (ffcol.at(i)+1 == inversep.at(i).at(1)) ) {
-         pos_for_reg.at(i) = 1.0/(pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i));
+  for (vector <int> inversevalue : inversep) {
+    for (int i = 0; i < ffline.size(); i++) {
+      if ( (ffline.at(i)+1 == inversevalue.at(0)) && (ffcol.at(i)+1 == inversevalue.at(1)) ) {
+         pos_for_reg.push_back( 1.0/(pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i)) );
       }else {
-         pos_for_reg.at(i) = pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i);
+         pos_for_reg.push_back( pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i) );
       };
+    };
   };
 
   // calculate L1 penalty
@@ -2080,7 +2082,6 @@ double Par::get_reg() {
     };
     reg = hlambda*reg;
   };
-
   return reg;
 
 };
@@ -2564,7 +2565,6 @@ if (core == 0 && verbose == true) {
     newSwarm.GetPar(p).state.cycle = cycle;
     newSwarm.GetPar(p).state.iter = 0;
     newSwarm.GetPar(p).state.parid = p;
-
     // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
     if (ptrainset > 0) {
        for (const int& swarmcore : swarmcores) {
@@ -2588,12 +2588,10 @@ if (core == 0 && verbose == true) {
     // evaluate fitness 
     vector <double> numgrad;
     newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
-
     // local minimization
     if (localmin == 1 || localmin == 2) {
-       newSwarm.GetPar(p).iterate(lm_iter_max);
+       newSwarm.GetPar(p).iterate();
     };
-
     // if we parallelize the training set, update gbfit and gbpos only among swarmcores
     if (ptrainset > 0) {
        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
@@ -2847,7 +2845,7 @@ if (verbose == true) {
 
     // local minimization
     if (localmin == 1 || localmin == 2) {
-       newSwarm.GetPar(p).iterate(lm_iter_max);
+       newSwarm.GetPar(p).iterate();
     };
 
     newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
@@ -2963,7 +2961,7 @@ if (core == 0 && verbose == true) {
           // evaluate fitness. if doing localmin with ptrainset > 0, the generation of trainset subsets
           // is performed inside eval_fitness. If not doing localmin, generation of trainset subsets is performed here.
           if (localmin == 1 || localmin == 2) {
-             newSwarm.GetPar(p).iterate(lm_iter_max);
+             newSwarm.GetPar(p).iterate();
           } else {
              vector <double> numgrad;
              // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
@@ -3029,7 +3027,7 @@ if (core == 0 && verbose == true) {
               newSwarm.GetPar(p).state.parid = p;
 
               if (localmin == 1 || localmin == 2) {
-                 newSwarm.GetPar(p).iterate(lm_iter_max);
+                 newSwarm.GetPar(p).iterate();
               } else {
                  vector <double> numgrad;
                  newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
@@ -3274,7 +3272,7 @@ if (verbose == true) {
       newSwarm.GetPar(p).state.parid = p;
 
       if (localmin == 1 || localmin == 2) {
-         newSwarm.GetPar(p).iterate(lm_iter_max);
+         newSwarm.GetPar(p).iterate();
       } else {
           vector <double> numgrad;
           newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);

@@ -143,7 +143,7 @@ class Par { // declaration of a particle
   double get_fitness(); // get particle fitness
   void set_fitness(double fit); // set particle fitness
   double eval_fitness(const vector <double> &active_params, vector <double> &grad, void *mydata); // evalulate fitness
-  int iterate(int maxiter);
+  int iterate();
   double minf;
   vector <double> x;
   vector <double> eval_numgrad(const vector <double> &active_params, void *mydata); // evaluate numerical gradients of fitness
