@@ -2043,7 +2043,6 @@ void Par::dropout (double dropprobability) {
      std::uniform_real_distribution <double> unidist(0.0, 1.0);
      if (unidist(generator) < dropprobability) {
         pos.at(i) = 0.0001;
-        cout << "core " << core <<" dropped dim = " << i << endl;
         // transform to standardized positions
         pos.at(i) = (pos.at(i) - mindomain.at(i)) / (maxdomain.at(i) - mindomain.at(i));
         dropped_dimns.push_back(i); // stores dimensions to be dropped
