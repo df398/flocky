@@ -213,9 +213,8 @@ Par::Par() {
   // read ffield file into matrix ffieldmat. split by each entry.
   read_ffield();
 
-  // set min/max domains from params.mod file and set dim = numlines in params.mod file
+  // set min/max domains from params.mod file
   read_bounds();
-  pos[dim];
 
   for (int m = 0; m < dim; m++) {
     // physical domains
@@ -1480,8 +1479,16 @@ int Par::iterate() {
  if (localmin == 2) {
    nlopt::opt opt(nlopt::LN_SBPLX, dim);
    opt.set_min_objective(fitness_wrapper, this);
-   std::vector<double> standard_mindomain(dim, 0.0);
+
+   std::vector<double> standard_mindomain(dim, 0.0001);
    std::vector<double> standard_maxdomain(dim, 1.0);
+
+   // dropout dimensions by setting their range to 0.0
+   for (int j : dropped_dimns) {
+       standard_mindomain.at(j) = (0.0001 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
+       standard_maxdomain.at(j) = (0.0001 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
+   };
+
    opt.set_lower_bounds(standard_mindomain);
    opt.set_upper_bounds(standard_maxdomain);
    opt.set_ftol_rel(lm_err_tol);
@@ -1549,10 +1556,6 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
-  // dropout
-  if (regular == 3) {
-     dropout(0.5);
-  };
   // check if ffield is LG or not. execute correct reac accordingly
   if (lg_yn == true) {
       write_ffield_lg(active_params, cycle, iter, parid);
@@ -1753,11 +1756,6 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   // prepare fort.3 files
   boost::filesystem::copy_file(pwd.string() + "/geo." + str_cycle + "." + str_parID,
     pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
-
-  // dropout
-  if (regular == 3) {
-     newSwarm.GetPar(p).dropout(0.5);
-  };
 
   // check if ffield is LG or not. execute correct reac accordingly
   if (lg_yn == true) {
@@ -2040,10 +2038,15 @@ void Par::set_vel(vector < double > vel_of_best_particle) {
 };
 
 void Par::dropout (double dropprobability) {
-  std::uniform_real_distribution < double > unidist(0.0, 1.0);
-  if (unidist(generator) < dropprobability) {
-     for (int i=0; i < dim; i++) {
-        pos.at(i) = 0.001*pos.at(i);
+  dropped_dimns.clear();
+  for (int i=0; i < dim; i++) {
+     std::uniform_real_distribution <double> unidist(0.0, 1.0);
+     if (unidist(generator) < dropprobability) {
+        pos.at(i) = 0.0001;
+        cout << "core " << core <<" dropped dim = " << i << endl;
+        // transform to standardized positions
+        pos.at(i) = (pos.at(i) - mindomain.at(i)) / (maxdomain.at(i) - mindomain.at(i));
+        dropped_dimns.push_back(i); // stores dimensions to be dropped
      };
   };
 };
@@ -2587,11 +2590,18 @@ if (core == 0 && verbose == true) {
 
     // evaluate fitness 
     vector <double> numgrad;
+
+    // dropout
+    if (regular == 3) {
+       newSwarm.GetPar(p).dropout(0.5);
+    };
     newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
+
     // local minimization
     if (localmin == 1 || localmin == 2) {
        newSwarm.GetPar(p).iterate();
     };
+
     // if we parallelize the training set, update gbfit and gbpos only among swarmcores
     if (ptrainset > 0) {
        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
@@ -2841,6 +2851,11 @@ if (verbose == true) {
 
     // evaluate fitness
     vector <double> numgrad;
+
+    // dropout
+    if (regular == 3) {
+       newSwarm.GetPar(p).dropout(0.5);
+    };
     newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
 
     // local minimization
@@ -2960,6 +2975,12 @@ if (core == 0 && verbose == true) {
 
           // evaluate fitness. if doing localmin with ptrainset > 0, the generation of trainset subsets
           // is performed inside eval_fitness. If not doing localmin, generation of trainset subsets is performed here.
+
+          // dropout
+          if (regular == 3) {
+             newSwarm.GetPar(p).dropout(0.5);
+          };
+
           if (localmin == 1 || localmin == 2) {
              newSwarm.GetPar(p).iterate();
           } else {
@@ -3025,6 +3046,11 @@ if (core == 0 && verbose == true) {
               newSwarm.GetPar(p).state.cycle = cycle;
               newSwarm.GetPar(p).state.iter = iter;
               newSwarm.GetPar(p).state.parid = p;
+
+             // dropout
+             if (regular == 3) {
+                newSwarm.GetPar(p).dropout(0.5);
+             };
 
               if (localmin == 1 || localmin == 2) {
                  newSwarm.GetPar(p).iterate();
@@ -3270,6 +3296,11 @@ if (verbose == true) {
       newSwarm.GetPar(p).state.cycle = cycle;
       newSwarm.GetPar(p).state.iter = iter;
       newSwarm.GetPar(p).state.parid = p;
+
+      // dropout
+      if (regular == 3) {
+         newSwarm.GetPar(p).dropout(0.5);
+      };
 
       if (localmin == 1 || localmin == 2) {
          newSwarm.GetPar(p).iterate();

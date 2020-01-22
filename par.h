@@ -170,6 +170,7 @@ class Par { // declaration of a particle
   vector < double > pos; // vector of position components of a particle
   vector < double > vel; // vector of velocity components of a particle
   vector < double > bpos; // particle's best own position
+  vector <int> dropped_dimns; // dimensions of position to be dropped out during local minimization
 
   double bfitness; // particle previous best fitness
   double fitness; // particle current fitness
