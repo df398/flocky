@@ -2606,10 +2606,10 @@ if (core == 0 && verbose == true) {
        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
           newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
           newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
-          if (curfit < gbfit) {
+          if (newSwarm.GetPar(p).get_fitness() < gbfit) {
             gbfitfound = true;
             parid_gbfit = p;
-            gbfit = curfit;
+            gbfit = newSwarm.GetPar(p).get_fitness();
             gbpos.clear();
             gbpos = newSwarm.GetPar(p).get_pos_vec();
             write_ffield_gbest(core, cycle, iter, p);
