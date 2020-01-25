@@ -98,7 +98,7 @@ mpiexec -np N flocky_mpi
 ```
 or, launch a serial version using:
 ```bash
-./flocky_serial
+flocky_serial
 ```
 > NOTE: both reac and flocky_mpi need to be in your path (or in the working directory)
 
