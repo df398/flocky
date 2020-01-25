@@ -40,6 +40,14 @@ Requirements:
 
 Install procedure:
 
+(0) Install Tapered ReaxFF:
+
+```bash
+cd Tapered-ReaxFF-for-flocky
+make -f Makefile.my
+cd ..
+```
+
 (1) Install OpenMPI or MPICH2 for parallel performance (to build a serial version, skip to step 2):
 
 On Ubuntu to install mpich type:
@@ -92,6 +100,7 @@ or, launch a serial version using:
 ```bash
 ./flocky_serial
 ```
+> reac and flocky_mpi need to be in your path (or in the working directory)
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to contribute.
