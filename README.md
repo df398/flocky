@@ -71,6 +71,7 @@ cmake -DCMAKE_INSTALL_PREFIX=path/to/preferred/installdir
 make
 make install
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:path/to/preferred/installdir/lib
+export NLOPT_PATH=path/to/preferred/installdir
 ```
 
 (5) Finally, compile flocky with the appropriate makefile:
