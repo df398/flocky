@@ -299,6 +299,8 @@ void Par::write_trainset() {
     int geo_end = 0;
     int energy_begin = 0;
     int energy_end = 0;
+    int forces_begin = 0;
+    int forces_end = 0;
     vector < vector <string> > traindata;
     vector <string> traindata_nonsplit;
     vector <string> keywords;
@@ -313,6 +315,14 @@ void Par::write_trainset() {
       boost::split(keywords, line, boost::is_any_of(" "));
       traindata_nonsplit.push_back(line);
       traindata.push_back(keywords);
+
+      if (keywords.at(0) == "FORCES") {
+         forces_begin = numlines;
+      };
+
+      if (keywords.at(0) == "ENDFORCES" || (keywords.at(0) == "END" && keywords.at(1) == "FORCES")) {
+         forces_end = numlines;
+      };
 
       if (keywords.at(0) == "CHARGE") {
          charge_begin = numlines;
@@ -360,6 +370,49 @@ void Par::write_trainset() {
     string str_core = std::to_string(core);
     ofstream trainset_file;
     trainset_file.open("CPU." + str_core + "/trainset.in", ios::out);
+    // FORCES SECTION
+    if (forces_end - forces_begin > 1) {
+       // calculate where to start and end
+       int keyword_begin_traindata = forces_begin-1;
+       int keyword_end_traindata = forces_end-1;
+       int substart = keyword_begin_traindata + 1;
+       int subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), keyword_end_traindata);
+       int tries = 0;
+       int reset_start = 0;
+       int reset_end = 0;
+       // print keyword
+       trainset_file << traindata_nonsplit.at(keyword_begin_traindata) << endl;
+       // print data for swarmcores
+       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+         for (int i = substart; i < subend; i++) {
+            trainset_file << traindata_nonsplit.at(i) << endl;
+         };
+       };
+       substart = subend;
+       subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), forces_end);
+       reset_start = substart;
+       reset_end = subend;
+       // print data for reaxffcores
+       for (const int& reaxffcore : reaxffcores) {
+           if (core == reaxffcore) {
+              if (tries == ptrainset-2) {subend = keyword_end_traindata;};
+              for (int i = substart; i < subend; i++) {
+                 trainset_file << traindata_nonsplit.at(i) << endl;
+              };
+           };
+           tries = tries + 1;
+           substart = subend;
+           subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), forces_end);
+           if (tries == ptrainset-1) {
+              substart = reset_start;
+              subend = reset_end;
+              tries = 0;
+           };
+       };
+       // print end keyword
+       trainset_file << traindata_nonsplit.at(keyword_end_traindata) << endl;
+    };
+
     // CHARGES SECTION
     if (charge_end - charge_begin > 1) {
        // calculate where to start and end
