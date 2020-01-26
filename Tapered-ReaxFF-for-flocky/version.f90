@@ -23,6 +23,7 @@
 !     - Numerically stable dihedrals formulation (2019)              *
 !     - Evaluate energies only for (unique) training set             *
 !       structures (2020)                                            *
+!     - Added atomic forces to training set (2020)                   *
 !                                                                    *
 !*********************************************************************
     subroutine version

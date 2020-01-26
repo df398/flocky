@@ -23,6 +23,7 @@
 !     - Numerically stable dihedrals formulation (2019)              *
 !     - Evaluate energies only for (unique) training set             *
 !       structures (2020)                                            *
+!     - Added atomic forces to training set (2020)                   *
 !                                                                    *
 !*********************************************************************
     subroutine reac
@@ -9775,6 +9776,82 @@ end subroutine valtaper
         goto 15
     end if
 
+    !df398 added atomic forces to training set
+    if (qhulp(1:6) == 'FORCES') then
+    !***********************************************************************
+    !                                                                      *
+    !     Forces (minus grad) data                                         *
+    !                                                                      *
+    !***********************************************************************
+        28 read (63,'(a80)',err=9010,end=500)qhulp
+        qstrana1(1:80)=qhulp
+        if (qhulp(1:1) == '#') goto 28
+        if (qhulp(1:11) == 'ENDFORCES') goto 10
+        vcomp=zero
+        totforce=zero
+        iat(1)=0
+        istart=1
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        qkeyhulp=qstrana2(1:30)
+        istart=iend
+
+        !df398 add unique structures to trainset_structs array
+        do j=1,nmolset
+           !write(*,*) 'qkeyhulp = ', qkeyhulp
+           if (trainset_structs(j) == qkeyhulp .or. (qkeyhulp(1:1) >= '0' .and. qkeyhulp(1:1) <= '9')) then
+              redundant = .true.
+              !write(*,*) 'redundant == true or not a structure description'
+              exit
+           endif
+        enddo
+        if (redundant .eqv. .false.) then
+           junique = junique + 1
+           trainset_structs(junique) = qkeyhulp
+           !write(*,*) 'FORCES >>> trainset_struct(',junique,') = ', trainset_structs(junique)
+        endif
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        weight=vout
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        iat(1)=iout
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        forcex=vout
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        forcey=vout
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        forcez=vout
+        istart=iend
+
+        totforce = sqrt(forcex*forcex+forcey*forcey+forcez*forcez)
+        vcomp = sqrt(d(iat(1),1)*d(iat(1),1) + d(iat(1),2)*d(iat(1),2) + d(iat(1),3)*d(iat(1),3))
+
+        24 continue
+
+        if (qkeyhulp == qkeyw(nprob)) then
+          ndata2=ndata2+1
+          caldat(ndata2)=totforce
+          compdat(ndata2)=vcomp
+          weightdat(ndata2)=weight
+          write (qdatid(ndata2),144)qkeyhulp,iat(1)
+        endif
+        goto 28
+    endif
+
     if (qhulp(1:8) == 'GEOMETRY') then
     !***********************************************************************
     !                                                                      *
@@ -10178,6 +10255,7 @@ end subroutine valtaper
     110 format (a20,' Torsion angle:',4i4)
     120 format (a20,' Valence angle:',3i4)
     130 format (a20,' Bond distance:',2i4)
+    144 format (a20,' Force on atom:',i4)
     140 format (a20,' Position atom:',i4)
     145 format (a20,' CRMS:',i4)
     150 format (a20,' RMSG force:')
@@ -10337,6 +10415,66 @@ end subroutine valtaper
 
         goto 15
     end if
+
+    !df398 added atomic forces to training set
+    if (qhulp(1:6) == 'FORCES') then
+    !***********************************************************************
+    !                                                                      *
+    !     Forces (minus grad) data                                         *
+    !                                                                      *
+    !***********************************************************************
+        28 read (63,'(a80)',err=9010,end=500)qhulp
+        qstrana1(1:80)=qhulp
+        if (qhulp(1:1) == '#') goto 28
+        if (qhulp(1:11) == 'ENDFORCES') goto 10
+        vcomp=zero
+        totforce=zero
+        iat(1)=0
+        istart=1
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        qkeyhulp=qstrana2(1:30)
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        weight=vout
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        iat(1)=iout
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        forcex=vout
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        forcey=vout
+        istart=iend
+
+        call stranal(istart,iend,vout,iout,1)
+        if (istart >= iend) goto 24
+        forcez=vout
+        istart=iend
+
+        totforce = sqrt(forcex*forcex+forcey*forcey+forcez*forcez)
+        vcomp = sqrt(d(iat(1),1)*d(iat(1),1) + d(iat(1),2)*d(iat(1),2) + d(iat(1),3)*d(iat(1),3))
+
+        24 continue
+        if (qkeyhulp == qkeyw(nprob)) then
+          ndata2=ndata2+1
+          caldat(ndata2)=totforce
+          compdat(ndata2)=vcomp
+          weightdat(ndata2)=weight
+          write (qdatid(ndata2),144)qkeyhulp,iat(1)
+        endif
+        goto 28
+    endif
 
     if (qhulp(1:8) == 'GEOMETRY') then
     !***********************************************************************
@@ -10693,6 +10831,7 @@ end subroutine valtaper
     110 format (a20,' Torsion angle:',4i4)
     120 format (a20,' Valence angle:',3i4)
     130 format (a20,' Bond distance:',2i4)
+    144 format (a20,' Force on atom:',i4)
     140 format (a20,' Position atom:',i4)
     145 format (a20,' CRMS:',i4)
     150 format (a20,' RMSG force:')
