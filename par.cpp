@@ -1637,7 +1637,7 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
   if (ptrainset > 0) {
      for (const int& swarmcore : swarmcores) {
-           for (int i = 1; i < 0.5*reaxffcores.size()+1; i++) {
+           for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
              int reaxffcore = swarmcore + i;
              if (core == swarmcore ) {
                MPI_Send( active_params.data(), active_params.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
@@ -2623,7 +2623,7 @@ if (core == 0 && verbose == true) {
     // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
     if (ptrainset > 0) {
        for (const int& swarmcore : swarmcores) {
-             for (int i = 1; i < 0.5*reaxffcores.size()+1; i++) {
+             for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
                int reaxffcore = swarmcore + i;
                if (core == swarmcore ) {
                  MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
@@ -3040,7 +3040,7 @@ if (core == 0 && verbose == true) {
              // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
              if (ptrainset > 0) {
                 for (const int& swarmcore : swarmcores) {
-                      for (int i = 1; i < 0.5*reaxffcores.size()+1; i++) {
+                      for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
                         int reaxffcore = swarmcore + i;
                         if (core == swarmcore ) {
                           MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
