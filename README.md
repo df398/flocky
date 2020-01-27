@@ -100,7 +100,7 @@ or, launch a serial version using:
 ```bash
 flocky_serial
 ```
-> NOTE: both reac and flocky_mpi need to be in your path (or in the working directory)
+> NOTE: both **reac** and **flocky_mpi** need to be in your path (or in the working directory). The directory **must** be visible (i.e shared) to all MPI processes.
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to contribute.
