@@ -12036,7 +12036,7 @@ end subroutine valtaper
     if (qhulp(1:6) == 'HETATM') then
         if (ibgfversion < 400) then
             read (qhulp, &
-            '(7x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f15.10,1x,a5,i3,i2,1x,f8.5)' &
+            '(7x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f10.5,1x,a5,i3,i2,1x,f8.5)' &
             ,end=40,err=40) &
             ir,qlabel(na+1),qresi1(na+1),qresi2(na+1),qresi3(na+1), &
             c(na+1,1),c(na+1,2), &

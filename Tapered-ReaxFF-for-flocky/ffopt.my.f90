@@ -1305,7 +1305,7 @@
     2850 format ('FREQUENCY')
     2900 format ('FORMAT ATOM   (a6,1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,', &
     '3f15.10,1x,a5,i3,i2,1x,f8.5)')
-    3000 format ('HETATM',1x,i5,1x,a2,3x,1x,3x,1x,1x,1x,5x,3f15.10,1x, &
+    3000 format ('HETATM',1x,i5,1x,a2,3x,1x,3x,1x,1x,1x,5x,3f10.5,1x, &
     a5,i3,i2,1x,f8.5)
     3100 format ('FORMAT CONECT (a6,12i6)')
     3200 format ('CONECT',12i6)
