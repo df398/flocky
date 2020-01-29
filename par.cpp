@@ -1529,18 +1529,46 @@ void Par::update_pos_levy(vector < double > globpos, double iter, double inertia
 
 
 int Par::iterate() {
+
+ std::vector<double> standard_mindomain(dim, 0.000001);
+ std::vector<double> standard_maxdomain(dim, 1.0);
+
+ // dropout dimensions by setting their range to 0.0
+ if (regular == 3) {
+    for (int j : dropped_dimns) {
+        standard_mindomain.at(j) = (0.0001 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
+        standard_maxdomain.at(j) = (0.0001 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
+    };
+    // multiply by 0.5 all the other params so as to preserve total params number in the ffield.
+    // now it should be possible to use the gbest ffield for the validation/test sets as-is.
+    for (int i=0; i < dim; i++) {
+       if (find(dropped_dimns.begin(), dropped_dimns.end(), i) != dropped_dimns.end()) {
+          pos.at(i) = 0.5*pos.at(i);
+       };
+    };
+ };
+
  if (localmin == 2) {
    nlopt::opt opt(nlopt::LN_SBPLX, dim);
    opt.set_min_objective(fitness_wrapper, this);
 
-   std::vector<double> standard_mindomain(dim, 0.0001);
-   std::vector<double> standard_maxdomain(dim, 1.0);
+   //std::vector<double> standard_mindomain(dim, 0.000001);
+   //std::vector<double> standard_maxdomain(dim, 1.0);
 
-   // dropout dimensions by setting their range to 0.0
-   for (int j : dropped_dimns) {
-       standard_mindomain.at(j) = (0.0001 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
-       standard_maxdomain.at(j) = (0.0001 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
-   };
+   //// dropout dimensions by setting their range to 0.0
+   //if (regular == 3) {
+   //   for (int j : dropped_dimns) {
+   //       standard_mindomain.at(j) = (0.0001 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
+   //       standard_maxdomain.at(j) = (0.0001 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
+   //   };
+   //   // multiply by 0.5 all the other params so as to preserve total params number in the ffield.
+   //   // now it should be possible to use the gbest ffield for the validation/test sets as-is.
+   //   for (int i=0; i < dim; i++) {
+   //      if (find(dropped_dimns.begin(), dropped_dimns.end(), i) != dropped_dimns.end()) {
+   //         pos.at(i) = 0.5*pos.at(i);
+   //      };
+   //   };
+   //};
 
    opt.set_lower_bounds(standard_mindomain);
    opt.set_upper_bounds(standard_maxdomain);
@@ -1564,8 +1592,8 @@ int Par::iterate() {
    nlopt::opt opt(nlopt::LD_LBFGS, dim);
    opt.set_min_objective(fitness_wrapper, this);  
    opt.set_vector_storage(4);
-   std::vector<double> standard_mindomain(dim, 0.0);
-   std::vector<double> standard_maxdomain(dim, 1.0);
+   //std::vector<double> standard_mindomain(dim, 0.000001);
+   //std::vector<double> standard_maxdomain(dim, 1.0);
    opt.set_lower_bounds(standard_mindomain);
    opt.set_upper_bounds(standard_maxdomain);
    opt.set_ftol_rel(lm_err_tol);
