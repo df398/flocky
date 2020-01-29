@@ -26,7 +26,7 @@ David Furman, Benny Carmeli, Yehuda Zeiri and Ronnie Kosloff,
 [Enhanced Particle Swarm Optimization Algorithm: Efficient Training of ReaxFF Reactive Force Fields](https://pubs.acs.org/doi/10.1021/acs.jctc.7b01272),
 J. Chem. Theory Comput. 2018, 14 (6)
 
-Click [here](https://df398.github.io/flocky/) for additional documentation and usage examples.
+Click [here](https://df398.github.io/flocky/) for additional documentation, usage examples and a user forum.
 
 
 ## Installation
