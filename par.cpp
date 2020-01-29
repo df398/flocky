@@ -2562,7 +2562,6 @@ if (core == 0 && verbose == true) {
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
-  string itercount = std::to_string(cycle);
   if (core == 0) {
     boost::filesystem::ofstream log("log.flocky", ofstream::app);
     log << "\n";
@@ -2618,7 +2617,8 @@ if (core == 0 && verbose == true) {
 
     // evaluate fitness and set bfit = curfit
     newSwarm.GetPar(p).state.cycle = cycle;
-    newSwarm.GetPar(p).state.iter = 0;
+    iter = 0;
+    newSwarm.GetPar(p).state.iter = iter;
     newSwarm.GetPar(p).state.parid = p;
     // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
     if (ptrainset > 0) {
@@ -2841,7 +2841,6 @@ if (verbose == true) {
 };
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
-  string itercount = std::to_string(cycle);
   boost::filesystem::ofstream log("log.flocky", ofstream::app);
   log << "\n";
   log << "Swarm generation started. Please wait." << endl;
@@ -2898,7 +2897,8 @@ if (verbose == true) {
     // evaluate fitness and set bfit = curfit
     vector <double> numgrad;
     newSwarm.GetPar(p).state.cycle = cycle;
-    newSwarm.GetPar(p).state.iter = 0;
+    iter = 0;
+    newSwarm.GetPar(p).state.iter = iter;
     newSwarm.GetPar(p).state.parid = p;
 
     // evaluate fitness
@@ -3037,25 +3037,22 @@ if (core == 0 && verbose == true) {
              newSwarm.GetPar(p).iterate();
           } else {
              vector <double> numgrad;
-             // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
-             if (ptrainset > 0) {
-                for (const int& swarmcore : swarmcores) {
-                      for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
-                        int reaxffcore = swarmcore + i;
-                        if (core == swarmcore ) {
-                          MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
-                          //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                        };
-                        if (core == reaxffcore) {
-                          MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-                          //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                        };
-                    };
-                };
+             for (const int& swarmcore : swarmcores) {
+                   for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
+                     int reaxffcore = swarmcore + i;
+                     if (core == swarmcore ) {
+                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
+                       //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
+                     };
+                     if (core == reaxffcore) {
+                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+                       //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
+                     };
+                 };
+             };
 
-                // generate trainset subsets
-                newSwarm.GetPar(p).write_trainset();
-             }; /* end if we parallelize the training set */
+             // generate trainset subsets
+             newSwarm.GetPar(p).write_trainset();
 
              newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
           };
@@ -3110,7 +3107,6 @@ if (core == 0 && verbose == true) {
                  vector <double> numgrad;
                  newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), numgrad, this);
               };
-
               // Update personal best positions and fitness
               if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
                 newSwarm.GetPar(p).update_bpos();
