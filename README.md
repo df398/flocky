@@ -100,7 +100,7 @@ or, launch a serial version using:
 ```bash
 flocky_serial
 ```
-> NOTE: both **reac** and **flocky_mpi** need to be in your path (or in the working directory). The directory **must** be visible (i.e shared) to all MPI processes.
+> note: **tapreaxff** has to be present in the working directory. To run **flocky** on HPC cluster machines, refer to the [documentation](https://df398.github.io/flocky/).
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to contribute.
