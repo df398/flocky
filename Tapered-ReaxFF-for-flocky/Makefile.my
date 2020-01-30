@@ -1,4 +1,8 @@
-#
+# Makefile for Tapered ReaxFF
+# David Furman, df398@cam.ac.uk
+# University of Cambridge
+
+
 #SUFFIX= -c 
 SUFFIX= -c -O3 -mcmodel=medium
 #LIBS = -static 
@@ -8,7 +12,7 @@ OBJECT= reac.my.o poten.my.o ffopt.my.o shanno.my.o version.o vibra.o blas.o
 INCLUD= cbka.blk cbkm.blk opt.blk 
 #
 
-reac:$(UPDATE) $(OBJECT) $(INCLUD) 
+tapreaxff:$(UPDATE) $(OBJECT) $(INCLUD) 
 	gfortran -o $@ $(OBJECT) $(LIBS)
 	date >> compile.log
 reac.my.o: reac.my.f90 $(INCLUD) 
