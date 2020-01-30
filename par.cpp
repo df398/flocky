@@ -1637,17 +1637,17 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
-  // check if ffield is LG or not. execute correct reac accordingly
+  // check if ffield is LG or not. execute correct tapreaxff accordingly
   if (lg_yn == true) {
       write_ffield_lg(active_params, cycle, iter, parid);
-  // prepare mandatory files before executing reac in each CPU directory
+  // prepare mandatory files before executing tapreaxff in each CPU directory
   } else {
       write_ffield(active_params, cycle, iter, parid);
   };
-  // check if reac exec is present
-  std::ifstream fin5(("CPU." + str_core + "/reac").c_str());
+  // check if tapreaxff exec is present
+  std::ifstream fin5(("CPU." + str_core + "/tapreaxff").c_str());
   if (fin5.fail()) {
-     cout << "reac executable not found for CPU " + str_core + ". Aborting! \n";
+     cout << "tapreaxff executable not found for CPU " + str_core + ". Aborting! \n";
      fin5.close();
      MPI_Abort(MPI_COMM_WORLD,3);
   };
@@ -1681,8 +1681,8 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
      // generate trainset subsets
      write_trainset();
   };
-  //arguments for reac, will run: reac                                                                                                                                  
-  char *args[3] = { "./reac", "", NULL} ;
+  //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
+  char *args[3] = { "./tapreaxff", "", NULL} ;
   pid_t c_pid, pid;
   int status;
 
@@ -1700,9 +1700,9 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
           if(dup2(outfile, STDOUT_FILENO) != STDOUT_FILENO){
             fprintf(stderr, "Error: failed to redirect standard output\n");
           }
-          /* redirect reac stdout to outfile*/
+          /* redirect tapreaxff stdout to outfile*/
           dup2 (outfile, STDOUT_FILENO);
-          /* redirect reac stderr to /dev/null */
+          /* redirect tapreaxff stderr to /dev/null */
           dup2(open("/dev/null", 0), 2);
 
         /* printf("Child: executing args\n"); */
@@ -1724,7 +1724,7 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
     _exit(1);
   };
   if (WIFSIGNALED (status)) {
-    cout << "reac exited abnormaly on CPU:" << core << "\n";
+    cout << "tapreaxff exited abnormaly on CPU:" << core << "\n";
     MPI_Abort(MPI_COMM_WORLD,4);
   };
 
@@ -1838,23 +1838,23 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   boost::filesystem::copy_file(pwd.string() + "/geo." + str_cycle + "." + str_parID,
     pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
-  // check if ffield is LG or not. execute correct reac accordingly
+  // check if ffield is LG or not. execute correct tapreaxff accordingly
   if (lg_yn == true) {
       write_ffield_lg(active_params, cycle, iter, parid);
   } else {
       write_ffield(active_params, cycle, iter, parid);
   };
 
-  // check if reac is present
-  std::ifstream fin5("reac");
+  // check if tapreaxff is present
+  std::ifstream fin5("tapreaxff");
   if (fin5.fail()) {
-      cout << "reac executable not found. Aborting! \n";
+      cout << "tapreaxff executable not found. Aborting! \n";
       fin5.close();
       exit(EXIT_FAILURE);
   }
   fin5.close();
 
-  // prepare mandatory files before executing reac
+  // prepare mandatory files before executing tapreaxff
   boost::filesystem::copy_file(pwd.string() + "/ffield",
       pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
 
@@ -1863,9 +1863,9 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
       pwd.string() + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
-  /* execute reac */
-  //arguments for reac, will run: reac                                                                                                                                  
-  char *args[3] = { "./reac", "", NULL} ;
+  /* execute tapreaxff */
+  //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
+  char *args[3] = { "./tapreaxff", "", NULL} ;
   pid_t c_pid, pid;
   int status;
 
@@ -1883,9 +1883,9 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
           if(dup2(outfile, STDOUT_FILENO) != STDOUT_FILENO){
             fprintf(stderr, "Error: failed to redirect standard output\n");
           }
-          /* redirect reac stdout to outfile*/
+          /* redirect tapreaxff stdout to outfile*/
           dup2 (outfile, STDOUT_FILENO);
-          /* redirect reac stderr to /dev/null */
+          /* redirect tapreaxff stderr to /dev/null */
           dup2(open("/dev/null", 0), 2);
 
         /* printf("Child: executing args\n"); */
@@ -1910,7 +1910,7 @@ double Par::eval_fitness(const vector <double> &active_params, vector<double> &g
   };
 
   if (WIFSIGNALED (status)) {
-    cout << "Error: reac exited abnormaly on CPU:" << core << "\n";
+    cout << "Error: tapreaxff exited abnormaly on CPU:" << core << "\n";
     exit(EXIT_FAILURE);
   };
 
@@ -2310,7 +2310,7 @@ void Swarm::get_userinp(){
 
   // prepare dirs for each CPU process
   boost::filesystem::create_directory("CPU." + str_core);
-  boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/CPU." + str_core + "/reac",
+  boost::filesystem::copy_file(pwd.string() + "/tapreaxff", pwd.string() + "/CPU." + str_core + "/tapreaxff",
       boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/ffield", pwd.string() + "/CPU." + str_core + "/ffield",
       boost::filesystem::copy_option::overwrite_if_exists);
@@ -2326,12 +2326,12 @@ void Swarm::get_userinp(){
   };
   charge_file.close();
 
-  // create fort.20 file needed by reac and reac.lg
+  // create fort.20 file needed by tapreaxff
   boost::filesystem::ofstream iopt_file(pwd.string() + "/CPU." + str_core + "/fort.20");
   iopt_file << "0";
   iopt_file.close();
 
-  // create fort.35 file needed by reac and reac.lg
+  // create fort.35 file needed by tapreaxff
   ofstream fort35_file(pwd.string() + "/CPU." + str_core + "/fort.35");
   fort35_file << "23434.1" << endl;
   fort35_file.close();
@@ -2438,12 +2438,12 @@ void Swarm::get_userinp(){
   };
   charge_file.close();
 
-  // create fort.20 file needed by reac and reac.lg
+  // create fort.20 file needed by tapreaxff
   boost::filesystem::ofstream iopt_file("fort.20");
   iopt_file << "0";
   iopt_file.close();
 
-  // create fort.35 file needed by reac and reac.lg
+  // create fort.35 file needed by tapreaxff
   ofstream fort35_file("fort.35");
   fort35_file << "23434.1" << endl;
   fort35_file.close();
@@ -3556,11 +3556,11 @@ if (core == 0 && verbose == true) {
   boost::filesystem::path p(pwd.string() + "/testovfit");
   boost::filesystem::current_path(p);
 
-  // execute reac
-  boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
+  // execute tapreaxff
+  boost::filesystem::copy_file(pwd.string() + "/tapreaxff", pwd.string() + "/testovfit/tapreaxff",
   boost::filesystem::copy_option::overwrite_if_exists);
-  //arguments for reac, will run: reac                                                                                                                                  
-  char *args[3] = { "./reac", "", NULL} ;
+  //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
+  char *args[3] = { "./tapreaxff", "", NULL} ;
   pid_t c_pid, pid;
   int status;
 
@@ -3578,9 +3578,9 @@ if (core == 0 && verbose == true) {
           if(dup2(outfile, STDOUT_FILENO) != STDOUT_FILENO){
             fprintf(stderr, "Error: failed to redirect standard output\n");
           }
-          /* redirect reac stdout to outfile*/
+          /* redirect tapreaxff stdout to outfile*/
           dup2 (outfile, STDOUT_FILENO);
-          /* redirect reac stderr to /dev/null */
+          /* redirect tapreaxff stderr to /dev/null */
           dup2(open("/dev/null", 0), 2);
 
         /* printf("Child: executing args\n"); */
@@ -3605,7 +3605,7 @@ if (core == 0 && verbose == true) {
   };
 
   if (WIFSIGNALED (status)) {
-    cout << "Error: reac exited abnormaly on CPU:" << core << "\n";
+    cout << "Error: tapreaxff exited abnormaly on CPU:" << core << "\n";
     MPI_Abort(MPI_COMM_WORLD,4); 
   };
 
@@ -3716,11 +3716,11 @@ if (verbose == true) {
   boost::filesystem::path p(pwd.string() + "/testovfit");
   boost::filesystem::current_path(p);
 
-  // execute reac
-  boost::filesystem::copy_file(pwd.string() + "/reac", pwd.string() + "/testovfit/reac",
+  // execute tapreaxff
+  boost::filesystem::copy_file(pwd.string() + "/tapreaxff", pwd.string() + "/testovfit/tapreaxff",
   boost::filesystem::copy_option::overwrite_if_exists);
-  //arguments for reac, will run: reac                                                                                                                                  
-  char *args[3] = { "./reac", "", NULL} ;
+  //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
+  char *args[3] = { "./tapreaxff", "", NULL} ;
   pid_t c_pid, pid;
   int status;
 
@@ -3738,9 +3738,9 @@ if (verbose == true) {
           if(dup2(outfile, STDOUT_FILENO) != STDOUT_FILENO){
             fprintf(stderr, "Error: failed to redirect standard output\n");
           }
-          /* redirect reac stdout to outfile*/
+          /* redirect tapreaxff stdout to outfile*/
           dup2 (outfile, STDOUT_FILENO);
-          /* redirect reac stderr to /dev/null */
+          /* redirect tapreaxff stderr to /dev/null */
           dup2(open("/dev/null", 0), 2);
 
         /* printf("Child: executing args\n"); */
@@ -3765,7 +3765,7 @@ if (verbose == true) {
   };
 
   if (WIFSIGNALED (status)) {
-    cout << "Error: reac exited abnormaly on CPU:" << core << "\n";
+    cout << "Error: tapreaxff exited abnormaly on CPU:" << core << "\n";
     exit(EXIT_FAILURE);
   };
 
