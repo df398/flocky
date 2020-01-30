@@ -2318,6 +2318,11 @@ void Swarm::get_userinp(){
       boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/geo", pwd.string() + "/CPU." + str_core + "/geo",
       boost::filesystem::copy_option::overwrite_if_exists);
+  // prepare fort.111 (forces) file for each CPU process once if it exists (for training FORCES in trainset)
+  if (boost::filesystem::exists(pwd.string() + "forgeo")) {
+     boost::filesystem::copy_file(pwd.string() + "/forgeo", pwd.string() + "/CPU." + str_core + "/fort.111",
+         boost::filesystem::copy_option::overwrite_if_exists);
+  };
 
   if (fixcharges == true) {
     boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",

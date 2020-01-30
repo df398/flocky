@@ -45,9 +45,9 @@
     dbopindc(nbomax,3,2*mbond),drdc(nbomax,3,2), &
     dbopi2ndc(nbomax,3,2*mbond),dbopi2dc(nbomax,3,2), &
     dargtdc(ntomax,3,4),dcell(3,nat,27), &
-    dbopidc(nbomax,3,2),dhdc(nvamax,3,3),cset(nmolset,nat,3), &
+    dbopidc(nbomax,3,2),dhdc(nvamax,3,3),frefset(nmolset,nat,3), cset(nmolset,nat,3), &
     dhbdc(nhbmax,3,3),chaset(nmolset,nat),cp(nat,3), &
-    cadd(nat,3),d2(3*navib,3*navib), &
+    cadd(nat,3),d2(3*navib,3*navib),fref(nat,3), &
     c(nat,3),d(3,nat),accel(3,nat),rrstraset(nmolset,mrestra), &
     vkrstrset(nmolset,mrestra),vkrst2set(nmolset,mrestra), &
     rrchaset(nmolset,mrestra),vkrtset(nmolset,mrestra), &
