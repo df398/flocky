@@ -6,14 +6,14 @@
 1      ! 0: randomize initial positions 1: use current ffield as initial positions
 0      ! 0: take position bounds from params.mod file 1: set %change from current ffield positions
 0.9    ! percent change from current ffield positions (in case above choice is 1)
-0      ! 0: no local minimization 1: LBFGS minimization 2: Nelder-Mead minimization
+0      ! 0: no local minimization 1: LBFGS minimization 2: Nelder-Mead (SBPLX) minimization
 2      ! max number of local minimization iterations
-1.0e-3 ! error tolerance on RMSG in local minimization
+1.0e-3 ! stopping tolerance for local minimization (max relative change in fitness value)
 0      ! 0: no regularization 1: L1 regularization 2: L2 regularization 3: Dropout
 1.0    ! scaling factor for regularization penalty
 0      ! 0: do not detect overfitting 1: detect overfitting
 0      ! 0: do not perform UQ 1: perform UQ
-2      ! swarm size (integer)
+2      ! swarm size (integer > 2)
 2.0    ! c1 parameter
 2.0    ! c2 parameter
 0.9    ! w1 parameter

@@ -75,7 +75,9 @@ export BOOST_INC_PATH=path/to/installation/prefix/include
 
 (4) Install NLopt as a shared library:
 ```bash
-cmake -DCMAKE_INSTALL_PREFIX=path/to/preferred/installdir
+mkdir build
+cd build
+cmake ../ -DCMAKE_INSTALL_PREFIX=path/to/preferred/installdir
 make
 make install
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:path/to/preferred/installdir/lib
