@@ -6,14 +6,13 @@ flocky is an open-source platform for development of high-quality ReaxFF reactiv
 
 Features:
 
-* Interfaced to the Tapered ReaxFF fortran code
-* 2-level MPI parallelisation over swarm members and over training set
-* Flexible parameter space exploration: supports use of bounds or percentage change from current values
-* Implicit multi-objective fitness function uses relative weights
-* Powerful local minimisation algorithms
-* Regularization methods (L1 or L2) and on-the-fly detection of overfitting during optimization
+* Interface to the Tapered ReaxFF fortran code
+* Two-level MPI parallelisation (swarm members and over training set)
+* Flexible parameter space specification (fixed bounds or percentages)
+* Augmented local minimisation algorithms (LBFGS and SBPLX variant to Nelder-Mead Simplex)
+* Regularisation methods and on-the-fly detection of overfitting during optimisation
 * On-the-fly Bayesian errors analysis for uncertainty quantification
-* Training set supports both finite-size and periodic systems
+* Extended training set support (atomic forces)
 
 
 For theoretical background behind Tapered ReaxFF, RiPSOGM and flocky, please consult:
