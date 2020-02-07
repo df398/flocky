@@ -629,9 +629,9 @@
 !                                                                    *
 !*********************************************************************
     100 format (a60)
-    200 format (i4,5f20.4)
-    300 format (7f20.4)
-    400 format (f20.4)
+    200 format (i4,5f20.6)
+    300 format (7f20.6)
+    400 format (f20.6)
     return
     end subroutine bepsdy
 !*********************************************************************
@@ -706,7 +706,7 @@
 
     100 format (62x,'FField value',1x,'QM/Lit value',2x,'Weight', &
     & 6x,'Error',4x,'Total error')
-    400 format (f20.4)
+    400 format (f30.10)
     return
     end subroutine calcerr
 !*********************************************************************

@@ -76,8 +76,6 @@ extern bool firstovfit;
 extern int freq;
 extern double levyscale;
 extern int parid_gbfit;
-extern double lmbfit;
-extern vector <double> lmbpos;
 extern int faili;
 extern int iter;
 extern int maxiters;

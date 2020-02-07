@@ -35,8 +35,6 @@ int    mycore_reaxffcore = 0;
 int    size_reaxffcores = 0;
 int    funceval = 0;
 double curfit;
-double lmbfit = numeric_limits < double > ::infinity();
-vector <double> lmbpos(dim,0);
 // tag if particle position in dimension lies inside [mindomain, maxdomain]
 //bool inside = true;
 int    ptrainset=1;
@@ -44,7 +42,7 @@ int    totmembers=2;
 vector <int> swarmcores(numcores/ptrainset,0);
 vector <int> reaxffcores((numcores - numcores/ptrainset),0);
 int    dim = 2;
-int    NumP = 0;
+int    NumP = 2;
 int    freq = 1;
 int    cycle = 0;
 int    maxcycles = 1;
@@ -188,11 +186,20 @@ void get_inversep() {
 
 
 double fitness_wrapper(const vector <double> &x, vector <double> &numgrad, void *data) {
-  //cout << "CPU: " << core << " entered wrapper" << endl;
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered wrapper" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered wrapper" << endl;
+};
+#endif
 
   double f;
 
-  // *** test function (2D Rosenbrock. x_opt[1,1] = 0.0. Search domain [-5,5]
+  // *** test function (2D Rosenbrock. x_opt[1,1] = 0.0. Search domain = [-5,5] should be defined in params.mod
   //double xp, yp;
   //Par * helper = static_cast <Par *> (data);
   //vector <double> mind = helper->mindomain;
@@ -213,34 +220,22 @@ double fitness_wrapper(const vector <double> &x, vector <double> &numgrad, void 
   //};
   //cout << endl;
 
+  // *** Tapered ReaxFF cost function
   // helper is a pointer to the calling member (which is an object of the Par class)
   Par * helper = static_cast <Par *> (data);
-  //vector <double> mind = helper->mindomain;
-  //vector <double> maxd = helper->maxdomain;
 
-  //cout << "CPU: " << core << " entering eval_fitness with x = " << x[0] << ", " << x[1] << ", " << x[2] << endl;
   f = helper->eval_fitness(x,data);
 
-  if (localmin == 1) {
-    //cout << "CPU: " << core << " entering eval_numgrad with x = " << x[0] << ", " << x[1] << ", " << x[2] << endl;
+  if (localmin == 1 && !numgrad.empty()) {
     numgrad = helper->eval_numgrad(x,data);
   };
 
-  //cout << "WRAPPER x in CPU: " << core << " is: " << x[0] << ", " << x[1];
-  //cout << ", " << x[2] << endl;
-  //cout << "WRAPPER f in CPU: " << core << " is: " << boost::format("%10.4f") %f << endl;
+  //cout << "WRAPPER x[0], x[1] in CPU: " << core << " is: " << x[0] << ", " << x[1] << endl;
+  //cout << "WRAPPER f in CPU: " << core << " is: " << boost::format("%10.6f") %f << endl;
   if (localmin == 1) {
-      //cout << "WRAPPER gradients in CPU: " << core << " is: " << boost::format("%10.4f") %numgrad.at(0) << ", " << 
-      //        boost::format("%10.4f") %numgrad.at(1) << ", " << boost::format("%10.4f") %numgrad.at(2) << endl;
+      //cout << "WRAPPER gradient[0], gradient[1] in CPU: " << core << " is: " << boost::format("%10.6f") %numgrad.at(0) << ", " << 
+      //        boost::format("%10.6f") %numgrad.at(1) << endl;
   };
-  //cout << "WRAPPER x in CPU: " << core << " is: " << x[0]*(maxd.at(0) - mind.at(0)) + mind.at(0) << ", " << x[1]*(maxd.at(1) - mind.at(1)) + mind.at(1);
-  //cout << ", " << x[2]*(maxd.at(2) - mind.at(2)) + mind.at(2) << endl;
-  //cout << "WRAPPER f in CPU: " << core << " is: " << boost::format("%10.4f") %f << endl;
-  //cout << "WRAPPER gradients in CPU: " << core << " is: " << boost::format("%10.4f") %numgrad.at(0) << ", " << 
-  //         boost::format("%10.4f") %numgrad.at(1) << ", " << boost::format("%10.4f") %numgrad.at(2) << endl;
-  //cout << endl;
-
-  //cout << "CPU: " << core << " left wrapper" << endl;
 
   return f;
 };
@@ -273,8 +268,18 @@ Par::Par() {
 };
 
 void Par::read_ffield() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered read_ffield()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered read_ffield()" << endl;
+};
+#endif
+
   // read ffield file into ffieldmat matrix split by entries
-  // following: https://stackoverflow.com/questions/10521658/reading-files-columns-into-array
   ffieldmat.clear();
 #ifdef WITH_MPI
   string str_core = std::to_string(core);
@@ -319,6 +324,17 @@ void Par::read_ffield() {
 };
 
 void Par::write_trainset() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered write_trainset()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered write_trainset()" << endl;
+};
+#endif
+
 #ifdef WITH_MPI
   string str_core = std::to_string(core);
   std::ifstream fin("trainset.in");
@@ -1342,6 +1358,17 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
 };
 
 void Par::read_bounds() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered read_bounds()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered read_bounds()" << endl;
+};
+#endif
+
   // Reading params columns into allData array split by entries
   // following: https://stackoverflow.com/questions/10521658/reading-files-columns-into-array
 
@@ -1415,6 +1442,17 @@ if (core == 0 && verbose == true && perc_yn == false) {
 };
 
 double Par::get_min_dim() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_min_dim()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_min_dim()" << endl;
+};
+#endif
+
   // get length of smallest domain dimension 
   double min_dim = 1.0E99;
   for (int i = 0; i < dim; i++) {
@@ -1443,6 +1481,16 @@ double Par::get_bpos(int u) {
 };
 
 vector < double > Par::get_normdir() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_normdir()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_normdir()" << endl;
+};
+#endif
 
   // generate d points uniformly distributed on a d-dimensional sphere (i.e. random direction)
   // following http://mathworld.wolfram.com/HyperspherePointPicking.html
@@ -1465,6 +1513,17 @@ vector < double > Par::get_normdir() {
 };
 
 double Par::get_levy_McCul(double iter, double maxiters) {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_levy_McCul()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_levy_McCul()" << endl;
+};
+#endif
+
   // ****************************************************** //
   // Gaussian mutation (no Levy)
    std::normal_distribution < double > distnorm(0.0, 1.0);
@@ -1495,12 +1554,33 @@ double Par::get_levy_McCul(double iter, double maxiters) {
 };
 
 void Par::update_bpos() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered update_bpos()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered update_bpos()" << endl;
+};
+#endif
+
   for (int j = 0; j < dim; j++) {
     bpos.at(j) = pos.at(j);
   };
 };
 
 void Par::update_vel(double inertiaf, double CF, vector < double > globpos, double iter) {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered update_vel()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered update_vel()" << endl;
+};
+#endif
 
   double r1 = dist1(generator);
   double r2 = dist1(generator);
@@ -1514,6 +1594,17 @@ void Par::update_vel(double inertiaf, double CF, vector < double > globpos, doub
 };
 
 void Par::update_pos() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered update_pos()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered update_pos()" << endl;
+};
+#endif
+
   for (int i = 0; i < dim; i++) {
     pos.at(i) = pos.at(i) + vel.at(i);
     //check physical bounds
@@ -1536,6 +1627,17 @@ void Par::update_pos() {
 };
 
 void Par::update_pos_levy(vector < double > globpos, double iter, double inertiaf) {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered update_pos_levy()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered update_pos_levy()" << endl;
+};
+#endif
+
   //std::normal_distribution <double> normdist2(0.0, 1.0);
   double levystep = abs(get_levy_McCul(iter, maxiters));
   vector < double > direction = get_normdir();
@@ -1546,9 +1648,9 @@ void Par::update_pos_levy(vector < double > globpos, double iter, double inertia
     // standardized positions
     //std::uniform_real_distribution < double > dist2(0.0,1.0);
     // levy step on physical position
-    pos.at(i) = pos.at(i) + levyscale * get_min_dim() * levystep * direction.at(i);
+    //pos.at(i) = pos.at(i) + levyscale * get_min_dim() * levystep * direction.at(i);
     // old step
-    //pos.at(i) = pos.at(i) + levyscale*(maxdomain.at(i) - mindomain.at(i))*levystep*direction.at(i);
+    pos.at(i) = pos.at(i) + levyscale*0.5*(maxdomain.at(i) - mindomain.at(i))*levystep*direction.at(i);
     // levy step on standardized position
     //pos.at(i) = pos.at(i) + levyscale * levystep * direction.at(i);
 
@@ -1573,21 +1675,23 @@ void Par::update_pos_levy(vector < double > globpos, double iter, double inertia
 
 
 void Par::iterate() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered iterate()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered iterate()" << endl;
+};
+#endif
 
- // dropout dimensions by setting their range to 0.0
+ // note: for localmin, dropout means ranges that belong to dropped dimensions, are set to 0.0
+ // so to exclude them from local minimization
  if (regular == 3) {
     for (int j : dropped_dimns) {
-        //standard_mindomain.at(j) = (0.0 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
-        //standard_maxdomain.at(j) = (0.0 - mindomain.at(j)) / (maxdomain.at(j) - mindomain.at(j));
         mindomain.at(j) = 0.0;
         maxdomain.at(j) = 0.0;
-    };
-    // multiply by 0.5 all the other params so as to preserve total params number in the ffield.
-    // now it should be possible to use the gbest ffield for the validation/test sets as-is.
-    for (int i=0; i < dim; i++) {
-       if (find(dropped_dimns.begin(), dropped_dimns.end(), i) != dropped_dimns.end()) {
-          pos.at(i) = 0.5*pos.at(i);
-       };
     };
  };
 
@@ -1595,21 +1699,17 @@ void Par::iterate() {
    vector <double> x(dim);
    double minf;
    double temphys;
-   // numgrad must be NULL (i.e. size 0) before calling fitness_wrapper
-   //numgrad.clear();
    nlopt::opt opt(nlopt::LN_NELDERMEAD, dim);
    opt.set_min_objective(fitness_wrapper, this);
-   //opt.set_lower_bounds(standard_mindomain);
-   //opt.set_upper_bounds(standard_maxdomain);
    opt.set_lower_bounds(mindomain);
    opt.set_upper_bounds(maxdomain);
-   opt.set_ftol_rel(lm_err_tol);
+   opt.set_xtol_abs(lm_err_tol);
    opt.set_maxeval(lm_iter_max);
    x = pos;
 
    try{
        nlopt::result result = opt.optimize(x, minf);
-       if (ptrainset > 0) {
+       if (ptrainset > 1) {
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
                #ifdef WITH_MPI
                ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
@@ -1655,7 +1755,7 @@ void Par::iterate() {
        fitness = minf;
    }
    catch(std::exception &e) {
-       if (ptrainset > 0) {
+       if (ptrainset > 1) {
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
               #ifdef WITH_MPI
               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
@@ -1685,23 +1785,18 @@ void Par::iterate() {
    double temphys;
    opt.set_min_objective(fitness_wrapper, this);  
    opt.set_vector_storage(10);
-   //opt.set_lower_bounds(standard_mindomain);
-   //opt.set_upper_bounds(standard_maxdomain);
    opt.set_lower_bounds(mindomain);
    opt.set_upper_bounds(maxdomain);
-   opt.set_ftol_rel(lm_err_tol);
+   opt.set_xtol_abs(lm_err_tol);
    opt.set_maxeval(lm_iter_max);
    vector <double> numgrad(dim,1e1);
 
    x = pos;
-   cout << "CPU: " << core << " inside localmin == 1, x is " << x[0] << ", " << x[1] << ", " << x[2] << endl;
    double minf;
 
    try{
        nlopt::result result = opt.optimize(x, minf);
-cout << "CPU: " << core << " after result" << endl;
-//       cout << "CPU " << core << " is after result" << endl;
-       if (ptrainset > 0) {
+       if (ptrainset > 1) {
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
                #ifdef WITH_MPI
                ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
@@ -1742,12 +1837,11 @@ cout << "CPU: " << core << " after result" << endl;
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
        };
-cout << "CPU: " << core << " setting pos = x" << endl;
        pos = x;
        fitness = minf;
    }
    catch(std::exception &e) {
-       if (ptrainset > 0) {
+       if (ptrainset > 1) {
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
               #ifdef WITH_MPI
               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
@@ -1769,13 +1863,22 @@ cout << "CPU: " << core << " setting pos = x" << endl;
            lmin_rep.close();
        };
    };
-cout << "CPU: " << core << " after catch" << endl;          
  }; 
 };
 
 double Par::eval_fitness(const vector <double> &active_params, void *my_func_data) {
 #ifdef WITH_MPI
-//cout << "CPU: " << core << " is in eval_fitness_" << endl;
+if (verbose == true) {
+  cout << "CPU: " << core << " entered eval_fitness()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered eval_fitness()" << endl;
+};
+#endif
+
+#ifdef WITH_MPI
   int cycle;
   int iter;
   int parid;
@@ -1797,21 +1900,27 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
   // prepare fort.3 files
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
-//cout << "CPU: " << core << " is in eval_fitness after cp geo to fort.3" << endl;
-  if (ptrainset > 0) {
+  if (ptrainset > 1) {
      // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
      for (const int& swarmcore : swarmcores) {
            for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
              int reaxffcore = swarmcore + i;
              if (core == swarmcore ) {
                MPI_Send( active_params.data(), active_params.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
-               //cout << "iter = " << iter << " swarmcore " << swarmcore << "sending pos: " << active_params.at(0)*(maxdomain.at(0) - mindomain.at(0)) + mindomain.at(0) << ", " << active_params.at(1)*(maxdomain.at(1) - mindomain.at(1)) + mindomain.at(1) << ", " << active_params.at(2)*(maxdomain.at(2) - mindomain.at(2)) + mindomain.at(2) << endl;
-               //cout << "iter = " << iter << " swarmcore " << swarmcore << "sending pos: " << active_params.at(0) << ", " << active_params.at(1) << ", " << active_params.at(2) << endl;
+               if (verbose == true) {
+                   for (int i=0; i < dim; i++) {
+                       cout << "iter = " << iter << " swarmcore " << swarmcore << "sending pos[" << i << "]: " << active_params.at(i) << " ";
+                   };
+                   cout << endl;
+               };
              };
              if (core == reaxffcore) {
                MPI_Recv( pos.data(), pos.size(), MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-               //cout << "iter = " << iter << " reaxffcore " << reaxffcore << "receiving pos: " << pos.at(0)*(maxdomain.at(0) - mindomain.at(0)) + mindomain.at(0) << ", " << pos.at(1)*(maxdomain.at(1) - mindomain.at(1)) + mindomain.at(1) << ", " << pos.at(2)*(maxdomain.at(2) - mindomain.at(2)) + mindomain.at(2) << endl;
-             //cout << "iter = " << iter << " reaxffcore " << reaxffcore << "receiving pos: " << pos.at(0) << ", " << pos.at(1) << ", " << pos.at(2) << endl;
+               if (verbose == true) {
+                  for (int i=0; i < dim; i++) {
+                      cout << "iter = " << iter << " reaxffcore " << reaxffcore << "receiving pos[" << i << "]: " << pos.at(i) << " ";
+                  };
+               };
              };
          };
      };
@@ -1819,23 +1928,22 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
      // generate trainset subsets
      write_trainset();
   };
-//cout << "CPU: " << core << " is in eval_fitness after setting positions to reaxffcores" << endl;
 
   // check if ffield is LG or not. execute correct tapreaxff accordingly
   if (lg_yn == true) {
-      if (ptrainset > 0 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+      if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
           write_ffield_lg(pos, cycle, iter, parid);
       }else{
           write_ffield_lg(active_params, cycle, iter, parid);
       };
   } else {
-        if (ptrainset > 0 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+        if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
           write_ffield(pos, cycle, iter, parid);
       }else{
           write_ffield(active_params, cycle, iter, parid);
       };
   };
-//cout << "CPU: " << core << " is in eval_fitness after write_ffield_lg" << endl;
+
   // check if tapreaxff exec is present
   std::ifstream fin5(("CPU." + str_core + "/tapreaxff").c_str());
   if (fin5.fail()) {
@@ -1844,20 +1952,20 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
      MPI_Abort(MPI_COMM_WORLD,3);
   };
   fin5.close();
-//cout << "CPU: " << core << " is in eval_fitness just before cp ffield to fort.4" << endl;
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
-//cout << "CPU: " << core << " is in eval_fitness just after cp ffield to fort.4" << endl;
+
   if (fixcharges == true){
      boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/charges",
        pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
+
+  // *** Ready to execute tapreaxff
   // cd to each CPU.x directory
   string old_path = pwd.string();
   boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
   boost::filesystem::current_path(p);
-
 
   //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
   char *args[3] = { "./tapreaxff", "", NULL} ;
@@ -1909,13 +2017,14 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
   // cd back to main directory
   boost::filesystem::path p2(old_path);
   boost::filesystem::current_path(p2);
-  // read fitness value contained in fort.13 file
+  // read fitness value contained in fort.13 file (note: fitness value reported in fort.13 should have at least 6 decimal digits, otherwise
+  // gradients will be inaccurate and lead to poor localmin performance)
   string str;
   if ( !boost::filesystem::exists( "CPU." + str_core + "/fort.13" ) )
   {
     //evalfit = numeric_limits < double > ::infinity();
     evalfit = 1E99;
-    if (ptrainset > 0 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+    if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
        pfitness = evalfit;
     };
   } else {
@@ -1936,12 +2045,12 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
       // convert to double
       if (regular == 1 || regular == 2 ) {
         evalfit = stod(str) + get_reg();
-        if (ptrainset > 0 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+        if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
            pfitness = evalfit;
         };
       }else{
         evalfit = stod(str);
-        if (ptrainset > 0 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+        if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
            pfitness = evalfit;
         };
       };
@@ -1949,9 +2058,9 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
     };
     boost::filesystem::remove( "CPU." + str_core + "/fort.13" );
   };
-//cout << "CPU: " << core << " is in eval_fitness after tapreaxff" << endl;
+
   // If we parallelize the training set, each reaxffcore adds its fitness to the fitness of its swarmcore
-  if (ptrainset > 0) {
+  if (ptrainset > 1) {
      int j = 1;
      int swarmcore;
 
@@ -1959,19 +2068,27 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
          swarmcore = reaxffcore - j;
          if (core == reaxffcore ) {
            MPI_Send( &pfitness, 1, MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD );
-           //cout << "iter = " << iter << " reaxffcore " << reaxffcore << " sent " << pfitness << " to swarmcore " << swarmcore << endl;
+           if (verbose == true) {
+              cout << "iter = " << iter << " reaxffcore " << reaxffcore << " sent " << pfitness << " to swarmcore " << swarmcore << endl;
+           };
          };
          if (core == swarmcore) {
            MPI_Recv( &pfitness, 1, MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-           //cout << "iter = " << iter << " swarmcore " << swarmcore << ": old fit + recv fit = new fit => " << evalfit << " + " << pfitness << " = " << evalfit + pfitness << endl;
+           if (verbose == true) {
+              cout << "iter = " << iter << " swarmcore " << swarmcore << ": old fit + recv fit = new fit => " << evalfit << " + " << pfitness << " = " << evalfit + pfitness << endl;
+           };
          };
          if (core == swarmcore) {
             if (pfitness >= 1E99) {
                 evalfit = 1E99;
-                //cout << "iter = " << iter << " swarmcore " << swarmcore << " newfitness: " << evalfit << endl; 
+                if (verbose == true) {
+                   cout << "iter = " << iter << " swarmcore " << swarmcore << " newfitness: " << evalfit << endl; 
+                };
             }else{
               evalfit = evalfit + pfitness;
-              //cout << "iter = " << iter << " swarmcore " << swarmcore << " newfitness: " << evalfit << endl;
+              if (verbose == true) {
+                 cout << "iter = " << iter << " swarmcore " << swarmcore << " newfitness: " << evalfit << endl;
+              };
             };
          };
 
@@ -1993,7 +2110,8 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
   //   pwd.string()+"/CPU."+str_core+"/geo." + str_cycle + "." + str_parID, 
   //     boost::filesystem::copy_option::overwrite_if_exists);
 
-//cout << "CPU " << core << " is in eval_fitness before evalfitdouble=evalfit" << endl;
+  // note: evalfit is long double so not to lose accuracy when summing doubles from different processes,
+  // while evalfitdouble is double
   evalfitdouble=evalfit;
   fitness=evalfit;
   return evalfitdouble;
@@ -2146,7 +2264,17 @@ double Par::eval_fitness(const vector <double> &active_params, void *my_func_dat
 
 vector <double> Par::eval_numgrad(const vector <double> &active_params, void * my_func_data) {
 #ifdef WITH_MPI
-//cout << "CPU: " << core << " is in eval_numgrad" << endl;
+if (verbose == true) {
+  cout << "CPU: " << core << " entered eval_numgrad()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered eval_numgrad()" << endl;
+};
+#endif
+
+#ifdef WITH_MPI
   int cycle;
   int iter;
   int parid;
@@ -2160,8 +2288,8 @@ vector <double> Par::eval_numgrad(const vector <double> &active_params, void * m
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
 
-  // note: diff cannot be lower than 1e-4 because it determines the ffield parameters in the ffield file
-  // which are read with assumed format of 4 decimal digits!
+  // note: diff cannot be lower than 1e-4 because it determines the written parameters in the ffield file
+  // which are then read with an assumed fixed format of 4 decimal digits in tapreaxff!
   double diff = 0.0001;
   double fitplus;
   double fitminus;
@@ -2188,19 +2316,23 @@ vector <double> Par::eval_numgrad(const vector <double> &active_params, void * m
   // perform central finite difference
   for (int i = 0; i < dim; i++) {
      local_params.at(i) = active_params.at(i) + diff;
-     //cout << "CPU: " << core << " active_params = " << boost::format("%18.6f") %active_params.at(i) << " local_params = " << boost::format("%18.6f") %local_params.at(i) << endl;
 
      fitplus = eval_fitness(local_params, &myfdata);
-     //cout << "CPU: " << core << " fitplus = " << boost::format("%18.6f") %fitplus << endl;
- 
+     if (verbose == true) {
+        cout << "CPU: " << core << " fitplus[" << i << "] = " << boost::format("%18.6f") %fitplus << endl;
+     };
+
      local_params.at(i) = active_params.at(i) - diff;
-     //cout << "CPU: " << core << " active_params = " << boost::format("%18.6f") %active_params.at(i) << " local_params = " << boost::format("%18.6f") %local_params.at(i) << endl;
 
      fitminus = eval_fitness(local_params, &myfdata);
-     //cout << "CPU: " << core << " fitminus = " << boost::format("%18.6f") %fitminus << endl;
+     if (verbose == true) {
+        cout << "CPU: " << core << " fitminus[" << i << "] = " << boost::format("%18.6f") %fitminus << endl;
+     };
 
      grad.at(i) = (fitplus - fitminus)/(2.0*diff);
-     //cout << "CPU: " << core << " grad compn = " << boost::format("%18.6f") %grad.at(i) << endl;
+     if (verbose == true) {
+        cout << "CPU: " << core << " grad[" << i << "] = " << boost::format("%18.6f") %grad.at(i) << endl;
+     };
   };
   
   // count total # func evaluations
@@ -2211,7 +2343,6 @@ vector <double> Par::eval_numgrad(const vector <double> &active_params, void * m
       boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.4.save",
         pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   };
-//cout << "CPU: " << core << " leaves eval_numgrad" << endl;
   return grad;
 #endif
 
@@ -2229,10 +2360,15 @@ vector <double> Par::eval_numgrad(const vector <double> &active_params, void * m
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
 
+  // note: diff cannot be lower than 1e-4 because it determines the written parameters in the ffield file
+  // which are then read with an assumed fixed format of 4 decimal digits in tapreaxff!
   double diff = 0.0001;
   double fitplus;
   double fitminus;
   vector <double> local_params;
+  vector <double> grad(dim, 0.0);
+  vector <double> empty_vec;
+  local_params = active_params;
 
   struct {
     int cyc;
@@ -2243,36 +2379,41 @@ vector <double> Par::eval_numgrad(const vector <double> &active_params, void * m
   myfdata.it = iter;
   myfdata.p = parid;
 
-  //// save fort.4 before writing new ffield
-  //boost::filesystem::copy_file(pwd.string() + "/fort.4",
-  //  pwd.string() + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
+  // save fort.4 before writing new ffield
+  boost::filesystem::copy_file(pwd.string() + "/fort.4",
+    pwd.string() + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
 
   // perform central finite difference
   for (int i = 0; i < dim; i++) {
      local_params.at(i) = active_params.at(i) + diff;
-     fitplus = eval_fitness(local_params, numgrad, &myfdata);
 
-     local_params.at(i) = active_params.at(i) - 2.0*diff;
-     fitminus = eval_fitness(local_params, numgrad, &myfdata);
+     fitplus = eval_fitness(local_params, &myfdata);
+     if (verbose == true) {
+        cout << "fitplus[" << i << "] = " << boost::format("%18.6f") %fitplus << endl;
+     };
 
-     local_params.at(i) = active_params.at(i) + diff;
+     local_params.at(i) = active_params.at(i) - diff;
 
-     // if current gradient is ill-defined use last saved value
-     if (fitplus != numeric_limits <double> ::infinity() && fitminus != numeric_limits <double> ::infinity()) {
-         numgrad.at(i) = (fitplus - fitminus)/2.0*diff;
-     } else {
-        numgrad.at(i) = 0.0;
+     fitminus = eval_fitness(local_params, &myfdata);
+     if (verbose == true) {
+        cout << "fitminus[" << i << "] = " << boost::format("%18.6f") %fitminus << endl;
+     };
+
+     grad.at(i) = (fitplus - fitminus)/(2.0*diff);
+     if (verbose == true) {
+        cout << "grad[" << i << "] = " << boost::format("%18.6f") %grad.at(i) << endl;
      };
   };
+
 
   // count total # func evaluations
   funceval = funceval + 2*dim;
 
-  //// retrive back saved ffield
-  //boost::filesystem::copy_file(pwd.string() + "/fort.4.save",
-  //  pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  // retrive back saved ffield
+  boost::filesystem::copy_file(pwd.string() + "/fort.4.save",
+    pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
 
-  return numgrad;
+  return grad;
 #endif
 };
 
@@ -2305,19 +2446,43 @@ void Par::set_vel(vector < double > vel_of_best_particle) {
 };
 
 void Par::dropout (double dropprobability) {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered dropout()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered dropout()" << endl;
+};
+#endif
+
   dropped_dimns.clear();
   for (int i=0; i < dim; i++) {
      std::uniform_real_distribution <double> unidist(0.0, 1.0);
      if (unidist(generator) < dropprobability) {
         pos.at(i) = 0.0001;
-        // transform to standardized positions
-        //pos.at(i) = (pos.at(i) - mindomain.at(i)) / (maxdomain.at(i) - mindomain.at(i));
         dropped_dimns.push_back(i); // stores dimensions to be dropped
+     }else{
+        // multiply by 0.5 all the other params so as to preserve total params number in the ffield.
+        // now it should be possible to use the gbest ffield for the validation/test sets as-is.
+        pos.at(i) = 0.5*pos.at(i);
      };
   };
 };
 
 double Par::get_reg() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_reg()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_reg()" << endl;
+};
+#endif
+
   double reg = 0.0;
 
   // vector to store the positions that will be converted below to their inverses to use in regularization
@@ -2367,6 +2532,17 @@ Swarm::Swarm() {
 };
 
 void Swarm::read_icharg_control() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered read_icharg_control()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered read_icharg_control()" << endl;
+};
+#endif
+
   // Read icharg value from reax control file
   string str_core = std::to_string(core);
   std::ifstream control_file("control");
@@ -2406,6 +2582,17 @@ void Swarm::read_icharg_control() {
 
 void Swarm::get_userinp(){
 #ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_userinp()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_userinp()" << endl;
+};
+#endif
+
+#ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
 
@@ -2440,7 +2627,7 @@ void Swarm::get_userinp(){
     if (ptrainset >= numcores) {
       cout << "Error: Number of training set sub-units >= number of allocated processors." << endl;
       MPI_Abort(MPI_COMM_WORLD,7);
-    }else if (ptrainset > 0) {
+    }else if (ptrainset > 1) {
       swarmcores.clear();
       reaxffcores.clear();
       for (int i = 0; i < numcores; i=i+ptrainset) {
@@ -2468,7 +2655,7 @@ void Swarm::get_userinp(){
       totmembers = NumP;
       NumP = int(floor(NumP / numcores));
     };
-    if (ptrainset < 0 || (ptrainset > 0 && mod(totmembers,ptrainset) != 0)) {
+    if (ptrainset < 0 || (ptrainset > 1 && mod(totmembers,ptrainset) != 0)) {
        cout << "Error: Number of training set sub-units < 0 or not a divisor of number of allocated processors." << endl;
        MPI_Abort(MPI_COMM_WORLD,7);
     };
@@ -2531,11 +2718,11 @@ void Swarm::get_userinp(){
   // MPI_Bcast must be visible to all processes!
   MPI_Bcast( & lg_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ptrainset, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  if (ptrainset == 0) {
+  if (ptrainset == 1) {
     boost::filesystem::copy_file(pwd.string() + "/trainset.in", pwd.string() + "/CPU." + str_core + "/trainset.in",
         boost::filesystem::copy_option::overwrite_if_exists);
   };
-  if (ptrainset > 0) {
+  if (ptrainset > 1) {
     // define size of vectors for all the rest of the cores
     swarmcores.resize(numcores/ptrainset);
     reaxffcores.resize(numcores - (numcores/ptrainset));
@@ -2648,6 +2835,17 @@ void Swarm::get_userinp(){
 
 
 vector <double> Swarm::get_com(Swarm newSwarm) {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_com()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_com()" << endl;
+};
+#endif
+
  vector <double> swarmcom(dim, 0.0);
  double sumpos = 0.0;
  double totsumpos = 0.0;
@@ -2680,6 +2878,17 @@ vector <double> Swarm::get_com(Swarm newSwarm) {
 };
 
 double Swarm::get_disp(Swarm newSwarm) {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_disp()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_disp()" << endl;
+};
+#endif
+
   double swarm_dispersion = 0.0;
   // define deviation vector between a swarm member and the center-of-mass
   vector <double> deviation_vec(dim, 0.0);
@@ -2727,6 +2936,17 @@ void Swarm::AddPar(Par & newPar) {
 };
 
 int Swarm::get_worse(Swarm newSwarm) {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_worse()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_worse()" << endl;
+};
+#endif
+
   double fit = -1.0 * numeric_limits < double > ::infinity();
   int particle_id;
   for (int p = 0; p < NumP; p++) {
@@ -2739,6 +2959,17 @@ int Swarm::get_worse(Swarm newSwarm) {
 };
 
 int Swarm::get_best(Swarm newSwarm) {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered get_best()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered get_best()" << endl;
+};
+#endif
+
   double fit = numeric_limits < double > ::infinity();
   int particle_id = 0;
   for (int p = 0; p < NumP; p++) {
@@ -2753,9 +2984,18 @@ int Swarm::get_best(Swarm newSwarm) {
 
 void Swarm::Populate(Swarm & newSwarm, int cycle) {
 #ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered Populate!" << endl; 
+if (verbose == true) {
+  cout << "CPU: " << core << " entered Populate()" << endl;
 };
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered Populate()" << endl;
+};
+#endif
+
+
+#ifdef WITH_MPI
 
  // define a new sub-communicator for reaxffcores and swarmcores //
     MPI_Comm ACTIVESWARM;  // swarmcores
@@ -2830,11 +3070,6 @@ if (core == 0 && verbose == true) {
         double tempstand;
         ffpos.clear();
         for (int m = 0; m < dim; m++) {
-          // standardize positions for CPU.0
-          //tempstand = stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))) - newSwarm.GetPar(0).mindomain.at(m);
-          //tempstand = tempstand/(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m));
-          //ffpos.push_back(tempstand);
-          // use physical positions for CPU.0
           ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
         };
         newSwarm.GetPar(0).set_pos(ffpos);
@@ -2855,18 +3090,13 @@ if (core == 0 && verbose == true) {
 
     // local minimization
     if (localmin == 1 || localmin == 2) {
-//cout << "CPU: " << core << "entered iterate" << endl;
        newSwarm.GetPar(p).iterate();
-//cout << "CPU: " << core << "left iterate" << endl;
     }else{
-       //cout << "CPU: " << " NOT SUPPOSED TO BE HERE!" << endl;
        newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
     };
-//MPI_Barrier(MPI_COMM_WORLD);
-//cout << "CPU: " << core << "reached barrier!" << endl;
-//MPI_Abort(MPI_COMM_WORLD,8);
+
     // if we parallelize the training set, update gbfit and gbpos only among swarmcores
-    if (ptrainset > 0) {
+    if (ptrainset > 1) {
       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
         newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
         newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
@@ -2876,11 +3106,7 @@ if (core == 0 && verbose == true) {
           gbfit = newSwarm.GetPar(p).get_fitness();
           gbpos.clear();
           gbpos = newSwarm.GetPar(p).get_pos_vec();
-          //write_ffield_gbest(core, cycle, iter, p);
         };
-        // cleaning ffield.tmp.* files after write_ffield_gbest already
-        // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
-        //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
       };
     }else {
       newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
@@ -2891,17 +3117,13 @@ if (core == 0 && verbose == true) {
         gbfit = newSwarm.GetPar(p).get_fitness();
         gbpos.clear();
         gbpos = newSwarm.GetPar(p).get_pos_vec();
-        //write_ffield_gbest(core, cycle, iter, p);
       };
-      // cleaning ffield.tmp.* files after write_ffield_gbest already
-      // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
-      //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
     };
 
   }; // done loop on members
 
   // if we parallelize the training set, do the following only among swarmcores
-  if (ptrainset > 0) {
+  if (ptrainset > 1) {
         // pair struct to hold the global best fitness across processes and its core rank
         struct {
           double tmp_fit;
@@ -2929,7 +3151,7 @@ if (core == 0 && verbose == true) {
          struct {
            double tmp_fit2;
            int tmp_parid;
-         } /*min_vals_in2, min_vals_out2;*/ min_vals_in2[1], min_vals_out2[1];
+         } min_vals_in2[1], min_vals_out2[1];
 
          // store current fit on each process
           min_vals_in2[0].tmp_fit2 = gbfit;
@@ -3080,9 +3302,6 @@ if (core == 0 && verbose == true) {
 #endif
 
 #ifndef WITH_MPI
-if (verbose == true) {
-   cout << "Swarm entered Populate!" << endl;
-};
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
   boost::filesystem::ofstream log("log.flocky", ofstream::app);
@@ -3131,11 +3350,6 @@ if (verbose == true) {
       vector < double > ffpos;
       ffpos.clear();
       for (int m = 0; m < dim; m++) {
-        // standardize positions
-        //tempstand = stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))) - newSwarm.GetPar(0).mindomain.at(m);
-        //tempstand = tempstand/(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m));
-        //ffpos.push_back(tempstand);
-        // use physical positions
         ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
       };
       newSwarm.GetPar(0).set_pos(ffpos);
@@ -3143,23 +3357,21 @@ if (verbose == true) {
     contff = false;
 
     // evaluate fitness and set bfit = curfit
-    vector <double> numgrad;
     newSwarm.GetPar(p).state.cycle = cycle;
     iter = 0;
     newSwarm.GetPar(p).state.iter = iter;
     newSwarm.GetPar(p).state.parid = p;
 
-
     // dropout
     if (regular == 3) {
        newSwarm.GetPar(p).dropout(0.5);
     };
-    // evaulate fitness
-    newSwarm.GetPar(p).set_fitness( newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this) );
 
     // local minimization
     if (localmin == 1 || localmin == 2) {
        newSwarm.GetPar(p).iterate();
+    }else{
+       newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
     };
 
     newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
@@ -3175,9 +3387,6 @@ if (verbose == true) {
     // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
     boost::filesystem::remove("ffield.tmp." + str_cycle + ".0." + "." + parID);
   }; // done loop over members
-if (verbose == true) {
-   cout << "Swarm done loop on members!" << endl;
-};
 
   //initial_disp = newSwarm.get_disp(newSwarm);
 
@@ -3207,10 +3416,6 @@ if (verbose == true) {
     newSwarm.printUQFF(newSwarm, 0, cycle, 1);
     newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
   };
-
-if (verbose == true) {
-   cout << "Swarm left Populate!" << endl;
-};
 #endif
 };
 
@@ -3218,9 +3423,17 @@ if (verbose == true) {
 
 void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 #ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered Propagate!" << endl;
+if (verbose == true) {
+   cout << "core " << core << " entered Propagate()" << endl;
 };
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+   cout << "entered Propagate()" << endl;
+};
+#endif
+
+#ifdef WITH_MPI
  // define a new sub-communicator for reaxffcores and swarmcores //
     MPI_Comm ACTIVESWARM;  // swarmcores
     MPI_Comm PASSIVESWARM; // reaxffcores
@@ -3259,7 +3472,7 @@ MPI_Barrier(MPI_COMM_WORLD);
     //
     for (int p = 0; p < NumP; p++) {
        // if we parallelize the training set, do the following only among swarmcores
-       if (ptrainset > 0) {
+       if (ptrainset > 1) {
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
               // Update velocities and positions
               newSwarm.GetPar(p).update_vel(inertiafac, confac, gbpos, iter);
@@ -3274,13 +3487,14 @@ MPI_Barrier(MPI_COMM_WORLD);
           newSwarm.GetPar(p).state.iter = iter;
           newSwarm.GetPar(p).state.parid = p;
 
-          // evaluate fitness. if doing localmin with ptrainset > 0, the generation of trainset subsets
+          // evaluate fitness. note: if doing localmin with ptrainset > 1, the generation of trainset subsets
           // is performed inside eval_fitness. If not doing localmin, generation of trainset subsets is performed here.
 
           // dropout
           if (regular == 3) {
              newSwarm.GetPar(p).dropout(0.5);
           };
+
           if (localmin == 1 || localmin == 2) {
               newSwarm.GetPar(p).iterate();
           } else {
@@ -3315,19 +3529,12 @@ MPI_Barrier(MPI_COMM_WORLD);
                  gbfit = newSwarm.GetPar(p).get_bfit();
                  gbpos.clear();
                  gbpos = newSwarm.GetPar(p).get_pos_vec();
-                 //write_ffield_gbest(core, cycle, iter, p);
                }else{
                  gbfitfound = false;
                };
              } else {
                newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
              };
-             // cleaning ffield.tmp.* files after write_ffield_gbest already
-             // copied the correct ffield.tmp.* file as the ffield.gbest.*
-             string str_cycle = std::to_string(cycle);
-             string str_iter = std::to_string(iter);
-             string str_parID = std::to_string(p);
-             //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
           };
        }else {
               // Update velocities and positions
@@ -3365,24 +3572,17 @@ MPI_Barrier(MPI_COMM_WORLD);
                   gbfit = newSwarm.GetPar(p).get_bfit();
                   gbpos.clear();
                   gbpos = newSwarm.GetPar(p).get_pos_vec();
-                  //write_ffield_gbest(core, cycle, iter, p);
                 }else{
                   gbfitfound = false;
                 };
               } else {
                 newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
               };
-              // cleaning ffield.tmp.* files after write_ffield_gbest already
-              // copied the correct ffield.tmp.* file as the ffield.gbest.*
-              string str_cycle = std::to_string(cycle);
-              string str_iter = std::to_string(iter);
-              string str_parID = std::to_string(p);
-              //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
        };
     }; // done loop over swarm members
 
     // if we parallelize the training set, do the following only among swarmcores
-    if (ptrainset > 0) {
+    if (ptrainset > 1) {
         //newSwarm.get_com(newSwarm);
 
         // pair struct to hold the global best fitness across processes and its core rank
@@ -3462,7 +3662,7 @@ MPI_Barrier(MPI_COMM_WORLD);
           newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
         };
         //newSwarm.printdisp(newSwarm, iter, cycle, freq);
-    }else { // done if ptrainset > 0
+    }else { // done if ptrainset > 1
         //newSwarm.get_com(newSwarm);
 
         // pair struct to hold the global best fitness across processes and its core rank
@@ -3532,7 +3732,7 @@ MPI_Barrier(MPI_COMM_WORLD);
     };
   }; // done loop over iterations
 
-  if (ptrainset == 0) {
+  if (ptrainset == 1) {
       MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   }else {
       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
@@ -3550,11 +3750,7 @@ MPI_Barrier(MPI_COMM_WORLD);
     log << "Global best ReaxFF parameters:" << endl;
     log << "[ ";
     for (int m = 0; m < dim; m++) {
-      // physical gbest position
       log << newSwarm.get_gbpos().at(m) << " ";
-      // standardized gbest position
-      //temphys = newSwarm.get_gbpos().at(m)*(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)) + newSwarm.GetPar(0).mindomain.at(m);
-      //log << boost::format("%8.4f") %temphys << " ";
     };
     log << "]\n" << endl;
     log.close();
@@ -3672,11 +3868,7 @@ if (verbose == true) {
   log << "Global best ReaxFF parameters:" << endl;
   log << "[ "; 
   for (int m = 0; m < dim; m++) {
-    // physical gbest position
     log << boost::format("%8.4f") %newSwarm.get_gbpos().at(m) << " ";
-    // standardized gbest position
-    //temphys = newSwarm.get_gbpos().at(m)*(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)) + newSwarm.GetPar(0).mindomain.at(m);
-    //log << boost::format("%8.4f") %temphys << " ";
   };
   log << "]" << endl;
   log.close();
@@ -3688,12 +3880,19 @@ if (verbose == true) {
 };
 
 void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
-  // cp current ffield to be the global best and current analysis files to global best analysis files
+#ifdef WITH_MPI
+if (verbose == true) {
+   cout << "core " << core << " entered write_ffield_gbest()" << endl;
+};
+#endif
 #ifndef WITH_MPI
 if (verbose == true) {
-   cout << "Swarm entered write_ffield_gbest!" << endl;
+   cout << "entered write_ffield_gbest()" << endl;
 };
+#endif
 
+
+#ifndef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
@@ -3712,19 +3911,8 @@ if (verbose == true) {
       "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   };
   test_fort99.close();
-
-  // clean temp files
-  //boost::filesystem::remove(pwd.string() + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
-
-if (verbose == true) {
-   cout << "Swarm left write_ffield_gbest!" << endl;
-};
 #endif
 #ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered write_ffield_gbest!" << endl;
-};
-
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
   string str_core = std::to_string(core);
@@ -3735,22 +3923,22 @@ if (core == 0 && verbose == true) {
     "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.99",
     "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
-
-  // clean temp files
-  //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
-
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " left write_ffield_gbest!" << endl;
-};
 #endif
 };
 
 void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int parid_gbfit) {
 #ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered detovfit!" << endl;
+if (verbose == true) {
+   cout << "core " << core << " entered detovfit()" << endl;
 };
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+   cout << "entered detovfit()" << endl;
+};
+#endif
 
+#ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(cpuid_gbfit);
   string str_cycle = std::to_string(cycle);
@@ -3903,15 +4091,8 @@ if (core == 0 && verbose == true) {
   //}else{
    //ovfitness = currovfitness;
   //};
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " left detovfit!" << endl;
-};
 #endif
 #ifndef WITH_MPI
-if (verbose == true) {
-   cout << "Swarm entered detovfit!" << endl;
-};
-
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
@@ -4063,10 +4244,6 @@ if (verbose == true) {
   //}else{
    //ovfitness = currovfitness;
   //};
-
-if (verbose == true) {
-   cout << "Swarm left write_ffield_gbest!" << endl;
-};
 #endif
 };
 
@@ -4128,6 +4305,17 @@ void Swarm::printopt(Swarm & newSwarm, int iter, int cycle, int fr) {
 
 
 void Swarm::printUQQoI(Swarm & newSwarm, int iter, int cycle, int fr) {
+#ifdef WITH_MPI
+if (verbose == true) {
+   cout << "core " << core << " entered printUQQoI()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+   cout << "entered printUQQoI" << endl;
+};
+#endif
+
   string str_core = std::to_string(core);
   string line;
   // define temp sums of partial errors from fort.99 file for each core
@@ -4144,6 +4332,7 @@ void Swarm::printUQQoI(Swarm & newSwarm, int iter, int cycle, int fr) {
   std::regex e4 ("Charge atom:");
   std::regex e5 ("Torsion angle:");
   std::regex e6 ("Energy");
+  std::regex e7 ("Force on atom:");
 
   vector <string> values; 
 
@@ -4250,6 +4439,23 @@ void Swarm::printUQQoI(Swarm & newSwarm, int iter, int cycle, int fr) {
             outfileUQENER.close();
             continue;
           };
+          if (regex_search (line,m,e6)){
+            boost::trim(line);
+            using boost::is_any_of;
+            boost::split(values, line, is_any_of("\t "),boost::token_compress_on);
+            // UQAFORC.* file will be generated for every cycle containing errors of all members
+            ofstream outfileUQAFORC("UQAFORC." + std::to_string(cycle), ofstream::app);
+            stringstream ss1;
+            // determine position of error backwards
+            int tmpcell = values.size() - 2;
+            ss1 << boost::format("%25.4f") %sqrt(stod(values.at(tmpcell)));
+            outfileUQAFORC << ss1.str() << endl;
+            ss1.str("");
+            values.clear();
+            outfileUQAFORC.close();
+            continue;
+          };
+
         }; // done reading all lines
       };
       myfile.close();
@@ -4258,6 +4464,17 @@ void Swarm::printUQQoI(Swarm & newSwarm, int iter, int cycle, int fr) {
 };
 
 void Swarm::printUQFF(Swarm & newSwarm, int iter, int cycle, int fr) {
+#ifdef WITH_MPI
+if (verbose == true) {
+   cout << "core " << core << " entered printUQFF" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+   cout << "entered printUQFF" << endl;
+};
+#endif
+
   boost::filesystem::path pwd(boost::filesystem::current_path());
   if (mod(iter, fr) == 0.0) {
     stringstream ss1;
@@ -4279,14 +4496,21 @@ void Swarm::printUQFF(Swarm & newSwarm, int iter, int cycle, int fr) {
 
 
 void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
+#ifdef WITH_MPI
+if (verbose == true) {
+   cout << "core " << core << " entered printpos" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+   cout << "entered printpos" << endl;
+};
+#endif
+
   boost::filesystem::path pwd(boost::filesystem::current_path());
   double phystempos;
 #ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered printpos!" << endl;
-};
-
-  if (ptrainset > 0) {
+  if (ptrainset > 1) {
      if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
         string str_core = std::to_string(core);
         boost::filesystem::create_directory("CPU." + str_core + "/pos");
@@ -4303,12 +4527,7 @@ if (core == 0 && verbose == true) {
             outfilepos << ss1.str();
             ss1.str("");
             for (int m = 0; m < dim; m++) {
-              // transform back to physical positions
-              //phystempos = newSwarm.GetPar(p).get_pos(m)*(newSwarm.GetPar(p).maxdomain.at(m) - newSwarm.GetPar(p).mindomain.at(m)) + newSwarm.GetPar(p).mindomain.at(m);
               phystempos = newSwarm.GetPar(p).get_pos(m);
-              // stream standardized position
-              //ss2 << boost::format("%10.4f") %newSwarm.GetPar(p).get_pos(m); 
-              // stream transformed to physical position
               ss2 << boost::format("%10.4f") %phystempos;
               outfilepos << ss2.str();
               ss2.str("");
@@ -4337,12 +4556,7 @@ if (core == 0 && verbose == true) {
          outfilepos << ss1.str();
          ss1.str("");
          for (int m = 0; m < dim; m++) {
-           // transform back to physical positions
-           //phystempos = newSwarm.GetPar(p).get_pos(m)*(newSwarm.GetPar(p).maxdomain.at(m) - newSwarm.GetPar(p).mindomain.at(m)) + newSwarm.GetPar(p).mindomain.at(m);
            phystempos = newSwarm.GetPar(p).get_pos(m);
-           // stream standardized position
-           //ss2 << boost::format("%10.4f") %newSwarm.GetPar(p).get_pos(m); 
-           // stream transformed to physical position
            ss2 << boost::format("%10.4f") %phystempos;
            outfilepos << ss2.str();
            ss2.str("");
@@ -4361,10 +4575,6 @@ if (core == 0 && verbose == true) {
 };
 #endif
 #ifndef WITH_MPI
-if (verbose == true) {
-   cout << "Swarm entered printpos!" << endl;
-};
-
   boost::filesystem::create_directory("pos");
   const char * path = "pos/pos_log.out.";
   ofstream outfilepos(path + std::to_string(cycle), ofstream::app);
@@ -4379,12 +4589,7 @@ if (verbose == true) {
       outfilepos << ss1.str();
       ss1.str("");
       for (int m = 0; m < dim; m++) {
-        // transform back to physical positions
-        //phystempos = newSwarm.GetPar(p).get_pos(m)*(newSwarm.GetPar(p).maxdomain.at(m) - newSwarm.GetPar(p).mindomain.at(m)) + newSwarm.GetPar(p).mindomain.at(m);
         phystempos = newSwarm.GetPar(p).get_pos(m);
-        // stream standardized position
-        //ss2 << boost::format("%10.4f") %newSwarm.GetPar(p).get_pos(m); 
-        // stream transformed to physical position
         ss2 << boost::format("%10.4f") %phystempos;
         outfilepos << ss2.str();
         ss2.str("");
@@ -4397,10 +4602,6 @@ if (verbose == true) {
   };
   outfilepos.close();
 #endif
-
-if (verbose == true) {
-   cout << "Swarm left printpos!" << endl;
-};
 };
 
 void Swarm::printvel(Swarm & newSwarm, int iter, int cycle, int fr) {
