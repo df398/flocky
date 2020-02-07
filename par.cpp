@@ -2199,8 +2199,6 @@ vector <double> Par::eval_numgrad(const vector <double> &active_params, void * m
      fitminus = eval_fitness(local_params, &myfdata);
      //cout << "CPU: " << core << " fitminus = " << boost::format("%18.6f") %fitminus << endl;
 
-     local_params.at(i) = active_params.at(i);
-
      grad.at(i) = (fitplus - fitminus)/(2.0*diff);
      //cout << "CPU: " << core << " grad compn = " << boost::format("%18.6f") %grad.at(i) << endl;
   };
@@ -2943,13 +2941,19 @@ if (core == 0 && verbose == true) {
          };
          // parid of the gbfit
          parid_gbfit = min_vals_out2[0].tmp_parid;
-         // now we can safely write ffield_gbest after all procs compared their gbfit
+
+         // now convert cpuid_gbfit value from ACTIVESWARM to MPI_COMM_WORLD
+         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+            cpuid_gbfit = swarmcores.at(cpuid_gbfit);
+         };
+         // so now we can safely write ffield_gbest after all procs compared their gbfit
          // and cleaning ffield.tmp.* files after write_ffield_gbest already
          // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
          if (core == cpuid_gbfit && gbfitfound == true) {
             write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
-            boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + std::to_string(cycle)+".0." + "." + std::to_string(parid_gbfit));
          };
+         // remove all ffield.tmp files
+         boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp." + std::to_string(cycle)+".0." + "." + std::to_string(parid_gbfit));
 
          if (core == 0) {
             // clean up any old files belonging to previous job
@@ -3028,14 +3032,17 @@ if (core == 0 && verbose == true) {
      MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
      // parid of the gbfit
      parid_gbfit = min_vals_out2[0].tmp_parid;
+     // broadcast parid_gbfit to reaxffcores as well so we can delete corresponding ffield.tmp files
+     MPI_Bcast(&parid_gbfit, 1, MPI_INT, cpuid_gbfit, MPI_COMM_WORLD);
 
      // now we can safely write ffield_gbest after all procs compared their gbfit
      // and cleaning ffield.tmp.* files after write_ffield_gbest already
      // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
      if (core == cpuid_gbfit) {
         write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
-        boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + std::to_string(cycle)+".0." + "." + std::to_string(parid_gbfit));
      };
+     // remove all ffield.tmp files
+     boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp." + std::to_string(cycle)+".0." + "." + std::to_string(parid_gbfit));
 
      if (core == 0) {
        // clean up any old files belonging to previous job
@@ -3417,11 +3424,19 @@ MPI_Barrier(MPI_COMM_WORLD);
         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
            MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, ACTIVESWARM);
         };
+        // broadcast parid_gbfit to reaxffcores as well so we can delete corresponding ffield.tmp files
+        MPI_Bcast(&parid_gbfit, 1, MPI_INT, cpuid_gbfit, MPI_COMM_WORLD);
 
-        // now we can safely write ffield_gbest after all procs compared their gbfit
+        // now convert cpuid_gbfit value from ACTIVESWARM to MPI_COMM_WORLD
+        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+           cpuid_gbfit = swarmcores.at(cpuid_gbfit);
+        };
+        // so now we can safely write ffield_gbest after all procs compared their gbfit
         if (core == cpuid_gbfit && gbfitfound == true) {
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
         };
+        // remove all ffield.tmp files
+        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp." + std::to_string(cycle) + "." + std::to_string(iter) + "." + std::to_string(parid_gbfit));
 
         if (ofit == true){
           if (gbfitfound == true) {
@@ -3489,6 +3504,8 @@ MPI_Barrier(MPI_COMM_WORLD);
         if (core == cpuid_gbfit && gbfitfound == true) {
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
         };
+        // remove all ffield.tmp files
+        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp." + std::to_string(cycle) + "." + std::to_string(iter) + "." + std::to_string(parid_gbfit));
 
         if (ofit == true){
           if (gbfitfound == true) {
@@ -3625,7 +3642,7 @@ if (verbose == true) {
       string str_cycle = std::to_string(cycle);
       string str_iter = std::to_string(iter);
       string str_parID = std::to_string(p);
-      //boost::filesystem::remove(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
+      boost::filesystem::remove(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
     }; // done loop over swarm members
 
     //newSwarm.get_com(newSwarm);
