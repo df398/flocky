@@ -1909,7 +1909,7 @@ if (verbose == true) {
                MPI_Send( active_params.data(), active_params.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
                if (verbose == true) {
                    for (int i=0; i < dim; i++) {
-                       cout << "iter = " << iter << " swarmcore " << swarmcore << "sending pos[" << i << "]: " << active_params.at(i) << " ";
+                       cout << "iter = " << iter << " swarmcore " << swarmcore << " sending pos[" << i << "]: " << active_params.at(i) << " ";
                    };
                    cout << endl;
                };
@@ -1918,8 +1918,9 @@ if (verbose == true) {
                MPI_Recv( pos.data(), pos.size(), MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
                if (verbose == true) {
                   for (int i=0; i < dim; i++) {
-                      cout << "iter = " << iter << " reaxffcore " << reaxffcore << "receiving pos[" << i << "]: " << pos.at(i) << " ";
+                      cout << "iter = " << iter << " reaxffcore " << reaxffcore << " receiving pos[" << i << "]: " << pos.at(i) << " ";
                   };
+                  cout << endl;
                };
              };
          };
@@ -3296,7 +3297,7 @@ if (verbose == true) {
      };
   };
 
-if (core == 0 && verbose == true) {
+if (verbose == true) {
    cout << "core " << core << " left Populate!" << endl;
 };
 #endif
@@ -3769,7 +3770,7 @@ MPI_Barrier(MPI_COMM_WORLD);
         MPI_Comm_free(newcomm);
     };
   };
-if (core == 0 && verbose == true) {
+if (verbose == true) {
    cout << "core " << core << " left Populate!" << endl;
 };
 #endif
