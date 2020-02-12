@@ -21,7 +21,7 @@ std::random_device seed;
 // Mersene Twister: Good quality random number generator
 #ifdef WITH_MPI
 std::mt19937 generator(seed() + core);
-//std::mt19937 generator(1234);
+//std::mt19937 generator(1022224);
 #endif
 #ifndef WITH_MPI
 std::mt19937 generator(seed());
@@ -222,6 +222,9 @@ if (verbose == true) {
 
   // *** Tapered ReaxFF cost function
   // helper is a pointer to the calling member (which is an object of the Par class)
+cout << "WRAPPER was entered on CPU: " << core << endl;
+cout << "--------------------------------" << endl;
+
   Par * helper = static_cast <Par *> (data);
 
   f = helper->eval_fitness(x,data);
@@ -230,8 +233,8 @@ if (verbose == true) {
     numgrad = helper->eval_numgrad(x,data);
   };
 
-  //cout << "WRAPPER x[0], x[1] in CPU: " << core << " is: " << x[0] << ", " << x[1] << endl;
-  //cout << "WRAPPER f in CPU: " << core << " is: " << boost::format("%10.6f") %f << endl;
+  cout << "WRAPPER x[0], x[1] in CPU: " << core << " is: " << x[0] << ", " << x[1] << endl;
+  cout << "WRAPPER f in CPU: " << core << " is: " << boost::format("%10.6f") %f << endl;
   if (localmin == 1) {
       //cout << "WRAPPER gradient[0], gradient[1] in CPU: " << core << " is: " << boost::format("%10.6f") %numgrad.at(0) << ", " << 
       //        boost::format("%10.6f") %numgrad.at(1) << endl;
@@ -1685,6 +1688,10 @@ if (verbose == true) {
   cout << "entered iterate()" << endl;
 };
 #endif
+  
+  //// return value (positive or negative) of a swarmcore localmin
+  //int lm_return;
+  //lm_return = 0;
 
  // note: for localmin, dropout means ranges that belong to dropped dimensions, are set to 0.0
  // so to exclude them from local minimization
@@ -1705,10 +1712,39 @@ if (verbose == true) {
    opt.set_upper_bounds(maxdomain);
    opt.set_xtol_abs(lm_err_tol);
    opt.set_maxeval(lm_iter_max);
+
    x = pos;
 
    try{
        nlopt::result result = opt.optimize(x, minf);
+       //if (ptrainset > 1 && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+       //   if (result > 0 || result < 0) {
+       //      lm_return = 1;
+       //   }else{
+       //      lm_return = 0;
+       //   };
+       //};
+       //if (ptrainset > 1) {
+       //    for (const int& swarmcore : swarmcores) {
+       //          for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
+       //              int reaxffcore = swarmcore + i;
+       //              if (core == swarmcore ) {
+       //                  MPI_Send( &lm_return, 1, MPI_INT, reaxffcore, 1, MPI_COMM_WORLD );
+       //                  cout << "swarmcore: " << core << " sending return = " << lm_return << " to reaxffcore "  << reaxffcore << endl;
+       //              };
+       //              if (core == reaxffcore) {
+       //                  MPI_Recv( &lm_return, 1, MPI_INT, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+       //                  cout << "reaxffcore: " << core << " receiving return = " << lm_return << " from swarmcore "  << swarmcore << endl;
+       //              };
+       //          };
+       //    };
+       //    MPI_Barrier(MPI_COMM_WORLD);
+       //    if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end() && lm_return == 1) {
+       //       cout << "reaxffcore: " << core << " noticed that swarmcore returned. forcing lm stop!" << endl;
+       //       opt.force_stop();
+       //    };
+       //};
+
        if (ptrainset > 1) {
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
                #ifdef WITH_MPI
@@ -1750,9 +1786,9 @@ if (verbose == true) {
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
        };
-
        pos = x;
        fitness = minf;
+       
    }
    catch(std::exception &e) {
        if (ptrainset > 1) {
@@ -1776,7 +1812,7 @@ if (verbose == true) {
            lmin_rep << "Warning: local minimization failed for CPU " << core << "--> " << e.what() << endl;
            lmin_rep.close();
        };      
-   };          
+   };         
  };            
                
  if (localmin == 1) {
@@ -1787,9 +1823,24 @@ if (verbose == true) {
    opt.set_vector_storage(10);
    opt.set_lower_bounds(mindomain);
    opt.set_upper_bounds(maxdomain);
-   opt.set_xtol_abs(lm_err_tol);
-   opt.set_maxeval(lm_iter_max);
    vector <double> numgrad(dim,1e1);
+
+   if (ptrainset > 1 && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+   // for swarmcores we use the user inputs for the stopping criteria
+       opt.set_xtol_abs(lm_err_tol);
+       opt.set_maxeval(lm_iter_max);
+   } else {
+   // but for the reaxffcores we make sure they keep minimising until
+   // the relevant swarmcore returns from opt and then reaxffcores localmin is forced stopped.
+       //opt.set_xtol_abs(1e-99);
+       //opt.set_maxeval(1e99);
+       opt.set_xtol_abs(lm_err_tol);
+       opt.set_maxeval(lm_iter_max);
+   };
+   if (ptrainset == 1) {
+       opt.set_xtol_abs(lm_err_tol);
+       opt.set_maxeval(lm_iter_max);
+   };
 
    x = pos;
    double minf;
@@ -1900,6 +1951,8 @@ if (verbose == true) {
   // prepare fort.3 files
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+
+cout << "CPU: " << core << " before setting positions" << endl;
   if (ptrainset > 1) {
      // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
      for (const int& swarmcore : swarmcores) {
@@ -1909,7 +1962,7 @@ if (verbose == true) {
                MPI_Send( active_params.data(), active_params.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
                if (verbose == true) {
                    for (int i=0; i < dim; i++) {
-                       cout << "iter = " << iter << " swarmcore " << swarmcore << " sending pos[" << i << "]: " << active_params.at(i) << " ";
+                       cout << "iter = " << iter << " CPU: " << core << " swarmcore sending pos[" << i << "]: " << active_params.at(i) << " " << endl;
                    };
                    cout << endl;
                };
@@ -1918,7 +1971,7 @@ if (verbose == true) {
                MPI_Recv( pos.data(), pos.size(), MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
                if (verbose == true) {
                   for (int i=0; i < dim; i++) {
-                      cout << "iter = " << iter << " reaxffcore " << reaxffcore << " receiving pos[" << i << "]: " << pos.at(i) << " ";
+                      cout << "iter = " << iter << " CPU: " << core << " reaxffcore receiving pos[" << i << "]: " << pos.at(i) << " " << endl;
                   };
                   cout << endl;
                };
@@ -1929,7 +1982,8 @@ if (verbose == true) {
      // generate trainset subsets
      write_trainset();
   };
-
+//MPI_Barrier(MPI_COMM_WORLD);
+cout << "CPU: " << core << " after setting positions" << endl;
   // check if ffield is LG or not. execute correct tapreaxff accordingly
   if (lg_yn == true) {
       if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
@@ -2060,6 +2114,9 @@ if (verbose == true) {
     boost::filesystem::remove( "CPU." + str_core + "/fort.13" );
   };
 
+//MPI_Barrier(MPI_COMM_WORLD);
+cout << "CPU: " << core << " before adding fitness" << endl;
+
   // If we parallelize the training set, each reaxffcore adds its fitness to the fitness of its swarmcore
   if (ptrainset > 1) {
      int j = 1;
@@ -2068,28 +2125,28 @@ if (verbose == true) {
      for (int reaxffcore : reaxffcores) {
          swarmcore = reaxffcore - j;
          if (core == reaxffcore ) {
-           MPI_Send( &pfitness, 1, MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD );
-           if (verbose == true) {
-              cout << "iter = " << iter << " reaxffcore " << reaxffcore << " sent " << pfitness << " to swarmcore " << swarmcore << endl;
-           };
+           MPI_Send( &pfitness, 1, MPI_DOUBLE, swarmcore, 2, MPI_COMM_WORLD );
+           //if (verbose == true) {
+              cout << "iter = " << iter << " CPU: " << core << "reaxffcore sent " << pfitness << " to swarmcore " << swarmcore << endl;
+           //};
          };
          if (core == swarmcore) {
-           MPI_Recv( &pfitness, 1, MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-           if (verbose == true) {
-              cout << "iter = " << iter << " swarmcore " << swarmcore << ": old fit + recv fit = new fit => " << evalfit << " + " << pfitness << " = " << evalfit + pfitness << endl;
-           };
+           MPI_Recv( &pfitness, 1, MPI_DOUBLE, reaxffcore, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+           //if (verbose == true) {
+              cout << "iter = " << iter << " CPU: " << core << " swarmcore: old fit + recv fit = new fit => " << evalfit << " + " << pfitness << " = " << evalfit + pfitness << endl;
+           //};
          };
          if (core == swarmcore) {
             if (pfitness >= 1E99) {
                 evalfit = 1E99;
-                if (verbose == true) {
-                   cout << "iter = " << iter << " swarmcore " << swarmcore << " newfitness: " << evalfit << endl; 
-                };
+                //if (verbose == true) {
+                   cout << "iter = " << iter << " CPU: " << core << " swarmcore newfitness: " << evalfit << endl; 
+                //};
             }else{
               evalfit = evalfit + pfitness;
-              if (verbose == true) {
-                 cout << "iter = " << iter << " swarmcore " << swarmcore << " newfitness: " << evalfit << endl;
-              };
+              //if (verbose == true) {
+                 cout << "iter = " << iter << " CPU: " << core << " swarmcore newfitness: " << evalfit << endl;
+              //};
             };
          };
 
@@ -2099,7 +2156,35 @@ if (verbose == true) {
            j = j + 1;
          };
      };
+
+//MPI_Barrier(MPI_COMM_WORLD);
+cout << "CPU: " << core << " after adding fitness" << endl;
+
+     // swarmcores setting reaxffcores to trick localmin
+     for (const int& swarmcore : swarmcores) {
+           for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
+             int reaxffcore = swarmcore + i;
+             if (core == swarmcore ) {
+               MPI_Send( &evalfit, 1, MPI_LONG_DOUBLE, reaxffcore, 3, MPI_COMM_WORLD );
+               if (verbose == true) {
+                       cout << ">>iter = " << iter << " CPU: " << core << " swarmcore sending fitness to CPU: " << core << " reaxffcore " << endl;
+                   cout << endl;
+               };
+             };
+             if (core == reaxffcore) {
+               MPI_Recv( &evalfit, 1, MPI_LONG_DOUBLE, swarmcore, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+               if (verbose == true) {
+                      cout << ">>iter = " << iter << " CPU: " << core << " reaxffcore receiving fitness = " << evalfit << " from CPU: " << core << " swarmcore " << endl;
+                  cout << endl;
+               };
+             };
+         };
+     };
   };
+
+
+//MPI_Barrier(MPI_COMM_WORLD);
+cout << "CPU: " << core << " after trick" << endl;
 //MPI_Barrier(MPI_COMM_WORLD);
   // Note: do not update the geometry file during iterations. Each member should use one geo file throughout
   // the training. Assuming we start with DFT_optimized (or sensible structures), and that we use some small
@@ -2115,6 +2200,11 @@ if (verbose == true) {
   // while evalfitdouble is double
   evalfitdouble=evalfit;
   fitness=evalfit;
+
+
+if (verbose == true) {
+  cout << "CPU: " << core << " left eval_fitness()" << endl;
+};
   return evalfitdouble;
 #endif
 
@@ -2259,6 +2349,9 @@ if (verbose == true) {
     //      boost::filesystem::copy_option::overwrite_if_exists);
 
 
+if (verbose == true) {
+  cout << "left eval_fitness()" << endl;
+};
   return evalfit;
 #endif
 };
@@ -3091,9 +3184,45 @@ if (verbose == true) {
 
     // local minimization
     if (localmin == 1 || localmin == 2) {
+             for (const int& swarmcore : swarmcores) {
+                   for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
+                     int reaxffcore = swarmcore + i;
+                     if (core == swarmcore ) {
+                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 4, MPI_COMM_WORLD );
+                       //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
+                     };
+                     if (core == reaxffcore) {
+                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+                       //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
+                     };
+                 };
+             };
+
        newSwarm.GetPar(p).iterate();
+       //MPI_Barrier(MPI_COMM_WORLD);
+       //if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+       //   MPI_Barrier(ACTIVESWARM);
+       //}else{
+       //   MPI_Barrier(PASSIVESWARM);
+       //};
     }else{
-       newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
+             for (const int& swarmcore : swarmcores) {
+                   for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
+                     int reaxffcore = swarmcore + i;
+                     if (core == swarmcore ) {
+                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 5, MPI_COMM_WORLD );
+                       //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
+                     };
+                     if (core == reaxffcore) {
+                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 5, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+                       //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
+                     };
+                 };
+             };
+
+             // generate trainset subsets
+             newSwarm.GetPar(p).write_trainset();
+             newSwarm.GetPar(p).set_fitness( newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this) );
     };
 
     // if we parallelize the training set, update gbfit and gbpos only among swarmcores
@@ -3298,7 +3427,7 @@ if (verbose == true) {
   };
 
 if (verbose == true) {
-   cout << "core " << core << " left Populate!" << endl;
+   cout << "CPU: " << core << " left Populate!" << endl;
 };
 #endif
 
@@ -3425,7 +3554,7 @@ if (verbose == true) {
 void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "core " << core << " entered Propagate()" << endl;
+   cout << "CPU: " << core << " entered Propagate()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -3440,7 +3569,7 @@ if (verbose == true) {
     MPI_Comm PASSIVESWARM; // reaxffcores
     MPI_Comm *newcomm;
     int color;
-MPI_Barrier(MPI_COMM_WORLD);
+//MPI_Barrier(MPI_COMM_WORLD);
     if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
         color = 444;
         newcomm = &ACTIVESWARM;
@@ -3497,17 +3626,30 @@ MPI_Barrier(MPI_COMM_WORLD);
           };
 
           if (localmin == 1 || localmin == 2) {
+             for (const int& swarmcore : swarmcores) {
+                   for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
+                     int reaxffcore = swarmcore + i;
+                     if (core == swarmcore ) {
+                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 6, MPI_COMM_WORLD );
+                       //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
+                     };
+                     if (core == reaxffcore) {
+                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+                       //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
+                     };
+                 };
+              };
               newSwarm.GetPar(p).iterate();
           } else {
              for (const int& swarmcore : swarmcores) {
                    for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
                      int reaxffcore = swarmcore + i;
                      if (core == swarmcore ) {
-                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
+                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 7, MPI_COMM_WORLD );
                        //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
                      };
                      if (core == reaxffcore) {
-                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 7, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
                        //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
                      };
                  };
@@ -3657,7 +3799,9 @@ MPI_Barrier(MPI_COMM_WORLD);
         if (core == 0) {
           newSwarm.printopt(newSwarm, iter, cycle, freq);
         };
+        cout << "CPU: " << core << " just before printpos!" << endl;
         newSwarm.printpos(newSwarm, iter, cycle, freq);
+        cout << "CPU: " << core << " just after printpos!" << endl;
         if (uq == true){
           newSwarm.printUQFF(newSwarm, iter, cycle, freq);
           newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
@@ -3740,7 +3884,14 @@ MPI_Barrier(MPI_COMM_WORLD);
           MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, ACTIVESWARM);
       };
   };
-  MPI_Barrier(MPI_COMM_WORLD);
+  cout << "CPU: " << core << " just before BARRIER!" << endl;
+       MPI_Barrier(MPI_COMM_WORLD);
+       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+          MPI_Barrier(ACTIVESWARM);
+       }else{
+          MPI_Barrier(PASSIVESWARM);
+       };
+  cout << "CPU: " << core << " just after BARRIER!" << endl;
 
   if (core == 0) {
     double temphys;
@@ -3771,7 +3922,7 @@ MPI_Barrier(MPI_COMM_WORLD);
     };
   };
 if (verbose == true) {
-   cout << "core " << core << " left Populate!" << endl;
+   cout << "CPU: " << core << " left Populate!" << endl;
 };
 #endif
 
@@ -3883,7 +4034,7 @@ if (verbose == true) {
 void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "core " << core << " entered write_ffield_gbest()" << endl;
+   cout << "CPU: " << core << " entered write_ffield_gbest()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -3930,7 +4081,7 @@ if (verbose == true) {
 void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int parid_gbfit) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "core " << core << " entered detovfit()" << endl;
+   cout << "CPU: " << core << " entered detovfit()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4308,7 +4459,7 @@ void Swarm::printopt(Swarm & newSwarm, int iter, int cycle, int fr) {
 void Swarm::printUQQoI(Swarm & newSwarm, int iter, int cycle, int fr) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "core " << core << " entered printUQQoI()" << endl;
+   cout << "CPU: " << core << " entered printUQQoI()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4467,7 +4618,7 @@ if (verbose == true) {
 void Swarm::printUQFF(Swarm & newSwarm, int iter, int cycle, int fr) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "core " << core << " entered printUQFF" << endl;
+   cout << "CPU: " << core << " entered printUQFF" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4499,7 +4650,7 @@ if (verbose == true) {
 void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "core " << core << " entered printpos" << endl;
+   cout << "CPU: " << core << " entered printpos" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4571,9 +4722,6 @@ if (verbose == true) {
      outfilepos.close();
   };
 
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered printpos!" << endl;
-};
 #endif
 #ifndef WITH_MPI
   boost::filesystem::create_directory("pos");

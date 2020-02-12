@@ -131,6 +131,7 @@ int main(int argc, char * argv[]) {
 
   }; // end cycles
 
+  MPI_Barrier(MPI_COMM_WORLD);
   ierr = MPI_Finalize();
   return 0;
 };
