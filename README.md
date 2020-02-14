@@ -108,7 +108,7 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 ## License
 flocky is distributed under the terms of the [GNU GPLv3](https://choosealicense.com/licenses/gpl-3.0/) license.
-Copyright © 2019 David Furman, University of Cambridge.
+Copyright © 2020 David Furman, University of Cambridge.
 
 ## Citations
 If you used flocky for your research, please cite the relevant publications:
