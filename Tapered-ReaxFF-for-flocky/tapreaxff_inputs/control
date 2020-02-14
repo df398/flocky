@@ -47,7 +47,7 @@
 # MM-parameters
   0.100 endmm      End point criterium for MM energy minimisation
   00000 imaxmo     <0 MD-based energy minimization >0 Steepest descent maximum movement (1/1D6 A) 0: Conjugate gradient
-  10000 imaxit     Maximum number of iterations
+  00000 imaxit     Maximum number of iterations
     005 iout4      Frequency of structure output during minimisation
       0 iout5      1:Remove fort.57 and fort.58 files
 0.00000 celopt     Cell parameter change
