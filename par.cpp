@@ -16,25 +16,20 @@
 
 #include "par.h"
 
-// initialize non-determinstic seed
-std::random_device seed;
-// Mersene Twister: Good quality random number generator
-#ifdef WITH_MPI
-std::mt19937 generator(seed() + core);
-//std::mt19937 generator(1022224);
-#endif
-#ifndef WITH_MPI
-std::mt19937 generator(seed());
-#endif
+// PCG family of PRNGS: seed with a real random value, if available
+pcg_extras::seed_seq_from<std::random_device> seed_source;
+// Make a random number generator
+pcg32 generator(seed_source);
+
 std::uniform_real_distribution <double> dist1(0.0, 1.0);
 
-int    ierr, core, numcores = 0;
 int    mycore_swarmcore = 0;
 int    size_swarmcores = 0;
 int    mycore_reaxffcore = 0;
 int    size_reaxffcores = 0;
 int    funceval = 0;
 double curfit;
+double localminfit;
 // tag if particle position in dimension lies inside [mindomain, maxdomain]
 //bool inside = true;
 int    ptrainset=1;
@@ -42,7 +37,7 @@ int    totmembers=2;
 vector <int> swarmcores(numcores/ptrainset,0);
 vector <int> reaxffcores((numcores - numcores/ptrainset),0);
 int    dim = 2;
-int    NumP = 2;
+int    NumP = 0;
 int    freq = 1;
 int    cycle = 0;
 int    maxcycles = 1;
@@ -197,10 +192,9 @@ if (verbose == true) {
 };
 #endif
 
-  double f;
-
   // *** test function (2D Rosenbrock. x_opt[1,1] = 0.0. Search domain = [-5,5] should be defined in params.mod
   //double xp, yp;
+  //double minfunc;
   //Par * helper = static_cast <Par *> (data);
   //vector <double> mind = helper->mindomain;
   //vector <double> maxd = helper->maxdomain;
@@ -214,7 +208,7 @@ if (verbose == true) {
   //};
 
   //cout << "WRAPPER x in CPU: " << core << " is: " << x[0] << ", " << x[1] << endl;
-  //cout << "WRAPPER f in CPU: " << core << " is: " << boost::format("%10.4f") %f << endl;
+  //cout << "WRAPPER f in CPU: " << core << " is: " << boost::format("%10.4f") %minfunc << endl;
   //if (localmin == 1) {
   //   cout << "WRAPPER gradients in CPU: " << core << " is: " << boost::format("%10.4f") %numgrad.at(0) << ", " << boost::format("%10.4f") %numgrad.at(1) << endl; 
   //};
@@ -222,25 +216,22 @@ if (verbose == true) {
 
   // *** Tapered ReaxFF cost function
   // helper is a pointer to the calling member (which is an object of the Par class)
-cout << "WRAPPER was entered on CPU: " << core << endl;
-cout << "--------------------------------" << endl;
-
   Par * helper = static_cast <Par *> (data);
-
-  f = helper->eval_fitness(x,data);
 
   if (localmin == 1 && !numgrad.empty()) {
     numgrad = helper->eval_numgrad(x,data);
   };
 
-  cout << "WRAPPER x[0], x[1] in CPU: " << core << " is: " << x[0] << ", " << x[1] << endl;
-  cout << "WRAPPER f in CPU: " << core << " is: " << boost::format("%10.6f") %f << endl;
-  if (localmin == 1) {
-      //cout << "WRAPPER gradient[0], gradient[1] in CPU: " << core << " is: " << boost::format("%10.6f") %numgrad.at(0) << ", " << 
-      //        boost::format("%10.6f") %numgrad.at(1) << endl;
-  };
+  double minfunc = helper->eval_fitness(x,data);
 
-  return f;
+  //cout << "------------------ iter = " << iter << " ------------------------------------" << endl;
+  //cout << "WRAPPER x in CPU: " << core << " is: " << boost::format("%10.4f") %x[0] << ", " << boost::format("%10.4f") %x[1] << endl;
+  //cout << "WRAPPER minfunc in CPU: " << core << " is: " << boost::format("%20.10f") %minfunc << endl;
+  //if (localmin == 1 && !numgrad.empty()) {
+  //   cout << "WRAPPER gradients in CPU: " << core << " is: " << boost::format("%30.10f") %numgrad.at(0) << ", " << boost::format("%30.10f") %numgrad.at(1) << endl;
+  //};
+  //cout << endl;
+  return minfunc;
 };
 
 // --------------- End general functions definitions -------------- //
@@ -262,7 +253,7 @@ Par::Par() {
     // initialize particle's position vector
     pos.push_back(x);
     // standardize the position
-    //pos.at(m) = (pos.at(m) - mindomain.at(m))/(maxdomain.at(m) - mindomain.at(m));
+    pos.at(m) = (pos.at(m) - mindomain.at(m))/(maxdomain.at(m) - mindomain.at(m));
     // initialize particle's velocity vector
     vel.push_back(v);
     // initialize particle's best own position vector
@@ -283,6 +274,7 @@ if (verbose == true) {
 #endif
 
   // read ffield file into ffieldmat matrix split by entries
+  // following: https://stackoverflow.com/questions/10521658/reading-files-columns-into-array
   ffieldmat.clear();
 #ifdef WITH_MPI
   string str_core = std::to_string(core);
@@ -435,7 +427,8 @@ if (verbose == true) {
        int keyword_begin_traindata = forces_begin-1;
        int keyword_end_traindata = forces_end-1;
        int substart = keyword_begin_traindata + 1;
-       int subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), keyword_end_traindata);
+       //int subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), keyword_end_traindata);
+       int subend = min(substart + ((forces_end - forces_begin) - mod((forces_end - forces_begin), ptrainset))/ptrainset, keyword_end_traindata);
        int tries = 0;
        int reset_start = 0;
        int reset_end = 0;
@@ -448,21 +441,23 @@ if (verbose == true) {
          };
        };
        substart = subend;
-       //subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), forces_end);
-       subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), keyword_end_traindata);
+       //subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), keyword_end_traindata);
+       subend = min(substart + ((forces_end - forces_begin) - mod((forces_end - forces_begin), ptrainset))/ptrainset, keyword_end_traindata);
        reset_start = substart;
        reset_end = subend;
        // print data for reaxffcores
        for (const int& reaxffcore : reaxffcores) {
+           tries = tries + 1;
            if (core == reaxffcore) {
-              if (tries == ptrainset-2) {subend = keyword_end_traindata;};
+              if (tries == ptrainset-1) {subend = keyword_end_traindata;};
               for (int i = substart; i < subend; i++) {
                  trainset_file << traindata_nonsplit.at(i) << endl;
               };
            };
-           tries = tries + 1;
+           //tries = tries + 1;
            substart = subend;
-           subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), forces_end);
+           //subend = min(substart + int(floor((forces_end - forces_begin)/ptrainset)), keyword_end_traindata);
+           subend = min(substart + ((forces_end - forces_begin) - mod((forces_end - forces_begin), ptrainset))/ptrainset, keyword_end_traindata);
            if (tries == ptrainset-1) {
               substart = reset_start;
               subend = reset_end;
@@ -479,7 +474,8 @@ if (verbose == true) {
        int keyword_begin_traindata = charge_begin-1;
        int keyword_end_traindata = charge_end-1;
        int substart = keyword_begin_traindata + 1;
-       int subend = min(substart + int(floor((charge_end - charge_begin)/ptrainset)), keyword_end_traindata);
+       //int subend = min(substart + int(floor((charge_end - charge_begin)/ptrainset)), keyword_end_traindata);
+       int subend = min(substart + ((charge_end - charge_begin) - mod((charge_end - charge_begin), ptrainset))/ptrainset, keyword_end_traindata);
        int tries = 0;
        int reset_start = 0; 
        int reset_end = 0;
@@ -492,21 +488,23 @@ if (verbose == true) {
          };
        };
        substart = subend;
-       //subend = min(substart + int(floor((charge_end - charge_begin)/ptrainset)), charge_end);
-       subend = min(substart + int(floor((charge_end - charge_begin)/ptrainset)), keyword_end_traindata);
+       //subend = min(substart + int(floor((charge_end - charge_begin)/ptrainset)), keyword_end_traindata);
+       subend = min(substart + ((charge_end - charge_begin) - mod((charge_end - charge_begin), ptrainset))/ptrainset, keyword_end_traindata);
        reset_start = substart;
        reset_end = subend;
        // print data for reaxffcores
        for (const int& reaxffcore : reaxffcores) {
+           tries = tries + 1;
            if (core == reaxffcore) {
-              if (tries == ptrainset-2) {subend = keyword_end_traindata;};
+              if (tries == ptrainset-1) {subend = keyword_end_traindata;};
               for (int i = substart; i < subend; i++) {
                  trainset_file << traindata_nonsplit.at(i) << endl;
               };
            };
-           tries = tries + 1;
+           //tries = tries + 1;
            substart = subend;
-           subend = min(substart + int(floor((charge_end - charge_begin)/ptrainset)), charge_end);
+           //subend = min(substart + int(floor((charge_end - charge_begin)/ptrainset)), keyword_end_traindata);
+           subend = min(substart + ((charge_end - charge_begin) - mod((charge_end - charge_begin), ptrainset))/ptrainset, keyword_end_traindata);
            if (tries == ptrainset-1) {
               substart = reset_start;
               subend = reset_end;
@@ -523,7 +521,8 @@ if (verbose == true) {
        int keyword_begin_traindata = cell_begin-1;
        int keyword_end_traindata = cell_end-1;
        int substart = keyword_begin_traindata + 1;
-       int subend = min(substart + int(floor((cell_end - cell_begin)/ptrainset)), keyword_end_traindata);
+       //int subend = min(substart + int(floor((cell_end - cell_begin)/ptrainset)), keyword_end_traindata);
+       int subend = min(substart + ((cell_end - cell_begin) - mod((cell_end - cell_begin), ptrainset))/ptrainset, keyword_end_traindata);
        int tries = 0;
        int reset_start = 0;
        int reset_end = 0;
@@ -538,21 +537,23 @@ if (verbose == true) {
          };
        };
        substart = subend;
-       //subend = min(substart + int(floor((cell_end - cell_begin)/ptrainset)), cell_end);
-       subend = min(substart + int(floor((cell_end - cell_begin)/ptrainset)), keyword_end_traindata);
+       //subend = min(substart + int(floor((cell_end - cell_begin)/ptrainset)), keyword_end_traindata);
+       subend = min(substart + ((cell_end - cell_begin) - mod((cell_end - cell_begin), ptrainset))/ptrainset, keyword_end_traindata);
        reset_start = substart;
        reset_end = subend;
        // print data for reaxffcores
        for (const int& reaxffcore : reaxffcores) {
+           tries = tries + 1;
            if (core == reaxffcore) {
-              if (tries == ptrainset-2) {subend = keyword_end_traindata;};
+              if (tries == ptrainset-1) {subend = keyword_end_traindata;};
               for (int i = substart; i < subend; i++) {
                  trainset_file << traindata_nonsplit.at(i) << endl;
               };
            };
-           tries = tries + 1;
+           //tries = tries + 1;
            substart = subend;
-           subend = min(substart + int(floor((cell_end - cell_begin)/ptrainset)), cell_end);
+           //subend = min(substart + int(floor((cell_end - cell_begin)/ptrainset)), keyword_end_traindata);
+           subend = min(substart + ((cell_end - cell_begin) - mod((cell_end - cell_begin), ptrainset))/ptrainset, keyword_end_traindata);
            if (tries == ptrainset-1) {
               substart = reset_start;
               subend = reset_end;
@@ -569,7 +570,8 @@ if (verbose == true) {
        int keyword_begin_traindata = heat_begin-1;
        int keyword_end_traindata = heat_end-1;
        int substart = keyword_begin_traindata + 1;
-       int subend = min(substart + int(floor((heat_end - heat_begin)/ptrainset)), keyword_end_traindata);
+       //int subend = min(substart + int(floor((heat_end - heat_begin)/ptrainset)), keyword_end_traindata);
+       int subend = min(substart + ((heat_end - heat_begin) - mod((heat_end - heat_begin), ptrainset))/ptrainset, keyword_end_traindata);
        int tries = 0;
        int reset_start = 0;
        int reset_end = 0;
@@ -584,21 +586,23 @@ if (verbose == true) {
          };
        };
        substart = subend;
-       //subend = min(substart + int(floor((heat_end - heat_begin)/ptrainset)), heat_end);
-       subend = min(substart + int(floor((heat_end - heat_begin)/ptrainset)), keyword_end_traindata);
+       //subend = min(substart + int(floor((heat_end - heat_begin)/ptrainset)), keyword_end_traindata);
+       subend = min(substart + ((heat_end - heat_begin) - mod((heat_end - heat_begin), ptrainset))/ptrainset, keyword_end_traindata);
        reset_start = substart;
        reset_end = subend;
        // print data for reaxffcores
        for (const int& reaxffcore : reaxffcores) {
+           tries = tries + 1;
            if (core == reaxffcore) {
-              if (tries == ptrainset-2) {subend = keyword_end_traindata;};
+              if (tries == ptrainset-1) {subend = keyword_end_traindata;};
               for (int i = substart; i < subend; i++) {
                  trainset_file << traindata_nonsplit.at(i) << endl;
               };
            };
-           tries = tries + 1;
+           //tries = tries + 1;
            substart = subend;
-           subend = min(substart + int(floor((heat_end - heat_begin)/ptrainset)), heat_end);
+           //subend = min(substart + int(floor((heat_end - heat_begin)/ptrainset)), keyword_end_traindata);
+           subend = min(substart + ((heat_end - heat_begin) - mod((heat_end - heat_begin), ptrainset))/ptrainset, keyword_end_traindata);
            if (tries == ptrainset-1) {
               substart = reset_start;
               subend = reset_end;
@@ -615,7 +619,8 @@ if (verbose == true) {
        int keyword_begin_traindata = geo_begin-1;
        int keyword_end_traindata = geo_end-1;
        int substart = keyword_begin_traindata + 1;
-       int subend = min(substart + int(floor((geo_end - geo_begin)/ptrainset)), keyword_end_traindata);
+       //int subend = min(substart + int(floor((geo_end - geo_begin)/ptrainset)), keyword_end_traindata);
+       int subend = min(substart + ( (geo_end - geo_begin) - mod((geo_end - geo_begin), ptrainset) )/ptrainset, keyword_end_traindata);
        int tries = 0;
        int reset_start = 0;
        int reset_end = 0;
@@ -630,21 +635,23 @@ if (verbose == true) {
          };
        };
        substart = subend;
-       //subend = min(substart + int(floor((geo_end - geo_begin)/ptrainset)), geo_end);
-       subend = min(substart + int(floor((geo_end - geo_begin)/ptrainset)), keyword_end_traindata);
+       //subend = min(substart + int(floor((geo_end - geo_begin)/ptrainset)), keyword_end_traindata);
+       subend = min(substart + ( (geo_end - geo_begin) - mod((geo_end - geo_begin), ptrainset) )/ptrainset, keyword_end_traindata);
        reset_start = substart;
        reset_end = subend;
        // print data for reaxffcores
        for (const int& reaxffcore : reaxffcores) {
+           tries = tries + 1;
            if (core == reaxffcore) {
-              if (tries == ptrainset-2) {subend = keyword_end_traindata;};
+              if (tries == ptrainset-1) {subend = keyword_end_traindata;};
               for (int i = substart; i < subend; i++) {
                  trainset_file << traindata_nonsplit.at(i) << endl;
               };
            };
-           tries = tries + 1;
+           //tries = tries + 1;
            substart = subend;
-           subend = min(substart + int(floor((geo_end - geo_begin)/ptrainset)), geo_end);
+           //subend = min(substart + int(floor((geo_end - geo_begin)/ptrainset)), keyword_end_traindata);
+           subend = min(substart + ( (geo_end - geo_begin) - mod((geo_end - geo_begin), ptrainset) )/ptrainset, keyword_end_traindata);
            if (tries == ptrainset-1) {
               substart = reset_start;
               subend = reset_end;
@@ -661,7 +668,8 @@ if (verbose == true) {
        int keyword_begin_traindata = energy_begin-1;
        int keyword_end_traindata = energy_end-1;
        int substart = keyword_begin_traindata + 1;
-       int subend = min(substart + int(floor((energy_end - energy_begin)/ptrainset)), keyword_end_traindata);
+       //int subend = min(substart + int(floor((energy_end - energy_begin)/ptrainset)), keyword_end_traindata);
+       int subend = min(substart + ( (energy_end - energy_begin) - mod((energy_end - energy_begin), ptrainset) )/ptrainset, keyword_end_traindata);
        int tries = 0;
        int reset_start = 0;
        int reset_end = 0;
@@ -675,28 +683,28 @@ if (verbose == true) {
          };
        };
        substart = subend;
-       //subend = min(substart + int(floor((energy_end - energy_begin)/ptrainset)), energy_end);
-       subend = min(substart + int(floor((energy_end - energy_begin)/ptrainset)), keyword_end_traindata);
+       //subend = min(substart + int(floor((energy_end - energy_begin)/ptrainset)), keyword_end_traindata);
+       subend = min(substart + ( (energy_end - energy_begin) - mod((energy_end - energy_begin), ptrainset) )/ptrainset, keyword_end_traindata);
        reset_start = substart;
        reset_end = subend;
        // print data for reaxffcores
        for (const int& reaxffcore : reaxffcores) {
-        if (subend > substart) {
+           tries = tries + 1;
            if (core == reaxffcore) {
               if (tries == ptrainset-1) {subend = keyword_end_traindata;};
               for (int i = substart; i < subend; i++) {
                  trainset_file << traindata_nonsplit.at(i) << endl;
               };
            };
-           tries = tries + 1;
+           //tries = tries + 1;
            substart = subend;
-           subend = min(substart + int(floor((energy_end - energy_begin)/ptrainset)), energy_end);
+           //subend = min(substart + int(floor((energy_end - energy_begin)/ptrainset)), keyword_end_traindata);
+           subend = min(substart + ( (energy_end - energy_begin) - mod((energy_end - energy_begin), ptrainset) )/ptrainset, keyword_end_traindata);
            if (tries == ptrainset-1) {
               substart = reset_start;
               subend = reset_end;
               tries = 0;
            };
-        };
        };
        // print end keyword
        trainset_file << traindata_nonsplit.at(keyword_end_traindata) << endl;
@@ -1012,6 +1020,8 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
 
 
 
+
+
 void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int iter, int parid) {
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
@@ -1028,8 +1038,8 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
     char buffer[50];
     double n;
     // transform back to physical positions before writing ffield
-    //tempphys = active_params.at(index)*(maxdomain.at(index) - mindomain.at(index)) + mindomain.at(index);
-    tempphys = active_params.at(index);
+    //tempphys = pos.at(index)*(maxdomain.at(index) - mindomain.at(index)) + mindomain.at(index);
+    tempphys = active_params.at(index)*(maxdomain.at(index) - mindomain.at(index)) + mindomain.at(index);
     // use physical positions
     n = sprintf(buffer, "%9.4f", tempphys);
     ffieldmat[line][ffcol.at(index)] = buffer;
@@ -1611,21 +1621,21 @@ if (verbose == true) {
   for (int i = 0; i < dim; i++) {
     pos.at(i) = pos.at(i) + vel.at(i);
     //check physical bounds
-    std::uniform_real_distribution < double > dist2(mindomain.at(i), maxdomain.at(i));
-    if (pos.at(i) > maxdomain.at(i)) {
-      pos.at(i) = dist2(generator);
-    };
-    if (pos.at(i) < mindomain.at(i)) {
-      pos.at(i) = dist2(generator);
-    };
+    //std::uniform_real_distribution < double > dist2(mindomain.at(i), maxdomain.at(i));
+    //if (pos.at(i) > maxdomain.at(i)) {
+    //  pos.at(i) = dist2(generator);
+    //};
+    //if (pos.at(i) < mindomain.at(i)) {
+    //  pos.at(i) = dist2(generator);
+    //};
     // check standardized bounds
-    //std::uniform_real_distribution < double > dist2(0.0,1.0);
-    //if (pos.at(i) > 1.0) {
-    //  pos.at(i) = dist2(generator);
-    //};
-    //if (pos.at(i) < 0.0) {
-    //  pos.at(i) = dist2(generator);
-    //};
+    std::uniform_real_distribution < double > dist2(0.0,1.0);
+    if (pos.at(i) > 1.0) {
+      pos.at(i) = dist2(generator);
+    };
+    if (pos.at(i) < 0.0) {
+      pos.at(i) = dist2(generator);
+    };
   };
 };
 
@@ -1647,37 +1657,36 @@ if (verbose == true) {
 
   for (int i = 0; i < dim; i++) {
     // physical positions
-    std::uniform_real_distribution < double > dist2(mindomain.at(i), maxdomain.at(i));
+    //std::uniform_real_distribution < double > dist2(mindomain.at(i), maxdomain.at(i));
     // standardized positions
-    //std::uniform_real_distribution < double > dist2(0.0,1.0);
+    std::uniform_real_distribution < double > dist2(0.0,1.0);
     // levy step on physical position
     //pos.at(i) = pos.at(i) + levyscale * get_min_dim() * levystep * direction.at(i);
     // old step
-    pos.at(i) = pos.at(i) + levyscale*0.5*(maxdomain.at(i) - mindomain.at(i))*levystep*direction.at(i);
+    //pos.at(i) = pos.at(i) + levyscale*(maxdomain.at(i) - mindomain.at(i))*levystep*direction.at(i);
     // levy step on standardized position
-    //pos.at(i) = pos.at(i) + levyscale * levystep * direction.at(i);
+    pos.at(i) = pos.at(i) + levyscale * levystep * direction.at(i);
 
     // check bounds on physical positions
-    if (pos.at(i) > maxdomain.at(i)) {
-      pos.at(i) = dist2(generator);
-    };
-    if (pos.at(i) < mindomain.at(i)) {
-      pos.at(i) = dist2(generator);
-    };
-
-    // check bounds on standardized positions
-    //if (pos.at(i) > 1.0) {
-    //  pos.at(i) = dist2(generator);
-    //}; 
-    //if (pos.at(i) < 0.0) {
+    //if (pos.at(i) > maxdomain.at(i)) {
     //  pos.at(i) = dist2(generator);
     //};
+    //if (pos.at(i) < mindomain.at(i)) {
+    //  pos.at(i) = dist2(generator);
+    //};
+    // check bounds on standardized positions
+    if (pos.at(i) > 1.0) {
+      pos.at(i) = dist2(generator);
+    }; 
+    if (pos.at(i) < 0.0) {
+      pos.at(i) = dist2(generator);
+    };
 
   };
 };
 
 
-void Par::iterate() {
+int Par::iterate() {
 #ifdef WITH_MPI
 if (verbose == true) {
   cout << "CPU: " << core << " entered iterate()" << endl;
@@ -1688,63 +1697,55 @@ if (verbose == true) {
   cout << "entered iterate()" << endl;
 };
 #endif
-  
-  //// return value (positive or negative) of a swarmcore localmin
-  //int lm_return;
-  //lm_return = 0;
 
- // note: for localmin, dropout means ranges that belong to dropped dimensions, are set to 0.0
+ std::vector<double> standard_mindomain(dim, 0.00001);
+ std::vector<double> standard_maxdomain(dim, 1.0);
+
+  // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
+  if (ptrainset > 1) {
+     for (const int& swarmcore : swarmcores) {
+           for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
+             int reaxffcore = swarmcore + i;
+             if (core == swarmcore ) {
+               MPI_Send( pos.data(), pos.size(), MPI_DOUBLE, reaxffcore, 11, MPI_COMM_WORLD );
+               //cout << "swarmcore " << swarmcore << " sending pos[0] = " << active_params.at(0) << " pos[1] = " << active_params.at(1) << endl;
+             };
+             if (core == reaxffcore) {
+               MPI_Recv( pos.data(), pos.size(), MPI_DOUBLE, swarmcore, 11, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+               //cout << "reaxffcore " << reaxffcore << " receiving pos[0] = " << pos.at(0) << " pos[1] = " << pos.at(1) << endl;
+             };
+         };
+     };
+  };
+
+
+ // note: for localmin, dropout means ranges that belong to dropped dimensions, are set equal
  // so to exclude them from local minimization
  if (regular == 3) {
     for (int j : dropped_dimns) {
-        mindomain.at(j) = 0.0;
-        maxdomain.at(j) = 0.0;
+        mindomain.at(j) = 0.0001;
+        maxdomain.at(j) = 0.0001;
     };
  };
 
- if (localmin == 2) {
-   vector <double> x(dim);
-   double minf;
-   double temphys;
-   nlopt::opt opt(nlopt::LN_NELDERMEAD, dim);
-   opt.set_min_objective(fitness_wrapper, this);
-   opt.set_lower_bounds(mindomain);
-   opt.set_upper_bounds(maxdomain);
-   opt.set_xtol_abs(lm_err_tol);
-   opt.set_maxeval(lm_iter_max);
 
+ if (localmin == 2) {
+   nlopt::opt opt(nlopt::LN_SBPLX, dim);
+   opt.set_min_objective(fitness_wrapper, this);
+   // use physical bounds
+   //opt.set_lower_bounds(mindomain);
+   //opt.set_upper_bounds(maxdomain);
+   // use standardized bounds
+   opt.set_lower_bounds(standard_mindomain);
+   opt.set_upper_bounds(standard_maxdomain);
+   // note: relative tolerance should be used rather than absolute
+   // so to take into account different magnitudes of different parameters
+   opt.set_xtol_rel(lm_err_tol);
+   opt.set_maxeval(lm_iter_max);
    x = pos;
 
    try{
        nlopt::result result = opt.optimize(x, minf);
-       //if (ptrainset > 1 && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-       //   if (result > 0 || result < 0) {
-       //      lm_return = 1;
-       //   }else{
-       //      lm_return = 0;
-       //   };
-       //};
-       //if (ptrainset > 1) {
-       //    for (const int& swarmcore : swarmcores) {
-       //          for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
-       //              int reaxffcore = swarmcore + i;
-       //              if (core == swarmcore ) {
-       //                  MPI_Send( &lm_return, 1, MPI_INT, reaxffcore, 1, MPI_COMM_WORLD );
-       //                  cout << "swarmcore: " << core << " sending return = " << lm_return << " to reaxffcore "  << reaxffcore << endl;
-       //              };
-       //              if (core == reaxffcore) {
-       //                  MPI_Recv( &lm_return, 1, MPI_INT, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-       //                  cout << "reaxffcore: " << core << " receiving return = " << lm_return << " from swarmcore "  << swarmcore << endl;
-       //              };
-       //          };
-       //    };
-       //    MPI_Barrier(MPI_COMM_WORLD);
-       //    if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end() && lm_return == 1) {
-       //       cout << "reaxffcore: " << core << " noticed that swarmcore returned. forcing lm stop!" << endl;
-       //       opt.force_stop();
-       //    };
-       //};
-
        if (ptrainset > 1) {
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
                #ifdef WITH_MPI
@@ -1760,8 +1761,7 @@ if (verbose == true) {
                for (int m = 0; m < dim; m++) {
                  // print physical local min positions
                  //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 temphys = x[m];
-                 lmin_rep << boost::format("%8.4f") %temphys << " ";
+                 lmin_rep << boost::format("%8.4f") %x[m] << " ";
                };
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
@@ -1780,15 +1780,95 @@ if (verbose == true) {
                for (int m = 0; m < dim; m++) {
                  // print physical local min positions
                  //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 temphys = x[m];
-                 lmin_rep << boost::format("%8.4f") %temphys << " ";
+                 lmin_rep << boost::format("%8.4f") %x[m] << " ";
                };
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
        };
-       pos = x;
-       fitness = minf;
-       
+   }
+   catch(std::exception &e) {
+       if (ptrainset > 1) {
+          if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+              #ifdef WITH_MPI
+              ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
+              #endif
+              #ifndef WITH_MPI
+              ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
+              #endif
+              lmin_rep << "Warning: local minimization failed for CPU " << core << "--> " << e.what() << endl;
+              lmin_rep.close();
+          };
+       }else { 
+           #ifdef WITH_MPI
+           ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
+           #endif
+           #ifndef WITH_MPI
+           ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
+           #endif
+           lmin_rep << "Warning: local minimization failed for CPU " << core << "--> " << e.what() << endl;
+           lmin_rep.close();
+       };
+   };
+ };
+ 
+
+ if (localmin == 1) {
+   nlopt::opt opt(nlopt::LD_LBFGS, dim);
+   opt.set_min_objective(fitness_wrapper, this);  
+   opt.set_vector_storage(10);
+   // use physical bounds
+   //opt.set_lower_bounds(mindomain);
+   //opt.set_upper_bounds(maxdomain);
+   // use standardized bounds
+   opt.set_lower_bounds(standard_mindomain);
+   opt.set_upper_bounds(standard_maxdomain);
+   // note: relative tolerance should be used rather than absolute
+   // so to take into account different magnitudes of different parameters
+   opt.set_xtol_rel(lm_err_tol);
+   opt.set_maxeval(lm_iter_max);
+   x = pos;
+
+   try{
+       nlopt::result result = opt.optimize(x, minf);
+       if (ptrainset > 1) {
+          if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+               #ifdef WITH_MPI
+               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
+               #endif
+               #ifndef WITH_MPI
+               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
+               #endif
+               lmin_rep << "local min completed! --> flocky iter: " << state.iter << endl;
+               lmin_rep << "new local min: " << boost::format("%8.4f") %minf << endl;
+               lmin_rep << "new parameters:" << endl;
+               lmin_rep << "[ ";
+               for (int m = 0; m < dim; m++) {
+                 // print physical local min positions
+                 //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
+                 lmin_rep << boost::format("%8.4f") %x[m] << " ";
+               };
+               lmin_rep << "]\n" << endl;
+               lmin_rep.close();
+          };
+       }else {
+               #ifdef WITH_MPI
+               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
+               #endif
+               #ifndef WITH_MPI
+               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
+               #endif
+               lmin_rep << "local min completed! --> flocky iter: " << state.iter << endl;
+               lmin_rep << "new local min: " << boost::format("%8.4f") %minf << endl;
+               lmin_rep << "new parameters:" << endl;
+               lmin_rep << "[ ";
+               for (int m = 0; m < dim; m++) {
+                 // print physical local min positions
+                 //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
+                 lmin_rep << boost::format("%8.4f") %x[m] << " ";
+               };
+               lmin_rep << "]\n" << endl;
+               lmin_rep.close();
+       };
    }
    catch(std::exception &e) {
        if (ptrainset > 1) {
@@ -1812,109 +1892,9 @@ if (verbose == true) {
            lmin_rep << "Warning: local minimization failed for CPU " << core << "--> " << e.what() << endl;
            lmin_rep.close();
        };      
-   };         
- };            
-               
- if (localmin == 1) {
-   nlopt::opt opt(nlopt::LD_LBFGS, dim);
-   std::vector <double> x(dim);
-   double temphys;
-   opt.set_min_objective(fitness_wrapper, this);  
-   opt.set_vector_storage(10);
-   opt.set_lower_bounds(mindomain);
-   opt.set_upper_bounds(maxdomain);
-   vector <double> numgrad(dim,1e1);
-
-   if (ptrainset > 1 && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-   // for swarmcores we use the user inputs for the stopping criteria
-       opt.set_xtol_abs(lm_err_tol);
-       opt.set_maxeval(lm_iter_max);
-   } else {
-   // but for the reaxffcores we make sure they keep minimising until
-   // the relevant swarmcore returns from opt and then reaxffcores localmin is forced stopped.
-       //opt.set_xtol_abs(1e-99);
-       //opt.set_maxeval(1e99);
-       opt.set_xtol_abs(lm_err_tol);
-       opt.set_maxeval(lm_iter_max);
    };
-   if (ptrainset == 1) {
-       opt.set_xtol_abs(lm_err_tol);
-       opt.set_maxeval(lm_iter_max);
-   };
+ };
 
-   x = pos;
-   double minf;
-
-   try{
-       nlopt::result result = opt.optimize(x, minf);
-       if (ptrainset > 1) {
-          if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-               #ifdef WITH_MPI
-               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
-               #endif
-               #ifndef WITH_MPI
-               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
-               #endif
-               lmin_rep << "local minimum reached! --> flocky iter: " << state.iter << endl;
-               lmin_rep << "new local min: " << boost::format("%8.4f") %minf << endl;
-               lmin_rep << "new parameters:" << endl;
-               lmin_rep << "[ ";
-               for (int m = 0; m < dim; m++) {
-                 // print physical local min positions
-                 //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 temphys = x[m];
-                 lmin_rep << boost::format("%8.4f") %temphys << " ";
-               };
-               lmin_rep << "]\n" << endl;
-               lmin_rep.close();
-          };
-       }else {
-               #ifdef WITH_MPI
-               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
-               #endif
-               #ifndef WITH_MPI
-               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
-               #endif
-               lmin_rep << "local minimum reached! --> flocky iter: " << state.iter << endl;
-               lmin_rep << "new local min: " << boost::format("%8.4f") %minf << endl;
-               lmin_rep << "new parameters:" << endl;
-               lmin_rep << "[ ";
-               for (int m = 0; m < dim; m++) {
-                 // print physical local min positions
-                 //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 temphys = x[m];
-                 lmin_rep << boost::format("%8.4f") %temphys << " ";
-               };
-               lmin_rep << "]\n" << endl;
-               lmin_rep.close();
-       };
-       pos = x;
-       fitness = minf;
-   }
-   catch(std::exception &e) {
-       if (ptrainset > 1) {
-          if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-              #ifdef WITH_MPI
-              ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
-              #endif
-              #ifndef WITH_MPI
-              ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
-              #endif
-              lmin_rep << "Warning: local minimization failed for CPU " << core << "--> " << e.what() << endl;
-              lmin_rep.close();
-          };
-       }else { 
-           #ifdef WITH_MPI
-           ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
-           #endif
-           #ifndef WITH_MPI
-           ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
-           #endif
-           lmin_rep << "Warning: local minimization failed for CPU " << core << "--> " << e.what() << endl;
-           lmin_rep.close();
-       };
-   };
- }; 
 };
 
 double Par::eval_fitness(const vector <double> &active_params, void *my_func_data) {
@@ -1933,7 +1913,9 @@ if (verbose == true) {
   int cycle;
   int iter;
   int parid;
+
   long double evalfit;
+  long double pfitness;
   double evalfitdouble;
 
   cycle = state.cycle;
@@ -1952,29 +1934,19 @@ if (verbose == true) {
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
      pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
-cout << "CPU: " << core << " before setting positions" << endl;
+  // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
   if (ptrainset > 1) {
-     // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
      for (const int& swarmcore : swarmcores) {
            for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
              int reaxffcore = swarmcore + i;
              if (core == swarmcore ) {
-               MPI_Send( active_params.data(), active_params.size(), MPI_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD );
-               if (verbose == true) {
-                   for (int i=0; i < dim; i++) {
-                       cout << "iter = " << iter << " CPU: " << core << " swarmcore sending pos[" << i << "]: " << active_params.at(i) << " " << endl;
-                   };
-                   cout << endl;
-               };
+               pos = active_params;
+               MPI_Send( active_params.data(), active_params.size(), MPI_DOUBLE, reaxffcore, 0, MPI_COMM_WORLD );
+               cout << "swarmcore " << swarmcore << " sending pos[0] = " << boost::format("%18.4f") %active_params.at(0) << " pos[1] = " << boost::format("%18.4f") %active_params.at(1) << endl;
              };
              if (core == reaxffcore) {
-               MPI_Recv( pos.data(), pos.size(), MPI_DOUBLE, swarmcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-               if (verbose == true) {
-                  for (int i=0; i < dim; i++) {
-                      cout << "iter = " << iter << " CPU: " << core << " reaxffcore receiving pos[" << i << "]: " << pos.at(i) << " " << endl;
-                  };
-                  cout << endl;
-               };
+               MPI_Recv( pos.data(), pos.size(), MPI_DOUBLE, swarmcore, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+               cout << "reaxffcore " << reaxffcore << " receiving pos[0] = " << boost::format("%18.4f") %pos.at(0) << " pos[1] = " << boost::format("%18.4f") %pos.at(1) << endl;
              };
          };
      };
@@ -1982,18 +1954,17 @@ cout << "CPU: " << core << " before setting positions" << endl;
      // generate trainset subsets
      write_trainset();
   };
-//MPI_Barrier(MPI_COMM_WORLD);
-cout << "CPU: " << core << " after setting positions" << endl;
+
   // check if ffield is LG or not. execute correct tapreaxff accordingly
   if (lg_yn == true) {
-      if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
-          write_ffield_lg(pos, cycle, iter, parid);
-      }else{
-          write_ffield_lg(active_params, cycle, iter, parid);
-      };
+     if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+        write_ffield_lg(pos, cycle, iter, parid);
+     }else{
+         write_ffield_lg(active_params, cycle, iter, parid);
+     };
   } else {
-        if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
-          write_ffield(pos, cycle, iter, parid);
+      if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+         write_ffield(pos, cycle, iter, parid);
       }else{
           write_ffield(active_params, cycle, iter, parid);
       };
@@ -2009,19 +1980,14 @@ cout << "CPU: " << core << " after setting positions" << endl;
   fin5.close();
   boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
       pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
-
   if (fixcharges == true){
      boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/charges",
        pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
   };
-
-
-  // *** Ready to execute tapreaxff
   // cd to each CPU.x directory
   string old_path = pwd.string();
   boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
   boost::filesystem::current_path(p);
-
   //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
   char *args[3] = { "./tapreaxff", "", NULL} ;
   pid_t c_pid, pid;
@@ -2072,16 +2038,11 @@ cout << "CPU: " << core << " after setting positions" << endl;
   // cd back to main directory
   boost::filesystem::path p2(old_path);
   boost::filesystem::current_path(p2);
-  // read fitness value contained in fort.13 file (note: fitness value reported in fort.13 should have at least 6 decimal digits, otherwise
-  // gradients will be inaccurate and lead to poor localmin performance)
+  // read fitness value contained in fort.13 file
   string str;
   if ( !boost::filesystem::exists( "CPU." + str_core + "/fort.13" ) )
   {
-    //evalfit = numeric_limits < double > ::infinity();
-    evalfit = 1E99;
-    if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
-       pfitness = evalfit;
-    };
+    evalfit = numeric_limits < double > ::infinity();
   } else {
     boost::filesystem::ifstream file13("CPU." + str_core + "/fort.13");
     stringstream tempstr;
@@ -2094,18 +2055,20 @@ cout << "CPU: " << core << " after setting positions" << endl;
     tempstr >> str;
     // check if fitness is numeric or ******
     if (str.at(0) == '*') {
-      //evalfit = numeric_limits < double > ::infinity();
-      evalfit = 1E99;
+      evalfit = numeric_limits < double > ::infinity();
+      if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+           pfitness = evalfit;
+      };
     } else {
       // convert to double
       if (regular == 1 || regular == 2 ) {
         evalfit = stod(str) + get_reg();
-        if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+        if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
            pfitness = evalfit;
         };
       }else{
         evalfit = stod(str);
-        if (ptrainset > 1 && find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+        if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
            pfitness = evalfit;
         };
       };
@@ -2113,11 +2076,11 @@ cout << "CPU: " << core << " after setting positions" << endl;
     };
     boost::filesystem::remove( "CPU." + str_core + "/fort.13" );
   };
-
-//MPI_Barrier(MPI_COMM_WORLD);
-cout << "CPU: " << core << " before adding fitness" << endl;
-
   // If we parallelize the training set, each reaxffcore adds its fitness to the fitness of its swarmcore
+  // Note: The following MPI_Send/Recv logic of assigning swarmcore and reaxffcore ranks is equivalent to
+  // the logic implemented in the top of this function
+  // that exploits the fact that number of cores in reaxffcores that belong to a swarmcore, is half the 
+  // total number of reaxffcores. 
   if (ptrainset > 1) {
      int j = 1;
      int swarmcore;
@@ -2125,29 +2088,16 @@ cout << "CPU: " << core << " before adding fitness" << endl;
      for (int reaxffcore : reaxffcores) {
          swarmcore = reaxffcore - j;
          if (core == reaxffcore ) {
-           MPI_Send( &pfitness, 1, MPI_DOUBLE, swarmcore, 2, MPI_COMM_WORLD );
-           //if (verbose == true) {
-              cout << "iter = " << iter << " CPU: " << core << "reaxffcore sent " << pfitness << " to swarmcore " << swarmcore << endl;
-           //};
+           MPI_Send( &pfitness, 1, MPI_LONG_DOUBLE, swarmcore, 1, MPI_COMM_WORLD );
+           cout << "reaxffcore " << reaxffcore << " sent " << boost::format("%30.10f") %pfitness << " to swarmcore " << swarmcore << endl;
          };
          if (core == swarmcore) {
-           MPI_Recv( &pfitness, 1, MPI_DOUBLE, reaxffcore, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-           //if (verbose == true) {
-              cout << "iter = " << iter << " CPU: " << core << " swarmcore: old fit + recv fit = new fit => " << evalfit << " + " << pfitness << " = " << evalfit + pfitness << endl;
-           //};
+           MPI_Recv( &pfitness, 1, MPI_LONG_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+           cout << "swarmcore " << swarmcore << "received " << boost::format("%30.10f") %pfitness << "from reaxffcore " << reaxffcore << endl;
          };
          if (core == swarmcore) {
-            if (pfitness >= 1E99) {
-                evalfit = 1E99;
-                //if (verbose == true) {
-                   cout << "iter = " << iter << " CPU: " << core << " swarmcore newfitness: " << evalfit << endl; 
-                //};
-            }else{
-              evalfit = evalfit + pfitness;
-              //if (verbose == true) {
-                 cout << "iter = " << iter << " CPU: " << core << " swarmcore newfitness: " << evalfit << endl;
-              //};
-            };
+            evalfit = evalfit + pfitness;
+            cout << "swarmcore " << swarmcore << " newfitness: " << boost::format("%30.10f") %evalfit << endl;
          };
 
          if (j == ptrainset-1) {
@@ -2156,35 +2106,32 @@ cout << "CPU: " << core << " before adding fitness" << endl;
            j = j + 1;
          };
      };
+  };
 
-//MPI_Barrier(MPI_COMM_WORLD);
-cout << "CPU: " << core << " after adding fitness" << endl;
-
-     // swarmcores setting reaxffcores to trick localmin
-     for (const int& swarmcore : swarmcores) {
-           for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
-             int reaxffcore = swarmcore + i;
-             if (core == swarmcore ) {
-               MPI_Send( &evalfit, 1, MPI_LONG_DOUBLE, reaxffcore, 3, MPI_COMM_WORLD );
-               if (verbose == true) {
-                       cout << ">>iter = " << iter << " CPU: " << core << " swarmcore sending fitness to CPU: " << core << " reaxffcore " << endl;
-                   cout << endl;
-               };
-             };
-             if (core == reaxffcore) {
-               MPI_Recv( &evalfit, 1, MPI_LONG_DOUBLE, swarmcore, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-               if (verbose == true) {
-                      cout << ">>iter = " << iter << " CPU: " << core << " reaxffcore receiving fitness = " << evalfit << " from CPU: " << core << " swarmcore " << endl;
-                  cout << endl;
-               };
-             };
-         };
-     };
+  if (ptrainset > 1) {
+    // swarmcores setting reaxffcores to trick localmin
+    for (const int& swarmcore : swarmcores) {
+          for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
+            int reaxffcore = swarmcore + i;
+            if (core == swarmcore ) {
+              MPI_Send( &evalfit, 1, MPI_LONG_DOUBLE, reaxffcore, 3, MPI_COMM_WORLD );
+              //if (verbose == true) {
+              //        cout << ">>iter = " << iter << " CPU: " << core << " swarmcore sending fitness to CPU: " << core << " reaxffcore " << endl;
+              //    cout << endl;
+              //};
+            };
+            if (core == reaxffcore) {
+              MPI_Recv( &evalfit, 1, MPI_LONG_DOUBLE, swarmcore, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+              //if (verbose == true) {
+              //       cout << ">>iter = " << iter << " CPU: " << core << " reaxffcore receiving fitness = " << evalfit << " from CPU: " << core << " swarmcore " << endl;
+              //   cout << endl;
+              //};
+            };
+        };
+    };
   };
 
 
-//MPI_Barrier(MPI_COMM_WORLD);
-cout << "CPU: " << core << " after trick" << endl;
 //MPI_Barrier(MPI_COMM_WORLD);
   // Note: do not update the geometry file during iterations. Each member should use one geo file throughout
   // the training. Assuming we start with DFT_optimized (or sensible structures), and that we use some small
@@ -2196,15 +2143,12 @@ cout << "CPU: " << core << " after trick" << endl;
   //   pwd.string()+"/CPU."+str_core+"/geo." + str_cycle + "." + str_parID, 
   //     boost::filesystem::copy_option::overwrite_if_exists);
 
-  // note: evalfit is long double so not to lose accuracy when summing doubles from different processes,
-  // while evalfitdouble is double
+  // LOCAL MIN: return gradient
+  //if (!grad_out.empty()) {
+  //    grad_out = eval_numgrad(active_params, cycle, iter, p);
+  //};
   evalfitdouble=evalfit;
   fitness=evalfit;
-
-
-if (verbose == true) {
-  cout << "CPU: " << core << " left eval_fitness()" << endl;
-};
   return evalfitdouble;
 #endif
 
@@ -2213,7 +2157,6 @@ if (verbose == true) {
   int cycle;
   int iter;
   int parid;
-  double evalfit;
 
   cycle = state.cycle;
   iter = state.iter;
@@ -2311,8 +2254,7 @@ if (verbose == true) {
   string str;
   if ( !boost::filesystem::exists("fort.13") )
   {
-       //evalfit = numeric_limits < double > ::infinity();
-       evalfit = 1E99;
+      fitness = numeric_limits < double > ::infinity();
   } else {
       boost::filesystem::ifstream file13("fort.13");
       stringstream tempstr;
@@ -2325,14 +2267,13 @@ if (verbose == true) {
       tempstr >> str;
       // check if fitness is numeric or ******
       if (str.at(0) == '*') {
-          //evalfit = numeric_limits < double > ::infinity();
-          evalfit = 1E99;
+          fitness = numeric_limits < double > ::infinity();
       } else {
           if (regular == 1 || regular == 2) {
              // convert to double
-             evalfit = stod(str) + get_reg();
+             fitness = stod(str) + get_reg();
           } else {
-             evalfit = stod(str);
+             fitness = stod(str);
           };
       file13.close();
       boost::filesystem::remove("fort.13");
@@ -2348,11 +2289,13 @@ if (verbose == true) {
     //   pwd.string() + "/geo."+str_cycle+"." + str_parID ,
     //      boost::filesystem::copy_option::overwrite_if_exists);
 
+    // LOCAL MIN: return gradient
+    //if (!grad_out.empty()) {
+    //    grad_out = numgrad;
+    //};
 
-if (verbose == true) {
-  cout << "left eval_fitness()" << endl;
-};
-  return evalfit;
+
+  return fitness;
 #endif
 };
 
@@ -2372,6 +2315,7 @@ if (verbose == true) {
   int cycle;
   int iter;
   int parid;
+
   cycle = state.cycle;
   iter = state.iter;
   parid = state.parid;
@@ -2389,7 +2333,6 @@ if (verbose == true) {
   double fitminus;
   vector <double> local_params;
   vector <double> grad(dim, 0.0);
-  vector <double> empty_vec;
   local_params = active_params;
 
   struct {
@@ -2402,41 +2345,45 @@ if (verbose == true) {
   myfdata.p = parid;
 
   // save fort.4 before writing new ffield
-  if (boost::filesystem::exists("fort.4")) {
+  if (boost::filesystem::exists(pwd.string() + "/CPU." + str_core + "/fort.4")) {
       boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.4",
-        pwd.string() + "/CPU." + str_core + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
+         pwd.string() + "/CPU." + str_core + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
   // perform central finite difference
   for (int i = 0; i < dim; i++) {
      local_params.at(i) = active_params.at(i) + diff;
-
+  
      fitplus = eval_fitness(local_params, &myfdata);
-     if (verbose == true) {
-        cout << "CPU: " << core << " fitplus[" << i << "] = " << boost::format("%18.6f") %fitplus << endl;
-     };
+     //if (verbose == true) {
+     //   cout << "CPU: " << core << " fitplus[" << i << "] = " << boost::format("%18.6f") %fitplus << endl;
+     //};
 
      local_params.at(i) = active_params.at(i) - diff;
 
      fitminus = eval_fitness(local_params, &myfdata);
-     if (verbose == true) {
-        cout << "CPU: " << core << " fitminus[" << i << "] = " << boost::format("%18.6f") %fitminus << endl;
-     };
+     //if (verbose == true) {
+     //   cout << "CPU: " << core << " fitminus[" << i << "] = " << boost::format("%18.6f") %fitminus << endl;
+     //};
 
      grad.at(i) = (fitplus - fitminus)/(2.0*diff);
-     if (verbose == true) {
-        cout << "CPU: " << core << " grad[" << i << "] = " << boost::format("%18.6f") %grad.at(i) << endl;
-     };
+     // transform grad.at(i) to physical again
+     //grad.at(i) = grad.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i);
+
+     //if (verbose == true) {
+     //   cout << "CPU: " << core << " grad[" << i << "] = " << boost::format("%18.6f") %grad.at(i) << endl;
+     //};
   };
   
   // count total # func evaluations
   funceval = funceval + 2*dim;
 
   // retrive back saved ffield
-  if (boost::filesystem::exists("fort.4.save")) {
+  if (boost::filesystem::exists(pwd.string() + "/CPU." + str_core + "/fort.4.save")) {
       boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.4.save",
         pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   };
+
   return grad;
 #endif
 
@@ -2461,7 +2408,6 @@ if (verbose == true) {
   double fitminus;
   vector <double> local_params;
   vector <double> grad(dim, 0.0);
-  vector <double> empty_vec;
   local_params = active_params;
 
   struct {
@@ -2482,23 +2428,22 @@ if (verbose == true) {
      local_params.at(i) = active_params.at(i) + diff;
 
      fitplus = eval_fitness(local_params, &myfdata);
-     if (verbose == true) {
-        cout << "fitplus[" << i << "] = " << boost::format("%18.6f") %fitplus << endl;
-     };
+     //if (verbose == true) {
+     //   cout << "fitplus[" << i << "] = " << boost::format("%18.6f") %fitplus << endl;
+     //};
 
      local_params.at(i) = active_params.at(i) - diff;
 
      fitminus = eval_fitness(local_params, &myfdata);
-     if (verbose == true) {
-        cout << "fitminus[" << i << "] = " << boost::format("%18.6f") %fitminus << endl;
-     };
+     //if (verbose == true) {
+     //   cout << "fitminus[" << i << "] = " << boost::format("%18.6f") %fitminus << endl;
+     //};
 
      grad.at(i) = (fitplus - fitminus)/(2.0*diff);
-     if (verbose == true) {
-        cout << "grad[" << i << "] = " << boost::format("%18.6f") %grad.at(i) << endl;
-     };
+     //if (verbose == true) {
+     //   cout << "grad[" << i << "] = " << boost::format("%18.6f") %grad.at(i) << endl;
+     //};
   };
-
 
   // count total # func evaluations
   funceval = funceval + 2*dim;
@@ -2576,7 +2521,6 @@ if (verbose == true) {
   cout << "entered get_reg()" << endl;
 };
 #endif
-
   double reg = 0.0;
 
   // vector to store the positions that will be converted below to their inverses to use in regularization
@@ -2636,7 +2580,6 @@ if (verbose == true) {
   cout << "entered read_icharg_control()" << endl;
 };
 #endif
-
   // Read icharg value from reax control file
   string str_core = std::to_string(core);
   std::ifstream control_file("control");
@@ -2718,8 +2661,8 @@ if (verbose == true) {
     istringstream(tempinput.at(0)) >> verbose;
     istringstream(tempinput.at(1)) >> lg_yn;
     istringstream(tempinput.at(2)) >> ptrainset;
-    if (ptrainset >= numcores) {
-      cout << "Error: Number of training set sub-units >= number of allocated processors." << endl;
+    if (ptrainset > numcores) {
+      cout << "Error: Number of allocated processors < number of training set sub-units" << endl;
       MPI_Abort(MPI_COMM_WORLD,7);
     }else if (ptrainset > 1) {
       swarmcores.clear();
@@ -2742,8 +2685,8 @@ if (verbose == true) {
     istringstream(tempinput.at(11)) >> ofit;
     istringstream(tempinput.at(12)) >> uq;
     istringstream(tempinput.at(13)) >> NumP;
-    if (NumP < numcores || NumP < 2) {
-      cout << "Error: Number of swarm members < number of allocated processors or < 2." << endl;
+    if (NumP < numcores) {
+      cout << "Error: Number of swarm members < number of allocated processors." << endl;
       MPI_Abort(MPI_COMM_WORLD,7);
     } else {
       totmembers = NumP;
@@ -2890,10 +2833,6 @@ if (verbose == true) {
     istringstream(tempinput.at(11)) >> ofit;
     istringstream(tempinput.at(12)) >> uq;
     istringstream(tempinput.at(13)) >> NumP;
-    if (NumP < 2) {
-      cout << "Error: Number of swarm members < 2." << endl;
-      exit(EXIT_FAILURE);     
-    };
     istringstream(tempinput.at(14)) >> c1;
     istringstream(tempinput.at(15)) >> c2;
     istringstream(tempinput.at(16)) >> inertiamax;
@@ -2982,7 +2921,6 @@ if (verbose == true) {
   cout << "entered get_disp()" << endl;
 };
 #endif
-
   double swarm_dispersion = 0.0;
   // define deviation vector between a swarm member and the center-of-mass
   vector <double> deviation_vec(dim, 0.0);
@@ -3040,7 +2978,6 @@ if (verbose == true) {
   cout << "entered get_worse()" << endl;
 };
 #endif
-
   double fit = -1.0 * numeric_limits < double > ::infinity();
   int particle_id;
   for (int p = 0; p < NumP; p++) {
@@ -3088,8 +3025,10 @@ if (verbose == true) {
 };
 #endif
 
-
 #ifdef WITH_MPI
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " entered Populate!" << endl; 
+};
 
  // define a new sub-communicator for reaxffcores and swarmcores //
     MPI_Comm ACTIVESWARM;  // swarmcores
@@ -3142,10 +3081,6 @@ if (verbose == true) {
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
       pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + parID,
         boost::filesystem::copy_option::overwrite_if_exists);
-    // clean up old local min report
-    if ( boost::filesystem::exists( "lmin_rep.out." + std::to_string(cycle)+"."+std::to_string(core)) ){
-      boost::filesystem::remove( "lmin_rep.out." + std::to_string(cycle)+"."+std::to_string(core) );
-    };
 
     Par NewPar;
     newSwarm.AddPar(NewPar);
@@ -3164,14 +3099,19 @@ if (verbose == true) {
         double tempstand;
         ffpos.clear();
         for (int m = 0; m < dim; m++) {
-          ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
+          // standardize positions for CPU.0
+          tempstand = stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))) - newSwarm.GetPar(0).mindomain.at(m);
+          tempstand = tempstand/(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m));
+          ffpos.push_back(tempstand);
+          // use physical positions for CPU.0
+          //ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
         };
         newSwarm.GetPar(0).set_pos(ffpos);
       };
       contff = false;
     };
 
-    // set state parameters for each member
+    // evaluate fitness and set bfit = curfit
     newSwarm.GetPar(p).state.cycle = cycle;
     iter = 0;
     newSwarm.GetPar(p).state.iter = iter;
@@ -3184,60 +3124,29 @@ if (verbose == true) {
 
     // local minimization
     if (localmin == 1 || localmin == 2) {
-             for (const int& swarmcore : swarmcores) {
-                   for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
-                     int reaxffcore = swarmcore + i;
-                     if (core == swarmcore ) {
-                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 4, MPI_COMM_WORLD );
-                       //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                     };
-                     if (core == reaxffcore) {
-                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-                       //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                     };
-                 };
-             };
-
        newSwarm.GetPar(p).iterate();
-       //MPI_Barrier(MPI_COMM_WORLD);
-       //if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-       //   MPI_Barrier(ACTIVESWARM);
-       //}else{
-       //   MPI_Barrier(PASSIVESWARM);
-       //};
     }else{
-             for (const int& swarmcore : swarmcores) {
-                   for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
-                     int reaxffcore = swarmcore + i;
-                     if (core == swarmcore ) {
-                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 5, MPI_COMM_WORLD );
-                       //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                     };
-                     if (core == reaxffcore) {
-                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 5, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-                       //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                     };
-                 };
-             };
-
-             // generate trainset subsets
-             newSwarm.GetPar(p).write_trainset();
-             newSwarm.GetPar(p).set_fitness( newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this) );
+       newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
     };
 
     // if we parallelize the training set, update gbfit and gbpos only among swarmcores
     if (ptrainset > 1) {
-      if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-        newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
-        newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
-        if (newSwarm.GetPar(p).get_fitness() < gbfit) {
-          gbfitfound = true;
-          parid_gbfit = p;
-          gbfit = newSwarm.GetPar(p).get_fitness();
-          gbpos.clear();
-          gbpos = newSwarm.GetPar(p).get_pos_vec();
-        };
-      };
+       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+          newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
+          if (newSwarm.GetPar(p).get_fitness() < gbfit) {
+            gbfitfound = true;
+            parid_gbfit = p;
+            gbfit = newSwarm.GetPar(p).get_fitness();
+            gbpos.clear();
+            gbpos = newSwarm.GetPar(p).get_pos_vec();
+            //write_ffield_gbest(core, cycle, iter, p);
+          }else{
+             gbfitfound = false;
+          };
+          // cleaning ffield.tmp.* files after write_ffield_gbest already
+          // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
+          //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
+       };
     }else {
       newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
       newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
@@ -3247,7 +3156,13 @@ if (verbose == true) {
         gbfit = newSwarm.GetPar(p).get_fitness();
         gbpos.clear();
         gbpos = newSwarm.GetPar(p).get_pos_vec();
+        //write_ffield_gbest(core, cycle, iter, p);
+      }else{
+         gbfitfound = false;
       };
+      // cleaning ffield.tmp.* files after write_ffield_gbest already
+      // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
+      //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
     };
 
   }; // done loop on members
@@ -3281,7 +3196,7 @@ if (verbose == true) {
          struct {
            double tmp_fit2;
            int tmp_parid;
-         } min_vals_in2[1], min_vals_out2[1];
+         } /*min_vals_in2, min_vals_out2;*/ min_vals_in2[1], min_vals_out2[1];
 
          // store current fit on each process
           min_vals_in2[0].tmp_fit2 = gbfit;
@@ -3295,39 +3210,33 @@ if (verbose == true) {
          parid_gbfit = min_vals_out2[0].tmp_parid;
 
          // now convert cpuid_gbfit value from ACTIVESWARM to MPI_COMM_WORLD
-         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-            cpuid_gbfit = swarmcores.at(cpuid_gbfit);
+         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end() && gbfitfound == true) {
+             cpuid_gbfit = swarmcores.at(cpuid_gbfit);
          };
-         // so now we can safely write ffield_gbest after all procs compared their gbfit
-         // and cleaning ffield.tmp.* files after write_ffield_gbest already
-         // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
-         if (core == cpuid_gbfit && gbfitfound == true) {
-            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
+
+         // do write_ffield_gbest
+         if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+            cout << "CPU: " << core << " (cpuid_gbfit) writing ffield_gbest: ffield.tmp."+to_string(cycle)+"."+"0."+to_string(parid_gbfit) << endl;
+            write_ffield_gbest(cpuid_gbfit, cycle, 0, parid_gbfit);
+            //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
          };
-         // remove all ffield.tmp files
-         boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp." + std::to_string(cycle)+".0." + "." + std::to_string(parid_gbfit));
 
-         if (core == 0) {
-            // clean up any old files belonging to previous job
-            if ( boost::filesystem::exists( "opti_log.out." + std::to_string(cycle)) ){
-              boost::filesystem::remove( "opti_log.out." + std::to_string(cycle) );
-            };
-            if ( boost::filesystem::exists( "disp_log.out." + std::to_string(cycle)) ){
-              boost::filesystem::remove( "disp_log.out." + std::to_string(cycle) );
-            };
-
-            newSwarm.printopt(newSwarm, 0, cycle, 1);
-            boost::filesystem::ofstream log("log.flocky", ofstream::app);
-            log << "\nSwarm generation completed." << endl;
-            if (localmin == 1 || localmin == 2 ) {
-               log << "Initial global best fit (+) local min: ";
-            }else{
-               log << "Initial global best fit: ";
-            };
-            log << boost::format("%18.4f") %gbfit << endl;
-            log << "flocky optimization started!" << endl;
-            log.close();
+        if (core == 0) {
+          // clean up any old files belonging to previous job
+          if ( boost::filesystem::exists( "opti_log.out." + std::to_string(cycle)) ){
+            boost::filesystem::remove( "opti_log.out." + std::to_string(cycle) );
           };
+          if ( boost::filesystem::exists( "disp_log.out." + std::to_string(cycle)) ){
+            boost::filesystem::remove( "disp_log.out." + std::to_string(cycle) );
+          };
+
+          newSwarm.printopt(newSwarm, 0, cycle, 1);
+          boost::filesystem::ofstream log("log.flocky", ofstream::app);
+          log << "\nSwarm generation completed." << endl;
+          log << "Initial global best fit: " << boost::format("%18.4f") %gbfit << endl;
+          log << "flocky optimization started!" << endl;
+          log.close();
+       };
 
           //newSwarm.printdisp(newSwarm, 0, cycle, 1);
           newSwarm.printpos(newSwarm, 0, cycle, 1);
@@ -3369,6 +3278,7 @@ if (verbose == true) {
      cpuid_gbfit = min_vals_out[0].tmp_cpu;
      // broadcast contents of gbpos vector from rank cpuid_gbfit
      MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
+
      // pair struct to hold the global best fitness across processes and its parID
      // The parID is required in detection of overfitting to cp the correct ffield.gbest file
      struct {
@@ -3384,17 +3294,11 @@ if (verbose == true) {
      MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
      // parid of the gbfit
      parid_gbfit = min_vals_out2[0].tmp_parid;
-     // broadcast parid_gbfit to reaxffcores as well so we can delete corresponding ffield.tmp files
-     MPI_Bcast(&parid_gbfit, 1, MPI_INT, cpuid_gbfit, MPI_COMM_WORLD);
 
-     // now we can safely write ffield_gbest after all procs compared their gbfit
-     // and cleaning ffield.tmp.* files after write_ffield_gbest already
-     // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
      if (core == cpuid_gbfit) {
-        write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
+        write_ffield_gbest(cpuid_gbfit, cycle, 0, parid_gbfit);
+        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
      };
-     // remove all ffield.tmp files
-     boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp." + std::to_string(cycle)+".0." + "." + std::to_string(parid_gbfit));
 
      if (core == 0) {
        // clean up any old files belonging to previous job
@@ -3408,12 +3312,7 @@ if (verbose == true) {
        newSwarm.printopt(newSwarm, 0, cycle, 1);
        boost::filesystem::ofstream log("log.flocky", ofstream::app);
        log << "\nSwarm generation completed." << endl;
-            if (localmin == 1 || localmin == 2 ) {
-               log << "Initial global best fit (+) local min: ";
-            }else{
-               log << "Initial global best fit: ";
-            };
-            log << boost::format("%18.4f") %gbfit << endl;
+       log << "Initial global best fit: " << boost::format("%18.4f") %gbfit << endl;
        log << "flocky optimization started!" << endl;
        log.close();
      };
@@ -3426,12 +3325,15 @@ if (verbose == true) {
      };
   };
 
-if (verbose == true) {
-   cout << "CPU: " << core << " left Populate!" << endl;
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " left Populate!" << endl;
 };
 #endif
 
 #ifndef WITH_MPI
+if (verbose == true) {
+   cout << "Swarm entered Populate!" << endl;
+};
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
   boost::filesystem::ofstream log("log.flocky", ofstream::app);
@@ -3458,11 +3360,7 @@ if (verbose == true) {
     boost::filesystem::copy_file(pwd.string() + "/geo",
       pwd.string() + "/geo." + str_cycle + "." + parID,
         boost::filesystem::copy_option::overwrite_if_exists);
-    // clean up old local min report
-    if ( boost::filesystem::exists("lmin_rep.out." + std::to_string(cycle)){
-      boost::filesystem::remove("lmin_rep.out." + std::to_string(cycle));
-    };
-
+    
     Par NewPar;
     newSwarm.AddPar(NewPar);
 
@@ -3480,17 +3378,26 @@ if (verbose == true) {
       vector < double > ffpos;
       ffpos.clear();
       for (int m = 0; m < dim; m++) {
-        ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
+        // standardize positions
+        tempstand = stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))) - newSwarm.GetPar(0).mindomain.at(m);
+        tempstand = tempstand/(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m));
+        ffpos.push_back(tempstand);
+        // use physical positions
+        //ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
       };
       newSwarm.GetPar(0).set_pos(ffpos);
     };
     contff = false;
 
     // evaluate fitness and set bfit = curfit
+    vector <double> numgrad;
     newSwarm.GetPar(p).state.cycle = cycle;
     iter = 0;
     newSwarm.GetPar(p).state.iter = iter;
     newSwarm.GetPar(p).state.parid = p;
+
+    // evaluate fitness
+    vector <double> numgrad;
 
     // dropout
     if (regular == 3) {
@@ -3500,11 +3407,9 @@ if (verbose == true) {
     // local minimization
     if (localmin == 1 || localmin == 2) {
        newSwarm.GetPar(p).iterate();
-    }else{
-       newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
     };
 
-    newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
+    newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
     newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
 
     if (newSwarm.GetPar(p).get_fitness() < gbfit) {
@@ -3517,6 +3422,10 @@ if (verbose == true) {
     // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
     boost::filesystem::remove("ffield.tmp." + str_cycle + ".0." + "." + parID);
   }; // done loop over members
+
+if (verbose == true) {
+   cout << "Swarm done loop on members!" << endl;
+};
 
   //initial_disp = newSwarm.get_disp(newSwarm);
 
@@ -3531,12 +3440,7 @@ if (verbose == true) {
   newSwarm.printopt(newSwarm, 0, cycle, 1);
   boost::filesystem::ofstream log2("log.flocky", ofstream::app);
   log2 << "\nSwarm generation completed." << endl;
-            if (localmin == 1 || localmin == 2 ) {
-               log2 << "Initial global best fit (+) local min: ";
-            }else{
-               log2 << "Initial global best fit: ";
-            };
-            log << boost::format("%18.4f") %gbfit << endl;
+  log2 << "Initial global best fit: " << boost::format("%18.4f") %gbfit << endl;
   log2 << "flocky optimization started!" << endl;
   log2.close();
 
@@ -3546,6 +3450,10 @@ if (verbose == true) {
     newSwarm.printUQFF(newSwarm, 0, cycle, 1);
     newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
   };
+
+if (verbose == true) {
+   cout << "Swarm left Populate!" << endl;
+};
 #endif
 };
 
@@ -3554,7 +3462,7 @@ if (verbose == true) {
 void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "CPU: " << core << " entered Propagate()" << endl;
+   cout << "core " << core << " entered Propagate()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -3562,14 +3470,17 @@ if (verbose == true) {
    cout << "entered Propagate()" << endl;
 };
 #endif
-
 #ifdef WITH_MPI
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " entered Propagate!" << endl;
+};
+
  // define a new sub-communicator for reaxffcores and swarmcores //
     MPI_Comm ACTIVESWARM;  // swarmcores
     MPI_Comm PASSIVESWARM; // reaxffcores
     MPI_Comm *newcomm;
     int color;
-//MPI_Barrier(MPI_COMM_WORLD);
+
     if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
         color = 444;
         newcomm = &ACTIVESWARM;
@@ -3579,15 +3490,18 @@ if (verbose == true) {
         newcomm = &PASSIVESWARM;
     };
     MPI_Comm_split( MPI_COMM_WORLD, color, core, newcomm );
+
     if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
          MPI_Comm_rank( ACTIVESWARM, &mycore_swarmcore);
          MPI_Comm_size( ACTIVESWARM, &size_swarmcores);
     };
+
     if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
          MPI_Comm_rank( PASSIVESWARM, &mycore_reaxffcore);
          MPI_Comm_size( PASSIVESWARM, &size_reaxffcores);
     };
  // ------------ end definition of new communicator ---------- //
+
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
 
@@ -3596,7 +3510,6 @@ if (verbose == true) {
   // ---------------------------------------------------------------- //
   for (iter = 1; iter < maxiters; iter++) {
     inertiafac = inertiamax - iter * (inertiamax - inertiamin) / maxiters;
-    gbfitfound = false;
     //
     // main loop over swarm members
     //
@@ -3617,7 +3530,7 @@ if (verbose == true) {
           newSwarm.GetPar(p).state.iter = iter;
           newSwarm.GetPar(p).state.parid = p;
 
-          // evaluate fitness. note: if doing localmin with ptrainset > 1, the generation of trainset subsets
+          // evaluate fitness. if doing localmin with ptrainset > 1, the generation of trainset subsets
           // is performed inside eval_fitness. If not doing localmin, generation of trainset subsets is performed here.
 
           // dropout
@@ -3626,38 +3539,9 @@ if (verbose == true) {
           };
 
           if (localmin == 1 || localmin == 2) {
-             for (const int& swarmcore : swarmcores) {
-                   for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
-                     int reaxffcore = swarmcore + i;
-                     if (core == swarmcore ) {
-                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 6, MPI_COMM_WORLD );
-                       //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                     };
-                     if (core == reaxffcore) {
-                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-                       //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                     };
-                 };
-              };
-              newSwarm.GetPar(p).iterate();
-          } else {
-             for (const int& swarmcore : swarmcores) {
-                   for (int i = 1; i < reaxffcores.size()/swarmcores.size() + 1; i++) {
-                     int reaxffcore = swarmcore + i;
-                     if (core == swarmcore ) {
-                       MPI_Send( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, reaxffcore, 7, MPI_COMM_WORLD );
-                       //cout << "swarmcore " << swarmcore << "sending pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                     };
-                     if (core == reaxffcore) {
-                       MPI_Recv( newSwarm.GetPar(p).pos.data(), newSwarm.GetPar(p).pos.size(), MPI_DOUBLE, swarmcore, 7, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-                       //cout << "reaxffcore " << reaxffcore << "receiving pos[0] = " << newSwarm.GetPar(p).get_pos_vec().at(0) << endl;
-                     };
-                 };
-             };
-
-             // generate trainset subsets
-             newSwarm.GetPar(p).write_trainset();
-             newSwarm.GetPar(p).set_fitness( newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this) );
+             newSwarm.GetPar(p).iterate();
+          }else{
+             newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
           };
 
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
@@ -3672,12 +3556,18 @@ if (verbose == true) {
                  gbfit = newSwarm.GetPar(p).get_bfit();
                  gbpos.clear();
                  gbpos = newSwarm.GetPar(p).get_pos_vec();
-               }else{
-                 gbfitfound = false;
+                 //write_ffield_gbest(core, cycle, iter, p);
                };
              } else {
+               gbfitfound = false;
                newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
              };
+             // cleaning ffield.tmp.* files after write_ffield_gbest already
+             // copied the correct ffield.tmp.* file as the ffield.gbest.*
+             string str_cycle = std::to_string(cycle);
+             string str_iter = std::to_string(iter);
+             string str_parID = std::to_string(p);
+             //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
           };
        }else {
               // Update velocities and positions
@@ -3701,9 +3591,9 @@ if (verbose == true) {
               if (localmin == 1 || localmin == 2) {
                  newSwarm.GetPar(p).iterate();
               } else {
-                 newSwarm.GetPar(p).set_fitness( newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this) );
+                 vector <double> numgrad;
+                 newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
               };
-
               // Update personal best positions and fitness
               if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
                 newSwarm.GetPar(p).update_bpos();
@@ -3715,12 +3605,18 @@ if (verbose == true) {
                   gbfit = newSwarm.GetPar(p).get_bfit();
                   gbpos.clear();
                   gbpos = newSwarm.GetPar(p).get_pos_vec();
-                }else{
-                  gbfitfound = false;
+                  //write_ffield_gbest(core, cycle, iter, p);
                 };
               } else {
+                gbfitfound = false;
                 newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
               };
+              // cleaning ffield.tmp.* files after write_ffield_gbest already
+              // copied the correct ffield.tmp.* file as the ffield.gbest.*
+              string str_cycle = std::to_string(cycle);
+              string str_iter = std::to_string(iter);
+              string str_parID = std::to_string(p);
+              //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
        };
     }; // done loop over swarm members
 
@@ -3742,6 +3638,7 @@ if (verbose == true) {
         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
            MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
         };
+
         // pair struct to hold the global best fitness across processes and its parID
         // The parID is required in detection of overfitting to cp the correct ffield.gbest file
         struct {
@@ -3759,6 +3656,7 @@ if (verbose == true) {
         };
         // parid of the gbfit
         parid_gbfit = min_vals_out2[0].tmp_parid;
+
         // global best fitness across all processes
         gbfit = min_vals_out[0].tmp_fit;
         // core rank the above fitness came from
@@ -3767,19 +3665,18 @@ if (verbose == true) {
         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
            MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, ACTIVESWARM);
         };
-        // broadcast parid_gbfit to reaxffcores as well so we can delete corresponding ffield.tmp files
-        MPI_Bcast(&parid_gbfit, 1, MPI_INT, cpuid_gbfit, MPI_COMM_WORLD);
 
         // now convert cpuid_gbfit value from ACTIVESWARM to MPI_COMM_WORLD
         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
            cpuid_gbfit = swarmcores.at(cpuid_gbfit);
         };
-        // so now we can safely write ffield_gbest after all procs compared their gbfit
-        if (core == cpuid_gbfit && gbfitfound == true) {
+
+        // do writ_ffield_gbest
+        if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end() && gbfitfound == true) {
+           cout << "CPU: " << core << " (cpuid_gbfit) writes ffield.gbest: " << "ffield.tmp." + to_string(cycle)+"."+to_string(iter)+"."+to_string(parid_gbfit) << endl;
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
+           //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
         };
-        // remove all ffield.tmp files
-        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp." + std::to_string(cycle) + "." + std::to_string(iter) + "." + std::to_string(parid_gbfit));
 
         if (ofit == true){
           if (gbfitfound == true) {
@@ -3794,14 +3691,13 @@ if (verbose == true) {
            if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
               MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, ACTIVESWARM);
            };
+          //MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, ACTIVESWARM);
         };
 
         if (core == 0) {
           newSwarm.printopt(newSwarm, iter, cycle, freq);
         };
-        cout << "CPU: " << core << " just before printpos!" << endl;
         newSwarm.printpos(newSwarm, iter, cycle, freq);
-        cout << "CPU: " << core << " just after printpos!" << endl;
         if (uq == true){
           newSwarm.printUQFF(newSwarm, iter, cycle, freq);
           newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
@@ -3822,10 +3718,6 @@ if (verbose == true) {
         min_vals_in[0].tmp_cpu = core;
         // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
         MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
-        // global best fitness across all processes
-        gbfit = min_vals_out[0].tmp_fit;
-        // core rank the above fitness came from
-        cpuid_gbfit = min_vals_out[0].tmp_cpu;
 
         // pair struct to hold the global best fitness across processes and its parID
         // The parID is required in detection of overfitting to cp the correct ffield.gbest file
@@ -3843,14 +3735,17 @@ if (verbose == true) {
         // parid of the gbfit
         parid_gbfit = min_vals_out2[0].tmp_parid;
 
+        // global best fitness across all processes
+        gbfit = min_vals_out[0].tmp_fit;
+        // core rank the above fitness came from
+        cpuid_gbfit = min_vals_out[0].tmp_cpu;
         // broadcast contents of gbpos vector from rank cpuid_gbfit
         MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-        // now we can safely write ffield_gbest after all procs compared their gbfit
+
         if (core == cpuid_gbfit && gbfitfound == true) {
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
+        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
         };
-        // remove all ffield.tmp files
-        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp." + std::to_string(cycle) + "." + std::to_string(iter) + "." + std::to_string(parid_gbfit));
 
         if (ofit == true){
           if (gbfitfound == true) {
@@ -3884,14 +3779,7 @@ if (verbose == true) {
           MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, ACTIVESWARM);
       };
   };
-  cout << "CPU: " << core << " just before BARRIER!" << endl;
-       MPI_Barrier(MPI_COMM_WORLD);
-       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-          MPI_Barrier(ACTIVESWARM);
-       }else{
-          MPI_Barrier(PASSIVESWARM);
-       };
-  cout << "CPU: " << core << " just after BARRIER!" << endl;
+  MPI_Barrier(MPI_COMM_WORLD);
 
   if (core == 0) {
     double temphys;
@@ -3902,7 +3790,11 @@ if (verbose == true) {
     log << "Global best ReaxFF parameters:" << endl;
     log << "[ ";
     for (int m = 0; m < dim; m++) {
-      log << newSwarm.get_gbpos().at(m) << " ";
+      temphys = newSwarm.get_gbpos().at(m)*(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)) + newSwarm.GetPar(0).mindomain.at(m);
+      // physical gbest position
+      //log << boost::format("%8.4f") %newSwarm.get_gbpos().at(m) << " ";
+      // standardized gbest position
+      log << boost::format("%8.4f") %temphys << " ";
     };
     log << "]\n" << endl;
     log.close();
@@ -3921,8 +3813,8 @@ if (verbose == true) {
         MPI_Comm_free(newcomm);
     };
   };
-if (verbose == true) {
-   cout << "CPU: " << core << " left Populate!" << endl;
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " left Populate!" << endl;
 };
 #endif
 
@@ -3965,7 +3857,8 @@ if (verbose == true) {
       if (localmin == 1 || localmin == 2) {
          newSwarm.GetPar(p).iterate();
       } else {
-          newSwarm.GetPar(p).set_fitness( newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this) );
+          vector <double> numgrad;
+          newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
       };
 
       // Update personal best positions and fitness
@@ -3990,7 +3883,7 @@ if (verbose == true) {
       string str_cycle = std::to_string(cycle);
       string str_iter = std::to_string(iter);
       string str_parID = std::to_string(p);
-      boost::filesystem::remove(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
+      //boost::filesystem::remove(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
     }; // done loop over swarm members
 
     //newSwarm.get_com(newSwarm);
@@ -4020,7 +3913,11 @@ if (verbose == true) {
   log << "Global best ReaxFF parameters:" << endl;
   log << "[ "; 
   for (int m = 0; m < dim; m++) {
-    log << boost::format("%8.4f") %newSwarm.get_gbpos().at(m) << " ";
+    // physical gbest position
+    //log << boost::format("%8.4f") %newSwarm.get_gbpos().at(m) << " ";
+    // standardized gbest position
+    temphys = newSwarm.get_gbpos().at(m)*(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)) + newSwarm.GetPar(0).mindomain.at(m);
+    log << boost::format("%8.4f") %temphys << " ";
   };
   log << "]" << endl;
   log.close();
@@ -4034,7 +3931,7 @@ if (verbose == true) {
 void Swarm::write_ffield_gbest(int core, int cycle, int iter, int par) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "CPU: " << core << " entered write_ffield_gbest()" << endl;
+   cout << "core " << core << " entered write_ffield_gbest()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4043,8 +3940,12 @@ if (verbose == true) {
 };
 #endif
 
-
+  // cp current ffield to be the global best and current analysis files to global best analysis files
 #ifndef WITH_MPI
+if (verbose == true) {
+   cout << "Swarm entered write_ffield_gbest!" << endl;
+};
+
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
@@ -4063,25 +3964,52 @@ if (verbose == true) {
       "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   };
   test_fort99.close();
+
+  // clean temp files
+  //boost::filesystem::remove(pwd.string() + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
+
+if (verbose == true) {
+   cout << "Swarm left write_ffield_gbest!" << endl;
+};
 #endif
 #ifdef WITH_MPI
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " entered write_ffield_gbest!" << endl;
+};
+
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
   string str_core = std::to_string(core);
   string str_iter = std::to_string(iter);
   string str_parID = std::to_string(par);
 
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
-    "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.99",
-    "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::ifstream test_ffieldtmp(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
+  if (!test_ffieldtmp.fail()) {
+      boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+        "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
+  };
+  test_ffieldtmp.close();
+
+  boost::filesystem::ifstream test_fort99(pwd.string() + "/CPU." + str_core + "/fort.99");
+  if (!test_fort99.fail()) {
+     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.99",
+       "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+  };
+  test_fort99.close();
+
+  // clean temp files
+  //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
+
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " left write_ffield_gbest!" << endl;
+};
 #endif
 };
 
 void Swarm::detovfit(Swarm &newSwarm, int cpuid_gbfit, int cycle, int iter, int parid_gbfit) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "CPU: " << core << " entered detovfit()" << endl;
+   cout << "core " << core << " entered detovfit()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4091,6 +4019,10 @@ if (verbose == true) {
 #endif
 
 #ifdef WITH_MPI
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " entered detovfit!" << endl;
+};
+
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(cpuid_gbfit);
   string str_cycle = std::to_string(cycle);
@@ -4243,8 +4175,15 @@ if (verbose == true) {
   //}else{
    //ovfitness = currovfitness;
   //};
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " left detovfit!" << endl;
+};
 #endif
 #ifndef WITH_MPI
+if (verbose == true) {
+   cout << "Swarm entered detovfit!" << endl;
+};
+
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
@@ -4396,6 +4335,10 @@ if (verbose == true) {
   //}else{
    //ovfitness = currovfitness;
   //};
+
+if (verbose == true) {
+   cout << "Swarm left write_ffield_gbest!" << endl;
+};
 #endif
 };
 
@@ -4459,7 +4402,7 @@ void Swarm::printopt(Swarm & newSwarm, int iter, int cycle, int fr) {
 void Swarm::printUQQoI(Swarm & newSwarm, int iter, int cycle, int fr) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "CPU: " << core << " entered printUQQoI()" << endl;
+   cout << "core " << core << " entered printUQQoI()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4467,7 +4410,6 @@ if (verbose == true) {
    cout << "entered printUQQoI" << endl;
 };
 #endif
-
   string str_core = std::to_string(core);
   string line;
   // define temp sums of partial errors from fort.99 file for each core
@@ -4607,7 +4549,6 @@ if (verbose == true) {
             outfileUQAFORC.close();
             continue;
           };
-
         }; // done reading all lines
       };
       myfile.close();
@@ -4618,7 +4559,7 @@ if (verbose == true) {
 void Swarm::printUQFF(Swarm & newSwarm, int iter, int cycle, int fr) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "CPU: " << core << " entered printUQFF" << endl;
+   cout << "core " << core << " entered printUQFF" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4626,7 +4567,6 @@ if (verbose == true) {
    cout << "entered printUQFF" << endl;
 };
 #endif
-
   boost::filesystem::path pwd(boost::filesystem::current_path());
   if (mod(iter, fr) == 0.0) {
     stringstream ss1;
@@ -4650,7 +4590,7 @@ if (verbose == true) {
 void Swarm::printpos(Swarm & newSwarm, int iter, int cycle, int fr) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "CPU: " << core << " entered printpos" << endl;
+   cout << "core " << core << " entered printpos" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -4658,12 +4598,15 @@ if (verbose == true) {
    cout << "entered printpos" << endl;
 };
 #endif
-
   boost::filesystem::path pwd(boost::filesystem::current_path());
   double phystempos;
 #ifdef WITH_MPI
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " entered printpos!" << endl;
+};
+
   if (ptrainset > 1) {
-     if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+     //if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
         string str_core = std::to_string(core);
         boost::filesystem::create_directory("CPU." + str_core + "/pos");
         const char * path = "/pos/pos_log.out.";
@@ -4679,19 +4622,23 @@ if (verbose == true) {
             outfilepos << ss1.str();
             ss1.str("");
             for (int m = 0; m < dim; m++) {
-              phystempos = newSwarm.GetPar(p).get_pos(m);
-              ss2 << boost::format("%10.4f") %phystempos;
+              // transform back to physical positions
+              phystempos = newSwarm.GetPar(p).get_pos(m)*(newSwarm.GetPar(p).maxdomain.at(m) - newSwarm.GetPar(p).mindomain.at(m)) + newSwarm.GetPar(p).mindomain.at(m);
+              // stream standardized position
+              //ss2 << boost::format("%18.4f") %newSwarm.GetPar(p).get_pos(m); 
+              // stream transformed to physical position
+              ss2 << boost::format("%18.4f") %phystempos;
               outfilepos << ss2.str();
               ss2.str("");
             };
-            ss3 << boost::format("%25.4f") %newSwarm.GetPar(p).get_fitness();
+            ss3 << boost::format("%30.10f") %newSwarm.GetPar(p).get_fitness();
             outfilepos << ss3.str();
             ss3.str("");
             outfilepos << endl;
           };
         };
         outfilepos.close();
-     };
+     //};
   }else {
      string str_core = std::to_string(core);
      boost::filesystem::create_directory("CPU." + str_core + "/pos");
@@ -4708,8 +4655,12 @@ if (verbose == true) {
          outfilepos << ss1.str();
          ss1.str("");
          for (int m = 0; m < dim; m++) {
-           phystempos = newSwarm.GetPar(p).get_pos(m);
-           ss2 << boost::format("%10.4f") %phystempos;
+           // transform back to physical positions
+           phystempos = newSwarm.GetPar(p).get_pos(m)*(newSwarm.GetPar(p).maxdomain.at(m) - newSwarm.GetPar(p).mindomain.at(m)) + newSwarm.GetPar(p).mindomain.at(m);
+           // stream standardized position
+           //ss2 << boost::format("%18.4f") %newSwarm.GetPar(p).get_pos(m); 
+           // stream transformed to physical position
+           ss2 << boost::format("%18.4f") %phystempos;
            outfilepos << ss2.str();
            ss2.str("");
          };
@@ -4722,8 +4673,15 @@ if (verbose == true) {
      outfilepos.close();
   };
 
+if (core == 0 && verbose == true) {
+   cout << "core " << core << " entered printpos!" << endl;
+};
 #endif
 #ifndef WITH_MPI
+if (verbose == true) {
+   cout << "Swarm entered printpos!" << endl;
+};
+
   boost::filesystem::create_directory("pos");
   const char * path = "pos/pos_log.out.";
   ofstream outfilepos(path + std::to_string(cycle), ofstream::app);
@@ -4738,8 +4696,12 @@ if (verbose == true) {
       outfilepos << ss1.str();
       ss1.str("");
       for (int m = 0; m < dim; m++) {
-        phystempos = newSwarm.GetPar(p).get_pos(m);
-        ss2 << boost::format("%10.4f") %phystempos;
+        // transform back to physical positions
+        phystempos = newSwarm.GetPar(p).get_pos(m)*(newSwarm.GetPar(p).maxdomain.at(m) - newSwarm.GetPar(p).mindomain.at(m)) + newSwarm.GetPar(p).mindomain.at(m);
+        // stream standardized position
+        //ss2 << boost::format("%18.4f") %newSwarm.GetPar(p).get_pos(m); 
+        // stream transformed to physical position
+        ss2 << boost::format("%18.4f") %phystempos;
         outfilepos << ss2.str();
         ss2.str("");
       };

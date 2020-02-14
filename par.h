@@ -41,6 +41,8 @@
 #ifdef WITH_MPI
 #include <mpi.h>
 #endif
+#include <include/pcg_random.hpp>
+
 using namespace std;
 
 extern int ierr, core, numcores;
@@ -102,7 +104,6 @@ extern int    numtoty;
 extern int    max_line_tors;
 extern int    numhbty;
 extern int    max_line_hbs;
-extern int    wrapcount;
 extern vector <vector <int >> inversep; // stores inverse params
 
 class Par { // declaration of a particle
@@ -144,9 +145,9 @@ class Par { // declaration of a particle
   double get_fitness(); // get particle fitness
   void set_fitness(double fit); // set particle fitness
   double eval_fitness(const vector <double> &active_params, void *mydata); // evalulate fitness
-  void iterate();
-  //double minf;
-  //vector <double> x;
+  int iterate();
+  double minf;
+  vector <double> x;
   vector <double> eval_numgrad(const vector <double> &active_params, void *mydata); // evaluate numerical gradients of fitness
   double get_bfit();
   void set_bfit(double bfit);
@@ -165,7 +166,7 @@ class Par { // declaration of a particle
   double get_reg(); // calculate regularization
   double reg;
   void dropout(double dropprobability);
-  //vector <double> numgrad;
+  vector <double> numgrad;
 
 
   vector < double > pos; // vector of position components of a particle
@@ -175,7 +176,7 @@ class Par { // declaration of a particle
 
   double bfitness; // particle previous best fitness
   double fitness; // particle current fitness
-  double pfitness; // particle temporary fitness when parallelizing training set
+  //double pfitness; // particle temporary fitness when parallelizing training set
 };
 
 class Swarm { // declaration of a Swarm
