@@ -2729,7 +2729,7 @@ if (verbose == true) {
   boost::filesystem::copy_file(pwd.string() + "/geo", pwd.string() + "/CPU." + str_core + "/geo",
       boost::filesystem::copy_option::overwrite_if_exists);
   // prepare fort.111 (forces) file for each CPU process once if it exists (for training FORCES in trainset)
-  if (boost::filesystem::exists(pwd.string() + "forgeo")) {
+  if (boost::filesystem::exists(pwd.string() + "/forgeo")) {
      boost::filesystem::copy_file(pwd.string() + "/forgeo", pwd.string() + "/CPU." + str_core + "/fort.111",
          boost::filesystem::copy_option::overwrite_if_exists);
   };
@@ -2862,6 +2862,13 @@ if (verbose == true) {
   ofstream fort35_file("fort.35");
   fort35_file << "23434.1" << endl;
   fort35_file.close();
+
+  // prepare fort.111 (forces) file if it exists (for training FORCES in trainset)
+  if (boost::filesystem::exists(pwd.string() + "/forgeo")) {
+     boost::filesystem::copy_file(pwd.string() + "/forgeo", pwd.string() + "/fort.111",
+         boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
 
 #endif
 };
