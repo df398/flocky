@@ -1942,11 +1942,11 @@ if (verbose == true) {
              if (core == swarmcore ) {
                pos = active_params;
                MPI_Send( active_params.data(), active_params.size(), MPI_DOUBLE, reaxffcore, 0, MPI_COMM_WORLD );
-               cout << "swarmcore " << swarmcore << " sending pos[0] = " << boost::format("%18.4f") %active_params.at(0) << " pos[1] = " << boost::format("%18.4f") %active_params.at(1) << endl;
+               //cout << "swarmcore " << swarmcore << " sending pos[0] = " << boost::format("%18.4f") %active_params.at(0) << " pos[1] = " << boost::format("%18.4f") %active_params.at(1) << endl;
              };
              if (core == reaxffcore) {
                MPI_Recv( pos.data(), pos.size(), MPI_DOUBLE, swarmcore, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-               cout << "reaxffcore " << reaxffcore << " receiving pos[0] = " << boost::format("%18.4f") %pos.at(0) << " pos[1] = " << boost::format("%18.4f") %pos.at(1) << endl;
+               //cout << "reaxffcore " << reaxffcore << " receiving pos[0] = " << boost::format("%18.4f") %pos.at(0) << " pos[1] = " << boost::format("%18.4f") %pos.at(1) << endl;
              };
          };
      };
