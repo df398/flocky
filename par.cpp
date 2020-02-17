@@ -2089,15 +2089,15 @@ if (verbose == true) {
          swarmcore = reaxffcore - j;
          if (core == reaxffcore ) {
            MPI_Send( &pfitness, 1, MPI_LONG_DOUBLE, swarmcore, 1, MPI_COMM_WORLD );
-           cout << "reaxffcore " << reaxffcore << " sent " << boost::format("%30.10f") %pfitness << " to swarmcore " << swarmcore << endl;
+           //cout << "reaxffcore " << reaxffcore << " sent " << boost::format("%30.10f") %pfitness << " to swarmcore " << swarmcore << endl;
          };
          if (core == swarmcore) {
            MPI_Recv( &pfitness, 1, MPI_LONG_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-           cout << "swarmcore " << swarmcore << "received " << boost::format("%30.10f") %pfitness << "from reaxffcore " << reaxffcore << endl;
+           //cout << "swarmcore " << swarmcore << "received " << boost::format("%30.10f") %pfitness << "from reaxffcore " << reaxffcore << endl;
          };
          if (core == swarmcore) {
             evalfit = evalfit + pfitness;
-            cout << "swarmcore " << swarmcore << " newfitness: " << boost::format("%30.10f") %evalfit << endl;
+            //cout << "swarmcore " << swarmcore << " newfitness: " << boost::format("%30.10f") %evalfit << endl;
          };
 
          if (j == ptrainset-1) {
