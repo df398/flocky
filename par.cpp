@@ -3229,7 +3229,7 @@ if (core == 0 && verbose == true) {
 
          // do write_ffield_gbest
          if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-            cout << "CPU: " << core << " (cpuid_gbfit) writing ffield_gbest: ffield.tmp."+to_string(cycle)+"."+"0."+to_string(parid_gbfit) << endl;
+            //cout << "CPU: " << core << " (cpuid_gbfit) writing ffield_gbest: ffield.tmp."+to_string(cycle)+"."+"0."+to_string(parid_gbfit) << endl;
             write_ffield_gbest(cpuid_gbfit, cycle, 0, parid_gbfit);
             //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
          };
