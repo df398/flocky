@@ -2661,6 +2661,12 @@ if (verbose == true) {
     istringstream(tempinput.at(0)) >> verbose;
     istringstream(tempinput.at(1)) >> lg_yn;
     istringstream(tempinput.at(2)) >> ptrainset;
+    if (ptrainset == 0) { 
+    //note: 18.02.20 letting ptrainset be equal to 0 causes hangs in the generation of ffield.gbest
+    //      it appears that setting it to 1 instead, solves the issue (and has the same effect
+    //      of not parallelising the training set. 
+        ptrainset = 1;
+    };
     if (ptrainset > numcores) {
       cout << "Error: Number of allocated processors < number of training set sub-units" << endl;
       MPI_Abort(MPI_COMM_WORLD,7);
