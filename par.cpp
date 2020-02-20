@@ -2501,13 +2501,19 @@ if (verbose == true) {
      std::uniform_real_distribution <double> unidist(0.0, 1.0);
      if (unidist(generator) < dropprobability) {
         pos.at(i) = 0.0001;
+        // standardize again to counter the transformation to physical params when writing ffield
+        pos.at(i) = ( pos.at(i) - mindomain.at(i) ) / (maxdomain.at(i) - mindomain.at(i));
         dropped_dimns.push_back(i); // stores dimensions to be dropped
      }else{
         // multiply by 0.5 all the other params so as to preserve total params number in the ffield.
         // now it should be possible to use the gbest ffield for the validation/test sets as-is.
-        pos.at(i) = 0.5*pos.at(i);
+        // step 1: multiply by 0.5 the physical params
+        pos.at(i) = 0.5*( pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i) );
+        // step 2: divide again by physical transformation to counter the multiplication when writing ffield.
+        pos.at(i) = ( pos.at(i) - mindomain.at(i) ) / (maxdomain.at(i) - mindomain.at(i));
      };
   };
+
 };
 
 double Par::get_reg() {
@@ -3684,9 +3690,9 @@ if (core == 0 && verbose == true) {
            cpuid_gbfit = swarmcores.at(cpuid_gbfit);
         };
 
-        // do writ_ffield_gbest
+        // do write_ffield_gbest
         if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end() && gbfitfound == true) {
-           cout << "CPU: " << core << " (cpuid_gbfit) writes ffield.gbest: " << "ffield.tmp." + to_string(cycle)+"."+to_string(iter)+"."+to_string(parid_gbfit) << endl;
+           //cout << "CPU: " << core << " (cpuid_gbfit) writes ffield.gbest: " << "ffield.tmp." + to_string(cycle)+"."+to_string(iter)+"."+to_string(parid_gbfit) << endl;
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
            //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
         };
@@ -3757,7 +3763,7 @@ if (core == 0 && verbose == true) {
 
         if (core == cpuid_gbfit && gbfitfound == true) {
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
-        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+           boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
         };
 
         if (ofit == true){
@@ -3955,9 +3961,6 @@ if (verbose == true) {
 
   // cp current ffield to be the global best and current analysis files to global best analysis files
 #ifndef WITH_MPI
-if (verbose == true) {
-   cout << "Swarm entered write_ffield_gbest!" << endl;
-};
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
@@ -3981,14 +3984,8 @@ if (verbose == true) {
   // clean temp files
   //boost::filesystem::remove(pwd.string() + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
 
-if (verbose == true) {
-   cout << "Swarm left write_ffield_gbest!" << endl;
-};
 #endif
 #ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered write_ffield_gbest!" << endl;
-};
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
@@ -4013,9 +4010,6 @@ if (core == 0 && verbose == true) {
   // clean temp files
   //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
 
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " left write_ffield_gbest!" << endl;
-};
 #endif
 };
 
@@ -4030,11 +4024,6 @@ if (verbose == true) {
    cout << "entered detovfit()" << endl;
 };
 #endif
-
-#ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered detovfit!" << endl;
-};
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(cpuid_gbfit);
@@ -4188,14 +4177,8 @@ if (core == 0 && verbose == true) {
   //}else{
    //ovfitness = currovfitness;
   //};
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " left detovfit!" << endl;
-};
 #endif
 #ifndef WITH_MPI
-if (verbose == true) {
-   cout << "Swarm entered detovfit!" << endl;
-};
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_cycle = std::to_string(cycle);
@@ -4349,9 +4332,6 @@ if (verbose == true) {
    //ovfitness = currovfitness;
   //};
 
-if (verbose == true) {
-   cout << "Swarm left write_ffield_gbest!" << endl;
-};
 #endif
 };
 
