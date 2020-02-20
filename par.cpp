@@ -4024,7 +4024,7 @@ if (verbose == true) {
    cout << "entered detovfit()" << endl;
 };
 #endif
-
+#ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(cpuid_gbfit);
   string str_cycle = std::to_string(cycle);
