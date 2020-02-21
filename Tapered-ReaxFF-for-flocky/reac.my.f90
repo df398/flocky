@@ -10133,9 +10133,9 @@ end subroutine valtaper
         24 continue
 
         if (qkeyhulp == qkeyw(nprob)) then
-          totforce = sqrt(frefset(nprob,iat(1),1)*frefset(nprob,iat(1),1)+frefset(nprob,iat(1),2)*frefset(nprob,iat(1),2)+&
+          vcomp = sqrt(frefset(nprob,iat(1),1)*frefset(nprob,iat(1),1)+frefset(nprob,iat(1),2)*frefset(nprob,iat(1),2)+&
                           frefset(nprob,iat(1),3)*frefset(nprob,iat(1),3))
-          vcomp = sqrt(d(iat(1),1)*d(iat(1),1) + d(iat(1),2)*d(iat(1),2) + d(iat(1),3)*d(iat(1),3))
+          totforce = sqrt(d(iat(1),1)*d(iat(1),1) + d(iat(1),2)*d(iat(1),2) + d(iat(1),3)*d(iat(1),3))
 
           ndata2=ndata2+1
           caldat(ndata2)=totforce
