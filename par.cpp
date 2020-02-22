@@ -224,13 +224,45 @@ if (verbose == true) {
 
   double minfunc = helper->eval_fitness(x,data);
 
-  //cout << "------------------ iter = " << iter << " ------------------------------------" << endl;
+  // print standardized data
+  //cout << "------------------ flocky iter = " << iter << " ------------------------------------" << endl;
   //cout << "WRAPPER x in CPU: " << core << " is: " << boost::format("%10.4f") %x[0] << ", " << boost::format("%10.4f") %x[1] << endl;
   //cout << "WRAPPER minfunc in CPU: " << core << " is: " << boost::format("%20.10f") %minfunc << endl;
   //if (localmin == 1 && !numgrad.empty()) {
   //   cout << "WRAPPER gradients in CPU: " << core << " is: " << boost::format("%30.10f") %numgrad.at(0) << ", " << boost::format("%30.10f") %numgrad.at(1) << endl;
   //};
   //cout << endl;
+
+  // print physical data
+  int cyc = helper->state.cycle;
+  #ifdef WITH_MPI
+  ofstream lmin_rep("lmin_rep.out." + std::to_string(cyc)+"."+std::to_string(core), ofstream::app);
+  #endif
+  #ifndef WITH_MPI
+  ofstream lmin_rep("lmin_rep.out." + std::to_string(cyc), ofstream::app);
+  #endif
+  lmin_rep << "------------------ flocky iter = " << iter << " ------------------------------------" << endl;
+  vector <double> mind = helper->mindomain;
+  vector <double> maxd = helper->maxdomain;
+  vector <double> xphys;
+  xphys.clear();
+  for (int i=0; i < dim; i++) {
+     xphys.push_back(x.at(i)*(maxd.at(i) - mind.at(i)) + mind.at(i));
+  };
+  lmin_rep << "WRAPPER x in CPU: " << core << " is: " << endl;
+  for (int i=0; i < dim; i++) {
+      lmin_rep << boost::format("%10.4f") %xphys[i] << " ";
+  };
+  lmin_rep << endl;
+  lmin_rep << "WRAPPER minfunc in CPU: " << core << " is: " << boost::format("%20.10f") %minfunc << endl;
+  if (localmin == 1 && !numgrad.empty()) {
+     lmin_rep << "WRAPPER gradients in CPU: " << core << " is: " << endl;
+     for (int i=0; i < dim; i++) {
+        lmin_rep << boost::format("%30.10f") %numgrad.at(i) << " ";
+     };
+  };
+  lmin_rep << endl;
+  lmin_rep.close();
   return minfunc;
 };
 
@@ -259,6 +291,8 @@ Par::Par() {
     // initialize particle's best own position vector
     bpos = pos;
   };
+
+
 };
 
 void Par::read_ffield() {
@@ -1370,6 +1404,30 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
 
 };
 
+void Par::check_bounds_contff() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered check_bounds_contff()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered check_bounds_contff()" << endl;
+};
+#endif
+
+  // check physical bounds (since params in ffieldmat are always physical)
+  for (int i = 0; i < dim; i++) { 
+      if (pos.at(i) > maxdomain.at(i)) {
+          pos.at(i) = maxdomain.at(i) - 0.0001;
+      };
+      if (pos.at(i) < mindomain.at(i)) {
+          pos.at(i) = mindomain.at(i) + 0.0001;
+      };
+  };                                         
+
+};
+
 void Par::read_bounds() {
 #ifdef WITH_MPI
 if (verbose == true) {
@@ -1698,8 +1756,9 @@ if (verbose == true) {
 };
 #endif
 
- std::vector<double> standard_mindomain(dim, 0.00001);
+ std::vector<double> standard_mindomain(dim, 0.0);
  std::vector<double> standard_maxdomain(dim, 1.0);
+ double temphys;
 
   // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
   if (ptrainset > 1) {
@@ -1717,7 +1776,6 @@ if (verbose == true) {
          };
      };
   };
-
 
  // note: for localmin, dropout means ranges that belong to dropped dimensions, are set equal
  // so to exclude them from local minimization
@@ -1760,8 +1818,8 @@ if (verbose == true) {
                lmin_rep << "[ ";
                for (int m = 0; m < dim; m++) {
                  // print physical local min positions
-                 //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 lmin_rep << boost::format("%8.4f") %x[m] << " ";
+                 temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
+                 lmin_rep << boost::format("%8.4f") %temphys << " ";
                };
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
@@ -1779,8 +1837,8 @@ if (verbose == true) {
                lmin_rep << "[ ";
                for (int m = 0; m < dim; m++) {
                  // print physical local min positions
-                 //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 lmin_rep << boost::format("%8.4f") %x[m] << " ";
+                 temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
+                 lmin_rep << boost::format("%8.4f") %temphys << " ";
                };
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
@@ -1844,8 +1902,8 @@ if (verbose == true) {
                lmin_rep << "[ ";
                for (int m = 0; m < dim; m++) {
                  // print physical local min positions
-                 //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 lmin_rep << boost::format("%8.4f") %x[m] << " ";
+                 temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
+                 lmin_rep << boost::format("%8.4f") %temphys << " ";
                };
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
@@ -1863,8 +1921,8 @@ if (verbose == true) {
                lmin_rep << "[ ";
                for (int m = 0; m < dim; m++) {
                  // print physical local min positions
-                 //temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 lmin_rep << boost::format("%8.4f") %x[m] << " ";
+                 temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
+                 lmin_rep << boost::format("%8.4f") %temphys << " ";
                };
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
@@ -3118,14 +3176,15 @@ if (core == 0 && verbose == true) {
         double tempstand;
         ffpos.clear();
         for (int m = 0; m < dim; m++) {
-          // standardize positions for CPU.0
-          tempstand = stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))) - newSwarm.GetPar(0).mindomain.at(m);
-          tempstand = tempstand/(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m));
-          ffpos.push_back(tempstand);
-          // use physical positions for CPU.0
-          //ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
+            ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
         };
         newSwarm.GetPar(0).set_pos(ffpos);
+        // reset parameters if outside domain before standardization possible
+        newSwarm.GetPar(0).check_bounds_contff();
+        // standardize positions
+        for (int m = 0; m < dim; m++) {
+            newSwarm.GetPar(0).pos.at(m) = ( newSwarm.GetPar(0).pos.at(m) - newSwarm.GetPar(0).mindomain.at(m) ) / ( newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)  );
+        };
       };
       contff = false;
     };
@@ -3391,23 +3450,26 @@ if (verbose == true) {
       gbpos.push_back(0.0);
     };
 
-    // If contff == y, then take force field's current values for the position of particle 0 (others are random)
-    if (contff == true) {
-      double tempstand;
-      vector < double > ffpos;
-      ffpos.clear();
-      for (int m = 0; m < dim; m++) {
-        // standardize positions
-        tempstand = stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))) - newSwarm.GetPar(0).mindomain.at(m);
-        tempstand = tempstand/(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m));
-        ffpos.push_back(tempstand);
-        // use physical positions
-        //ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
+    if (core == 0) {
+      // If contff == y, then take force field's current values for the position of particle 0 (others are random)
+      if (contff == true) {
+          vector < double > ffpos;
+          double tempstand;
+          ffpos.clear();
+          for (int m = 0; m < dim; m++) {
+               ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
+          };
+          newSwarm.GetPar(0).set_pos(ffpos);
+          // reset parameters if outside domain before standardization possible
+          newSwarm.GetPar(0).check_bounds_contff();
+          // standardize positions
+          for (int m = 0; m < dim; m++) {
+              newSwarm.GetPar(0).pos.at(m) = ( newSwarm.GetPar(0).pos.at(m) - newSwarm.GetPar(0).mindomain.at(m) ) / ( newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)  );
+          };
       };
-      newSwarm.GetPar(0).set_pos(ffpos);
+         contff = false;
     };
-    contff = false;
-
+      
     // evaluate fitness and set bfit = curfit
     vector <double> numgrad;
     newSwarm.GetPar(p).state.cycle = cycle;

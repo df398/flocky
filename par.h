@@ -121,6 +121,7 @@ class Par { // declaration of a particle
   } state;
 
   void read_bounds(); // read in min/max bounds of params and set min/max domain. Output dim = number of lines.
+  void check_bounds_contff(); // check if parameters are outside bounds and reset them back into domain
   double get_min_dim();
   void read_ffield(); // read ffield file into matrix
   void write_trainset();
