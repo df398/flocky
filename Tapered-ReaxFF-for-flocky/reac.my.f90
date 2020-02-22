@@ -11476,7 +11476,7 @@ end subroutine valtaper
     if (qhulp(1:6) == 'HETATM') then
         if (ibgfversion < 400) then
             read (qhulp, &
-            '(7x,5x,1x,5x,1x,3x,1x,1x,1x,5x,3f10.5,1x,5x,3x,2x,1x,8x)' &
+            '(7x,5x,1x,5x,1x,3x,1x,1x,1x,5x,3f20.5,1x,5x,3x,2x,1x,8x)' &
             ,end=40,err=40) fref(na+1,1), fref(na+1,2), fref(na+1,3)
         else
             stop 'Unsupported forces file Biograf-version'
