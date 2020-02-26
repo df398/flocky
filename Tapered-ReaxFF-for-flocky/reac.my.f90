@@ -5249,7 +5249,8 @@
      
 !     do 10 ivl=1,nvpair
     do 10 ivl=1,nvpair
-        if (nvlbo(ivl) == 0) goto 10  !not in bond order range
+        !df398 comment the following because it causes energy discontinuities
+        !if (nvlbo(ivl) == 0) goto 10  !not in bond order range
         i1=nvl1(ivl)
         i2=nvl2(ivl)
         ix=nvlx(ivl)
