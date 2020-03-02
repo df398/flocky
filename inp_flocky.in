@@ -10,6 +10,7 @@
 2      ! max number of local minimization iterations
 1.0e-3 ! stopping tolerance for local minimization (relative change in position)
 0      ! 0: no regularization 1: L1 regularization 2: L2 regularization 3: Dropout
+0.5    ! dropout percentage (in case above choice is 3)
 1.0    ! scaling factor for regularization penalty
 0      ! 0: do not detect overfitting 1: detect overfitting
 0      ! 0: do not perform UQ 1: perform UQ

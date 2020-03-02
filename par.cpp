@@ -52,6 +52,7 @@ bool   lg_yn = false;
 bool   contff = false;
 bool   verbose = false;
 int    regular = 0;
+double dropvalue = 0.5;
 double hlambda = 0.01;
 bool   chang = false;
 bool   perc_yn = true;
@@ -2563,10 +2564,10 @@ if (verbose == true) {
         pos.at(i) = ( pos.at(i) - mindomain.at(i) ) / (maxdomain.at(i) - mindomain.at(i));
         dropped_dimns.push_back(i); // stores dimensions to be dropped
      }else{
-        // multiply by 0.5 all the other params so as to preserve total params number in the ffield.
+        // multiply by dropprobability all the other params so as to preserve total params number in the ffield.
         // now it should be possible to use the gbest ffield for the validation/test sets as-is.
-        // step 1: multiply by 0.5 the physical params
-        pos.at(i) = 0.5*( pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i) );
+        // step 1: multiply by dropprobability the physical params
+        pos.at(i) = dropprobability*( pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i) );
         // step 2: divide again by physical transformation to counter the multiplication when writing ffield.
         pos.at(i) = ( pos.at(i) - mindomain.at(i) ) / (maxdomain.at(i) - mindomain.at(i));
      };
@@ -2751,10 +2752,11 @@ if (verbose == true) {
     istringstream(tempinput.at(7)) >> lm_iter_max;
     istringstream(tempinput.at(8)) >> lm_err_tol;
     istringstream(tempinput.at(9)) >> regular;
-    istringstream(tempinput.at(10)) >> hlambda;
-    istringstream(tempinput.at(11)) >> ofit;
-    istringstream(tempinput.at(12)) >> uq;
-    istringstream(tempinput.at(13)) >> NumP;
+    istringstream(tempinput.at(10)) >> dropvalue;
+    istringstream(tempinput.at(11)) >> hlambda;
+    istringstream(tempinput.at(12)) >> ofit;
+    istringstream(tempinput.at(13)) >> uq;
+    istringstream(tempinput.at(14)) >> NumP;
     if (NumP < numcores) {
       cout << "Error: Number of swarm members < number of allocated processors." << endl;
       MPI_Abort(MPI_COMM_WORLD,7);
@@ -2766,15 +2768,15 @@ if (verbose == true) {
        cout << "Error: Number of training set sub-units < 0 or not a divisor of number of allocated processors." << endl;
        MPI_Abort(MPI_COMM_WORLD,7);
     };
-    istringstream(tempinput.at(14)) >> c1;
-    istringstream(tempinput.at(15)) >> c2;
-    istringstream(tempinput.at(16)) >> inertiamax;
-    istringstream(tempinput.at(17)) >> inertiamin; 
-    istringstream(tempinput.at(18)) >> faili;
-    istringstream(tempinput.at(19)) >> levyscale;
-    istringstream(tempinput.at(20)) >> freq;
-    istringstream(tempinput.at(21)) >> maxiters;
-    istringstream(tempinput.at(22)) >> maxcycles;
+    istringstream(tempinput.at(15)) >> c1;
+    istringstream(tempinput.at(16)) >> c2;
+    istringstream(tempinput.at(17)) >> inertiamax;
+    istringstream(tempinput.at(18)) >> inertiamin; 
+    istringstream(tempinput.at(19)) >> faili;
+    istringstream(tempinput.at(20)) >> levyscale;
+    istringstream(tempinput.at(21)) >> freq;
+    istringstream(tempinput.at(22)) >> maxiters;
+    istringstream(tempinput.at(23)) >> maxcycles;
   };  // close if core==0
  
   // check if reaxff was set to run with fixed charges and require charges file
@@ -2856,6 +2858,7 @@ if (verbose == true) {
   MPI_Bcast( & lm_err_tol, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   //MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & regular, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & dropvalue, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast( & hlambda, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ofit, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
@@ -2899,19 +2902,20 @@ if (verbose == true) {
     istringstream(tempinput.at(7)) >> lm_iter_max;
     istringstream(tempinput.at(8)) >> lm_err_tol;
     istringstream(tempinput.at(9)) >> regular;
-    istringstream(tempinput.at(10)) >> hlambda;
-    istringstream(tempinput.at(11)) >> ofit;
-    istringstream(tempinput.at(12)) >> uq;
-    istringstream(tempinput.at(13)) >> NumP;
-    istringstream(tempinput.at(14)) >> c1;
-    istringstream(tempinput.at(15)) >> c2;
-    istringstream(tempinput.at(16)) >> inertiamax;
-    istringstream(tempinput.at(17)) >> inertiamin;
-    istringstream(tempinput.at(18)) >> faili;
-    istringstream(tempinput.at(19)) >> levyscale;
-    istringstream(tempinput.at(20)) >> freq;
-    istringstream(tempinput.at(21)) >> maxiters;
-    istringstream(tempinput.at(22)) >> maxcycles;
+    istringstream(tempinput.at(10)) >> dropvalue;
+    istringstream(tempinput.at(11)) >> hlambda;
+    istringstream(tempinput.at(12)) >> ofit;
+    istringstream(tempinput.at(13)) >> uq;
+    istringstream(tempinput.at(14)) >> NumP;
+    istringstream(tempinput.at(15)) >> c1;
+    istringstream(tempinput.at(16)) >> c2;
+    istringstream(tempinput.at(17)) >> inertiamax;
+    istringstream(tempinput.at(18)) >> inertiamin;
+    istringstream(tempinput.at(19)) >> faili;
+    istringstream(tempinput.at(20)) >> levyscale;
+    istringstream(tempinput.at(21)) >> freq;
+    istringstream(tempinput.at(22)) >> maxiters;
+    istringstream(tempinput.at(23)) >> maxcycles;
 
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -3197,7 +3201,7 @@ if (core == 0 && verbose == true) {
 
     // dropout
     if (regular == 3) {
-       newSwarm.GetPar(p).dropout(0.5);
+       newSwarm.GetPar(p).dropout(dropvalue);
     };
 
     // local minimization
@@ -3482,7 +3486,7 @@ if (verbose == true) {
 
     // dropout
     if (regular == 3) {
-       newSwarm.GetPar(p).dropout(0.5);
+       newSwarm.GetPar(p).dropout(dropvalue);
     };
 
     // local minimization
@@ -3616,7 +3620,7 @@ if (core == 0 && verbose == true) {
 
           // dropout
           if (regular == 3) {
-             newSwarm.GetPar(p).dropout(0.5);
+             newSwarm.GetPar(p).dropout(dropvalue);
           };
 
           if (localmin == 1 || localmin == 2) {
@@ -3666,7 +3670,7 @@ if (core == 0 && verbose == true) {
 
              // dropout
              if (regular == 3) {
-                newSwarm.GetPar(p).dropout(0.5);
+                newSwarm.GetPar(p).dropout(dropvalue);
              };
 
               if (localmin == 1 || localmin == 2) {
@@ -3932,7 +3936,7 @@ if (verbose == true) {
 
       // dropout
       if (regular == 3) {
-         newSwarm.GetPar(p).dropout(0.5);
+         newSwarm.GetPar(p).dropout(dropvalue);
       };
 
       if (localmin == 1 || localmin == 2) {

@@ -69,6 +69,7 @@ extern bool lg_yn;
 extern bool contff;
 extern bool fixcharges;
 extern int regular;
+extern double regular;
 extern double hlambda;
 extern bool ofit;
 extern bool uq;
