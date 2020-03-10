@@ -24,6 +24,7 @@
 !     - Evaluate energies only for (unique) training set             *
 !       structures (2020)                                            *
 !     - Added atomic forces to training set (2020)                   *
+!     - Numerically stable lone pairs formulation (2020)             *
 !                                                                    *
 !*********************************************************************
 !***********************************************************************

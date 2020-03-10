@@ -24,6 +24,7 @@
 !     - Evaluate energies only for (unique) training set             *
 !       structures (2020)                                            *
 !     - Added atomic forces to training set (2020)                   *
+!     - Numerically stable lone pairs formulation (2020)             *
 !                                                                    *
 !*********************************************************************
 !*******************************************************************
@@ -252,6 +253,10 @@
         dbodsboj2=zero
         bocor1=1.0d0
         bocor2=1.0d0
+        !df398 initialisiation of exphu3 and exphu4 was missing
+        !and led to wrong (very large) derivatives for Fe/S clusters
+        exphu3=0.0d0
+        exphu4=0.0d0
         ! df398: check v13cor flag if 1-3 bond-order correction is performed
 	!        minus => always correct. (original: 0.001d0)
         if (v13cor(ibt) > 0.001d0) then
@@ -430,38 +435,69 @@
     !     Determine number of lone pairs on atoms
     !                                                                    *
     !*********************************************************************
+        !df398 these belong to original ReaxFF (discontinuous staircase)
+        !ity=ia(i1,1)
+        !voptlp=0.50d0*(stlp(ity)-aval(ity))
+        !vlp(i1)=zero
+        !vund=abo(i1)-stlp(ity)
+        !vlph=2.0d0*int(vund/2.0d0)
+        !vlpex=vund-vlph
+        !vp16h=vpar(16)-1.0d0
+
+        !expvlp=exp(-vpar(16)*(2.0d0+vlpex)*(2.0d0+vlpex))
+        !vlp(i1)=expvlp-int(vund/2.0d0)
+        !dvlpdsbo(i1)=-vpar(16)*2.0d0*(2.0d0+vlpex)*expvlp
+
+        !df398 new form (smooth staircase)
         ity=ia(i1,1)
-    !     voptlp=0.50*(stlp(ity)-aval(ity))+vlp2(ity)       !For Si-lp
         voptlp=0.50d0*(stlp(ity)-aval(ity))
         vlp(i1)=zero
-        vund=abo(i1)-stlp(ity)
-        vlph=2.0d0*int(vund/2.0d0)
-        vlpex=vund-vlph
-        vp16h=vpar(16)-1.0d0
+        xx=abo(i1)-stlp(ity)
+        prefac=20.0d0
+        intx=nint(xx/2.0d0)
+        intxm=nint(-xx/2.0d0)
+        Hx=1.0d0/(1.0d0 + exp(-prefac*(xx/2.0d0 - intx)))
+        Hxm=1.0d0/(1.0d0 + exp(-prefac*(-xx/2.0d0 - intxm)))
+        newintx= intx - 1.0d0 + Hx
+        newintxm= intxm - 1.0d0 + Hxm
 
-        expvlp=exp(-vpar(16)*(2.0d0+vlpex)*(2.0d0+vlpex))
-        dvlpdsbo(i1)=-vpar(16)*2.0d0*(2.0d0+vlpex)*expvlp
-        vlp(i1)=expvlp-int(vund/2.0d0)
+        y=1.0d0/(2.0d0*PI)
+        x=abo(i1)-stlp(ity)
+        !df398 vlp is a composite function: y=f(x) where f = x-sin(x) and x=x-sin(x) up to 4th generation. Also the step width and height are adjusted to match
+        !the step widths for ReaxFF lone pairs. 
+        vlp(i1) = y*(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0)& 
+                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0)) &
+                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0) &
+                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0))) &
+                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0) &
+                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0)) &
+                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0) &
+                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0)))))
+
+        !df398 derivative of vlp with respect to bond orders term.
+        dvlpdsbo(i1)=-(1.0d0+cos(PI*x)+(cos(PI*x)+1.0d0)*cos(sin(PI*x)+PI*x)+& 
+                       ((1.0d0+cos(PI*x))*cos(sin(PI*x)+PI*x)+cos(PI*x)+1.0d0) &
+                       *cos(sin(sin(PI*x)+PI*x)+sin(PI*x)+PI*x)+((1.0d0+cos(PI*x)+(cos(PI*x)+1.0d0)*cos(sin(PI*x)+PI*x)) &
+                       *cos(sin(sin(PI*x)+PI*x)+sin(PI*x)+PI*x)+(1.0d0+cos(PI*x))*cos(sin(PI*x)+PI*x)+cos(PI*x)+1.0d0) &
+                       *cos(sin(sin(sin(PI*x)+PI*x)+sin(PI*x)+PI*x)+sin(sin(PI*x)+PI*x)+sin(PI*x)+PI*x))/2
+
     !*********************************************************************
     !                                                                    *
     !     Calculate lone pair energy                                     *
     !                                                                    *
     !*********************************************************************
         diffvlp=voptlp-vlp(i1)
-        exphu1=exp(-75.0d0*diffvlp)
-    !     exphu2=exp(75.0*diffvlp)
+        exphu1=exp(-prefac*diffvlp)
         hulp1=1.0d0/(1.0d0+exphu1)
-    !     hulp2=1.0/(1.0+exphu2)
-    !     elph=vlp1(ity)*diffvlp*hulp1+vlp2(ity)*diffvlp*hulp2   !Stabilize extra lone pair
         elph=vlp1(ity)*diffvlp*hulp1
         estrain(i1)=estrain(i1)+elph
-    !     delpdvlp=-vlp1(ity)*hulp1-vlp1(ity)*diffvlp*hulp1*hulp1*   !Stabilize extra lone pair
-    !    $75.0*exphu1-vlp2(ity)*hulp2+vlp2(ity)*diffvlp*hulp2*hulp2*
-    !    $75.0*exphu2
-        delpdvlp=-vlp1(ity)*hulp1-vlp1(ity)*diffvlp*hulp1*hulp1* &
-        & 75.0d0*exphu1
+
+        delpdvlp=-vlp1(ity)*hulp1-vlp1(ity)*diffvlp*hulp1*hulp1*prefac*exphu1
+
         elp=elp+elph
         delpdsbo=delpdvlp*dvlpdsbo(i1)
+
+
     !*********************************************************************
     !                                                                    *
     !     Calculate first derivative of lone pair energy to              *

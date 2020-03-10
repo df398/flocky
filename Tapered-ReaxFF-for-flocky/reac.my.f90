@@ -24,6 +24,7 @@
 !     - Evaluate energies only for (unique) training set             *
 !       structures (2020)                                            *
 !     - Added atomic forces to training set (2020)                   *
+!     - Numerically stable lone pairs formulation (2020)             *
 !                                                                    *
 !*********************************************************************
     subroutine reac
@@ -5120,7 +5121,13 @@
     if (kxt == 0) kxt=1
     if (kyt == 0) kyt=1
     if (kzt == 0) kzt=1
-
+    !df398 adjust vlbora (short range cutoff for vlist)
+    !to half the simulation box but limit its maximum value
+    !to swb, otherwise too many bonds will populate
+    !the vlist and calculation will be very slow.
+    temp=min(tm11,tm22)
+    smallestLength=min(temp,tm33)
+    vlbora=min(0.5d0*smallestLength,swb)
     call trarot2  !Translate atoms back into unit cell
 
     do i1=1,na-1
