@@ -2911,6 +2911,15 @@
         return
     end if
 
+    if (ncha == 0) then
+        if (kx > 0 .OR. ky > 0 .OR. kz > 0) then
+           call charcrysnocg         ! df398 charges on periodic system (CG solver)
+           return
+        else
+           call chargesstnocg    ! df398 chargess on full system (direct solver)
+           return
+    end if
+
     if (kx > 0 .OR. ky > 0 .OR. kz > 0) then
         call charcrys
         return
@@ -2918,11 +2927,6 @@
 
     if (ncha == 4) then
         call chargesst    !chargess on full system
-        return
-    end if
-
-    if (ncha == 0) then
-        call chargesstnocg    !chargess on full system without CG solver
         return
     end if
 
@@ -3139,6 +3143,198 @@
 !*********************************************************************
 
     subroutine charcrys
+
+!*********************************************************************
+    include 'cbka.blk'
+    include 'cbkm.blk'
+    dimension elcvec(nat),char(nat)
+    dimension ct(nat,3)
+
+!     Space to hold old chargess
+!     real*8 chgold(nat)        ! The chargess from the previous iteration
+!     integer ioldchg           ! Flag that chgold has something interesting
+!     common /cchgold/ ioldchg,chgold
+!     data ioldchg /0/
+
+!     Space for dsysv
+    integer :: ipiv(nat)
+    real*8 :: work(5*nat)
+
+!*********************************************************************
+!                                                                    *
+!     Determine chargess on atoms: crystal                            *
+!                                                                    *
+!*********************************************************************
+    if (ndebug == 1) then
+        open (65,file='fort.65',status='unknown',position='append')
+        write (65,*) 'In charcrys'
+        call timer(65)
+        close (65)
+    end if
+    ech=zero
+    cfield=332.0638d0
+    chmax=2.5d0
+    chmin=-2.0d0
+
+    kxt=kx
+    kyt=ky
+    kzt=kz
+    if (kxt == 0) kxt=1
+    if (kyt == 0) kyt=1
+    if (kzt == 0) kzt=1
+
+    do i1=1,na+1
+        elcvec(i1)=zero
+        do i2=1,na+1
+            xmortr(i1,i2)=zero
+        end do
+    end do
+    chamol=syscha       !System charge
+
+    do i1=1,na
+        ity=ia(i1,1)
+        xmortr(i1,i1)=2.0d0*eta(ity)  !EEM method
+        elcvec(i1)=-chi(ity)
+        xmortr(na+1,i1)=1.0d0
+! df398 commented next block. Multiplication by cfield is wrong.
+!        if (ifieldx == 1 .AND. ipolar == 1) then
+!            elcvec(i1)=elcvec(i1)-vfieldx*cfield*c(i1,1)
+!        end if
+!        if (ifieldy == 1 .AND. ipolar == 1) then
+!            elcvec(i1)=elcvec(i1)-vfieldy*cfield*c(i1,2)
+!        end if
+!        if (ifieldz == 1 .AND. ipolar == 1) then
+!            elcvec(i1)=elcvec(i1)-vfieldz*cfield*c(i1,3)
+!        end if
+        if (ifieldx == 1 .AND. ipolar == 1) then
+            elcvec(i1)=elcvec(i1)-vfieldx*c(i1,1)
+        end if
+        if (ifieldy == 1 .AND. ipolar == 1) then
+            elcvec(i1)=elcvec(i1)-vfieldy*c(i1,2)
+        end if
+        if (ifieldz == 1 .AND. ipolar == 1) then
+            elcvec(i1)=elcvec(i1)-vfieldz*c(i1,3)
+        end if
+
+        do 5 k1=-kxt,kxt              !Sum over periodic self-images
+            do 5 k2=-kyt,kyt
+                do 5 k3=-kzt,kzt
+
+                    dx=k1*tm11
+                    dy=k1*tm21+k2*tm22
+                    dz=k1*tm31+k2*tm32+k3*tm33
+                    dis=sqrt(dx*dx+dy*dy+dz*dz)
+
+                    if (dis < swb .AND. dis > 0.001d0) then
+                        call taper(dis,dis*dis)
+                        hulp1=(dis**3+(1.0d0/(gam(ity)**3)))
+                        hulp2=hulp1**(1.0d0/3.0d0)
+                        xmortr(i1,i1)=xmortr(i1,i1)+1.0d0*sw*14.40d0/hulp2
+                    end if
+
+        5 END DO
+    end do
+
+    elcvec(na+1)=chamol     !Charge on system
+    do 10 ivl=1,nvpair-nvlself      !Verlet-list
+        i2=nvl1(ivl)
+        i3=nvl2(ivl)
+        ix=nvlx(ivl)
+        iy=nvly(ivl)
+        iz=nvlz(ivl)
+        dx=c(i2,1)-c(i3,1)+ix*tm11
+        dy=c(i2,2)-c(i3,2)+ix*tm21+iy*tm22
+        dz=c(i2,3)-c(i3,3)+ix*tm31+iy*tm32+iz*tm33
+        dis2=sqrt(dx*dx+dy*dy+dz*dz)
+
+        ity1=ia(i2,1)
+        ity2=ia(i3,1)
+        gamt=sqrt(gam(ity1)*gam(ity2))
+
+        if (dis2 < swb .AND. dis2 > 0.001d0) then
+            call taper(dis2,dis2*dis2)
+            hulp1=(dis2**3+(1.0d0/(gamt**3)))
+            hulp2=hulp1**(1.0d0/3.0d0)
+            xmortr(i3,i2)=xmortr(i3,i2)+sw*14.40d0/hulp2
+
+        end if
+
+    10 END DO
+
+!     do i2=1,na-1                   !No Verlet-list
+!     do i3=i2+1,na
+!     ity1=ia(i2,1)
+!     ity2=ia(i3,1)
+!     gamt=sqrt(gam(ity1)*gam(ity2))
+!     dx=c(i2,1)-c(i3,1)
+!     dy=c(i2,2)-c(i3,2)
+!     dz=c(i2,3)-c(i3,3)
+
+!     do 10 k1=-kxt,kxt   !Sum over periodic images
+!     dx2=dx+k1*tm11
+!     do 10 k2=-kyt,kyt
+!     dy2=dy+k1*tm21+k2*tm22
+!     do 10 k3=-kzt,kzt
+!     dz2=dz+k1*tm31+k2*tm32+k3*tm33
+!     dis2=sqrt(dx2*dx2+dy2*dy2+dz2*dz2)
+
+!     if (dis2.lt.swb.and.dis2.gt.0.001) then
+!     call taper(dis2,dis2*dis2)
+!     hulp1=(dis2**3+(1.0/(gamt**3)))
+!     hulp2=hulp1**(1.0/3.0)
+!     xmortr(i3,i2)=xmortr(i3,i2)+sw*14.40/hulp2
+!     end if
+
+!  10 continue
+
+!     end do
+!     end do
+
+!     call matsym4(na+1,na+1,na+1,na+1,na+1,xmortr,char,
+!    $elcvec)
+
+!     if (ioldchg .ne. 0) then
+
+    call fillmatrix(na+1,xmortr,neem) ! fill in top half of matrix
+    call dcopy(na+1,chgold,1,char,1)
+    if (ndebug == 1) then
+        open (65,file='fort.65',status='unknown',position='append')
+        write (65,*) 'Calling cgsolve'
+        call timer(65)
+        close (65)
+    end if
+    call cgsolve(na+1,xmortr,neem,char,elcvec,mdstep,convg)
+
+
+!     else
+!        call matsym4(na+1,na+1,na+1,na+1,na+1,xmortr,char,
+!    $   elcvec)
+!        call dcopy(na+1,elcvec,1,char,1)
+!        call dsysv('L',na+1,1,xmortr,neem,ipiv,
+!    $        char,nat,work,5*nat,info)
+!        if (info .ne. 0) stop 'dsysv solved failed in charcrys'
+!        ioldchg=1              ! Only called once
+!     endif
+
+
+    ech=zero
+    do i2=1,na
+        ch(i2)=char(i2)
+    !     if (ch(i2).gt.chmax) ch(i2)=chmax
+    !     if (ch(i2).lt.chmin) ch(i2)=chmin
+        ech=ech+23.02d0*(chi(ia(i2,1))*ch(i2)+ &
+        eta(ia(i2,1))*ch(i2)*ch(i2))
+    end do
+    chisys=char(na+1)   !! df398 adapted from chargestnocg
+
+    call dcopy(nat,ch,1,chgold,1) ! Save the chargess
+
+    return
+    end subroutine charcrys
+!*********************************************************************
+!*********************************************************************
+
+    subroutine charcrysnocg
 
 !*********************************************************************
     include 'cbka.blk'
