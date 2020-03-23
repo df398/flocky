@@ -2918,6 +2918,7 @@
         else
            call chargesstnocg    ! df398 chargess on full system (direct solver)
            return
+        endif
     end if
 
     if (kx > 0 .OR. ky > 0 .OR. kz > 0) then
