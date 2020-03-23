@@ -3531,7 +3531,7 @@
     !call dcopy(nat,ch,1,chgold,1) ! Save the chargess !! df398 commented out
 
     return
-    end subroutine charcrys
+    end subroutine charcrysnocg
 !*********************************************************************
 !*********************************************************************
 
