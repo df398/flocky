@@ -7926,7 +7926,7 @@
     2800 format ('TORSION RESTRAINT ',4i4,2f8.2,f8.4,f9.6)
     2900 format ('FORMAT ATOM   (a6,1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,', &
     '3f10.5,1x,a5,i3,i2,1x,f8.5)')
-    3000 format ('HETATM',1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f10.5,1x, &
+    3000 format ('HETATM',1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f15.10,1x, &
     a5,i3,i2,1x,f8.5)
     3100 format ('FORMAT CONECT (a6,12i6)')
     3200 format ('CONECT',12i6)
@@ -11681,7 +11681,7 @@ end subroutine valtaper
     if (qhulp(1:6) == 'HETATM') then
         if (ibgfversion < 400) then
             read (qhulp, &
-            '(7x,5x,1x,5x,1x,3x,1x,1x,1x,5x,3f20.5,1x,5x,3x,2x,1x,8x)' &
+            '(7x,5x,1x,5x,1x,3x,1x,1x,1x,5x,3f15.10,1x,5x,3x,2x,1x,8x)' &
             ,end=40,err=40) fref(na+1,1), fref(na+1,2), fref(na+1,3)
         else
             stop 'Unsupported forces file Biograf-version'
@@ -12055,7 +12055,7 @@ end subroutine valtaper
     if (qhulp(1:6) == 'HETATM') then
         if (ibgfversion < 400) then
             read (qhulp, &
-            '(7x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f10.5,1x,a5,i3,i2,1x,f8.5)' &
+            '(7x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f15.10,1x,a5,i3,i2,1x,f8.5)' &
             ,end=40,err=40) &
             ir,qlabel(na+1),qresi1(na+1),qresi2(na+1),qresi3(na+1), &
             c(na+1,1),c(na+1,2), &
@@ -13036,7 +13036,7 @@ end subroutine valtaper
 
     if (qhulp(1:6) == 'HETATM') then
         irecog=1
-        read (qhulp,'(7x,i5,1x,a5,1x,3x,1x,1x,1x,5x,3f10.5)' &
+        read (qhulp,'(7x,i5,1x,a5,1x,3x,1x,1x,1x,5x,3f15.10)' &
         ,end=900,err=900) &
         ir,qlabhulp,cadd(naa+1,1),cadd(naa+1,2),cadd(naa+1,3)
         if (qlabhulp(1:1) == ' ') qlabhulp=qlabhulp(2:5)
