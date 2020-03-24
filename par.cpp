@@ -1500,11 +1500,18 @@ if (verbose == true) {
         mindomain.push_back(stod(ffieldmat.at(ffline.at(i)).at(ffcol.at(i))));
         maxdomain.push_back(stod(ffieldmat.at(ffline.at(i)).at(ffcol.at(i))));
         mindomain.at(i) = (1.0 - perc)*mindomain.at(i);
-        maxdomain.at(i) + (1.0 + perc)*maxdomain.at(i);
+        maxdomain.at(i) = (1.0 + perc)*maxdomain.at(i);
+        // for negative values exchange bounds
+        if (maxdomain.at(i) < mindomain.at(i)) {
+           double temp;
+           temp = maxdomain.at(i);
+           maxdomain.at(i) = mindomain.at(i);
+           mindomain.at(i) = temp;
+        };
         };
 
     };
-if (core == 0 && verbose == true && perc_yn == false) {
+if (core == 0 && verbose == true) {
     cout << "parameters to train with their bounds:" << endl;
     for (int i = 0; i < dim; i++) {
         cout << ffline.at(i)+1 << " " << ffcol.at(i)+1 << " " << mindomain.at(i) << " " << maxdomain.at(i) << " " << endl;
