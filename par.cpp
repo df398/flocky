@@ -3767,8 +3767,9 @@ if (core == 0 && verbose == true) {
         if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end() && gbfitfound == true) {
            //cout << "CPU: " << core << " (cpuid_gbfit) writes ffield.gbest: " << "ffield.tmp." + to_string(cycle)+"."+to_string(iter)+"."+to_string(parid_gbfit) << endl;
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
-           boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+           //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
         };
+        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
 
         if (ofit == true){
           if (gbfitfound == true) {
@@ -3836,8 +3837,9 @@ if (core == 0 && verbose == true) {
 
         if (core == cpuid_gbfit && gbfitfound == true) {
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
-           boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+           //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
         };
+        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
 
         if (ofit == true){
           if (gbfitfound == true) {
