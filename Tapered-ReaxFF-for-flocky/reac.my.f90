@@ -4199,7 +4199,7 @@
         idef(i1)=int(default)
         nphb(i1)=int(vnphb)
 
-        if (rcore2(i1) > 0.01 .AND. acore2(i1) > 0.01) then          !Inner wall-parameters present
+        if (rcore2(i1) > 0.0001 .AND. acore2(i1) > 0.0001) then          !Inner wall-parameters present
             if (vop(i1) > 0.5) then                                     !Shielding vdWaals-parameters present
                 if (ivdwty /= 0 .AND. ivdwty /= 3) then
                     open (1,file='fort.1',status='unknown',position='append')
@@ -4257,8 +4257,8 @@
         else                                                         !No Inner wall parameters present
             if (dispscale /= 0.0 .and. dispscale /= 20.0) then
                 open (1,file='fort.1',status='unknown',position='append')
-                write (1,*) 'Error: lg correction requires inner-wall parameters to be present for element ', qas(i1)
-                stop 'no inner-wall parameters found but lg correction was included for element'
+                write (1,*) 'Warning: lg correction requires inner-wall parameters to be present for element ', qas(i1)
+                !stop 'no inner-wall parameters found but lg correction was included for element'
                 close(1)
             endif
             if (vop(i1) > 0.5) then                                     !Shielding vdWaals-parameters present
@@ -7926,7 +7926,7 @@
     2800 format ('TORSION RESTRAINT ',4i4,2f8.2,f8.4,f9.6)
     2900 format ('FORMAT ATOM   (a6,1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,', &
     '3f10.5,1x,a5,i3,i2,1x,f8.5)')
-    3000 format ('HETATM',1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f15.10,1x, &
+    3000 format ('HETATM',1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f10.5,1x, &
     a5,i3,i2,1x,f8.5)
     3100 format ('FORMAT CONECT (a6,12i6)')
     3200 format ('CONECT',12i6)
@@ -13036,7 +13036,7 @@ end subroutine valtaper
 
     if (qhulp(1:6) == 'HETATM') then
         irecog=1
-        read (qhulp,'(7x,i5,1x,a5,1x,3x,1x,1x,1x,5x,3f15.10)' &
+        read (qhulp,'(7x,i5,1x,a5,1x,3x,1x,1x,1x,5x,3f10.5)' &
         ,end=900,err=900) &
         ir,qlabhulp,cadd(naa+1,1),cadd(naa+1,2),cadd(naa+1,3)
         if (qlabhulp(1:1) == ' ') qlabhulp=qlabhulp(2:5)

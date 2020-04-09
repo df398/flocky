@@ -256,7 +256,7 @@ if (verbose == true) {
       lmin_rep << boost::format("%10.4f") %xphys[i] << " ";
   };
   lmin_rep << endl;
-  lmin_rep << "WRAPPER minfunc in CPU: " << core << " is: " << boost::format("%20.10f") %minfunc << endl;
+  lmin_rep << "WRAPPER minfunc in CPU: " << core << " is: " << boost::format("%1.10e") %minfunc << endl;
   if (localmin == 1 && !numgrad.empty()) {
      lmin_rep << "WRAPPER gradients in CPU: " << core << " is: " << endl;
      for (int i=0; i < dim; i++) {
@@ -1426,6 +1426,9 @@ if (verbose == true) {
       if (pos.at(i) < mindomain.at(i)) {
           pos.at(i) = mindomain.at(i) + 0.0001;
       };
+      if (pos.at(i) == 0.0) {
+          pos.at(i) = 0.0001;
+      };
   };                                         
 
 };
@@ -1509,7 +1512,7 @@ if (verbose == true) {
            maxdomain.at(i) = mindomain.at(i);
            mindomain.at(i) = temp;
         };
-        };
+      };
 
     };
 if (core == 0 && verbose == true) {
@@ -1696,11 +1699,11 @@ if (verbose == true) {
     //  pos.at(i) = dist2(generator);
     //};
     // check standardized bounds
-    std::uniform_real_distribution < double > dist2(0.0,1.0);
+    std::uniform_real_distribution < double > dist2(0.0001,1.0);
     if (pos.at(i) > 1.0) {
       pos.at(i) = dist2(generator);
     };
-    if (pos.at(i) < 0.0) {
+    if (pos.at(i) < 0.0001) {
       pos.at(i) = dist2(generator);
     };
   };
@@ -1726,7 +1729,7 @@ if (verbose == true) {
     // physical positions
     //std::uniform_real_distribution < double > dist2(mindomain.at(i), maxdomain.at(i));
     // standardized positions
-    std::uniform_real_distribution < double > dist2(0.0,1.0);
+    std::uniform_real_distribution < double > dist2(0.0001,1.0);
     // levy step on physical position
     //pos.at(i) = pos.at(i) + levyscale * get_min_dim() * levystep * direction.at(i);
     // old step
@@ -1745,7 +1748,7 @@ if (verbose == true) {
     if (pos.at(i) > 1.0) {
       pos.at(i) = dist2(generator);
     }; 
-    if (pos.at(i) < 0.0) {
+    if (pos.at(i) < 0.0001) {
       pos.at(i) = dist2(generator);
     };
 
@@ -1765,8 +1768,9 @@ if (verbose == true) {
 };
 #endif
 
- std::vector<double> standard_mindomain(dim, 0.0);
- std::vector<double> standard_maxdomain(dim, 1.0);
+ std::vector <double> standard_mindomain(dim, 0.0);
+ std::vector <double> standard_maxdomain(dim, 1.0);
+
  double temphys;
 
   // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
@@ -1792,6 +1796,7 @@ if (verbose == true) {
     for (int j : dropped_dimns) {
         mindomain.at(j) = 0.0001;
         maxdomain.at(j) = 0.0001;
+        pos.at(j) = 0.0001;
     };
  };
 
@@ -1822,13 +1827,13 @@ if (verbose == true) {
                ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
                #endif
                lmin_rep << "local min completed! --> flocky iter: " << state.iter << endl;
-               lmin_rep << "new local min: " << boost::format("%8.4f") %minf << endl;
+               lmin_rep << "new local min: " << boost::format("        %1.10e") %minf << endl;
                lmin_rep << "new parameters:" << endl;
                lmin_rep << "[ ";
                for (int m = 0; m < dim; m++) {
                  // print physical local min positions
                  temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
-                 lmin_rep << boost::format("%8.4f") %temphys << " ";
+                 lmin_rep << boost::format("    %8.4f") %temphys << " ";
                };
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
@@ -1841,7 +1846,7 @@ if (verbose == true) {
                ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
                #endif
                lmin_rep << "local min completed! --> flocky iter: " << state.iter << endl;
-               lmin_rep << "new local min: " << boost::format("%8.4f") %minf << endl;
+               lmin_rep << "new local min: " << boost::format("        %1.10e") %minf << endl;
                lmin_rep << "new parameters:" << endl;
                lmin_rep << "[ ";
                for (int m = 0; m < dim; m++) {
@@ -1906,7 +1911,7 @@ if (verbose == true) {
                ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
                #endif
                lmin_rep << "local min completed! --> flocky iter: " << state.iter << endl;
-               lmin_rep << "new local min: " << boost::format("%8.4f") %minf << endl;
+               lmin_rep << "new local min: " << boost::format("        %1.10e") %minf << endl;
                lmin_rep << "new parameters:" << endl;
                lmin_rep << "[ ";
                for (int m = 0; m < dim; m++) {
@@ -1925,7 +1930,7 @@ if (verbose == true) {
                ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
                #endif
                lmin_rep << "local min completed! --> flocky iter: " << state.iter << endl;
-               lmin_rep << "new local min: " << boost::format("%8.4f") %minf << endl;
+               lmin_rep << "new local min: " << boost::format("        %1.10e") %minf << endl;
                lmin_rep << "new parameters:" << endl;
                lmin_rep << "[ ";
                for (int m = 0; m < dim; m++) {
@@ -2110,6 +2115,9 @@ if (verbose == true) {
   if ( !boost::filesystem::exists( "CPU." + str_core + "/fort.13" ) )
   {
     evalfit = numeric_limits < double > ::infinity();
+    if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+         pfitness = evalfit;
+    };
   } else {
     boost::filesystem::ifstream file13("CPU." + str_core + "/fort.13");
     stringstream tempstr;
@@ -2121,7 +2129,7 @@ if (verbose == true) {
     // insert back to str
     tempstr >> str;
     // check if fitness is numeric or ******
-    if (str.at(0) == '*') {
+    if (str.at(0) == '*' || !isdigit(str.at(0))) {
       evalfit = numeric_limits < double > ::infinity();
       if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
            pfitness = evalfit;
@@ -2156,15 +2164,15 @@ if (verbose == true) {
          swarmcore = reaxffcore - j;
          if (core == reaxffcore ) {
            MPI_Send( &pfitness, 1, MPI_LONG_DOUBLE, swarmcore, 1, MPI_COMM_WORLD );
-           //cout << "reaxffcore " << reaxffcore << " sent " << boost::format("%30.10f") %pfitness << " to swarmcore " << swarmcore << endl;
+           //cout << "reaxffcore " << reaxffcore << " sent " << boost::format("%1.10e") %pfitness << " to swarmcore " << swarmcore << endl;
          };
          if (core == swarmcore) {
            MPI_Recv( &pfitness, 1, MPI_LONG_DOUBLE, reaxffcore, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-           //cout << "swarmcore " << swarmcore << "received " << boost::format("%30.10f") %pfitness << "from reaxffcore " << reaxffcore << endl;
+           //cout << "swarmcore " << swarmcore << "received " << boost::format("%1.10e") %pfitness << "from reaxffcore " << reaxffcore << endl;
          };
          if (core == swarmcore) {
             evalfit = evalfit + pfitness;
-            //cout << "swarmcore " << swarmcore << " newfitness: " << boost::format("%30.10f") %evalfit << endl;
+            //cout << "swarmcore " << swarmcore << " newfitness: " << boost::format("%1.10e") %evalfit << endl;
          };
 
          if (j == ptrainset-1) {
@@ -2333,8 +2341,11 @@ if (verbose == true) {
       // insert back to str
       tempstr >> str;
       // check if fitness is numeric or ******
-      if (str.at(0) == '*') {
-          fitness = numeric_limits < double > ::infinity();
+      if (str.at(0) == '*' || !isdigit(str.at(0))) {
+        evalfit = numeric_limits < double > ::infinity();
+        if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+             pfitness = evalfit;
+        };
       } else {
           if (regular == 1 || regular == 2) {
              // convert to double
@@ -2567,21 +2578,33 @@ if (verbose == true) {
 };
 #endif
 
+
   dropped_dimns.clear();
   for (int i=0; i < dim; i++) {
      std::uniform_real_distribution <double> unidist(0.0, 1.0);
      if (unidist(generator) < dropprobability) {
-        pos.at(i) = 0.0001;
-        // standardize again to counter the transformation to physical params when writing ffield
-        pos.at(i) = ( pos.at(i) - mindomain.at(i) ) / (maxdomain.at(i) - mindomain.at(i));
         dropped_dimns.push_back(i); // stores dimensions to be dropped
-     }else{
-        // multiply by dropprobability all the other params so as to preserve total params number in the ffield.
-        // now it should be possible to use the gbest ffield for the validation/test sets as-is.
-        // step 1: multiply by dropprobability the physical params
-        pos.at(i) = dropprobability*( pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i) );
-        // step 2: divide again by physical transformation to counter the multiplication when writing ffield.
+        pos.at(i) = 0.0001;  // dropped dimension
+        // standardize again to counter the transformation to physical params when writing ffield and printpos
+        // since during localmin (iterate) once-standardized positions are necessary, a separate initialization (0.0001)
+        // of drooped positions made in 'iterate'. 
         pos.at(i) = ( pos.at(i) - mindomain.at(i) ) / (maxdomain.at(i) - mindomain.at(i));
+        //cout << "CPU " << core << " dropped standardized pos.at(" << i << ") = " << pos.at(i) << endl;
+     }else{
+        // multiply by 1/dropprobability all the other params so as to preserve total params number in the ffield.
+        // now it should be possible to use the gbest ffield for the validation/test sets as-is.
+        // step 1: multiply by 1/dropprobability the *physical* params
+        pos.at(i) = (1.0/dropprobability)*( pos.at(i)*(maxdomain.at(i) - mindomain.at(i)) + mindomain.at(i) );
+        // step 2: update domains
+        mindomain.at(i) = (1.0/dropprobability)*mindomain.at(i);
+        maxdomain.at(i) = (1.0/dropprobability)*maxdomain.at(i);
+        // step 3: convert back to standardized form based on new domains
+        pos.at(i) = ( pos.at(i) - mindomain.at(i) ) / (maxdomain.at(i) - mindomain.at(i));
+        //cout << "CPU " << core << " non-dropped standardized pos.at(" << i << ") = " << pos.at(i) << endl;
+        // step 4: convert new domains back to original before next dropout
+        mindomain.at(i) = dropprobability*mindomain.at(i);
+        maxdomain.at(i) = dropprobability*maxdomain.at(i);
+        // NOTE: should multiplication by 1/dropprobability moved to printpos and writeffield sections??
      };
   };
 
@@ -3185,6 +3208,7 @@ if (core == 0 && verbose == true) {
       gbpos.push_back(0.0);
 
     };
+
     if (core == 0) {
       // If contff == y, then take force field's current values for the position of particle 0 (others are random)
       if (contff == true) {
@@ -3327,7 +3351,7 @@ if (core == 0 && verbose == true) {
           newSwarm.printopt(newSwarm, 0, cycle, 1);
           boost::filesystem::ofstream log("log.flocky", ofstream::app);
           log << "\nSwarm generation completed." << endl;
-          log << "Initial global best fit: " << boost::format("%18.4f") %gbfit << endl;
+          log << "Initial global best fit: " << boost::format("        %1.10e") %gbfit << endl;
           log << "flocky optimization started!" << endl;
           log.close();
        };
@@ -3406,7 +3430,7 @@ if (core == 0 && verbose == true) {
        newSwarm.printopt(newSwarm, 0, cycle, 1);
        boost::filesystem::ofstream log("log.flocky", ofstream::app);
        log << "\nSwarm generation completed." << endl;
-       log << "Initial global best fit: " << boost::format("%18.4f") %gbfit << endl;
+       log << "Initial global best fit: " << boost::format("        %1.10e") %gbfit << endl;
        log << "flocky optimization started!" << endl;
        log.close();
      };
@@ -3537,7 +3561,7 @@ if (verbose == true) {
   newSwarm.printopt(newSwarm, 0, cycle, 1);
   boost::filesystem::ofstream log2("log.flocky", ofstream::app);
   log2 << "\nSwarm generation completed." << endl;
-  log2 << "Initial global best fit: " << boost::format("%18.4f") %gbfit << endl;
+  log2 << "Initial global best fit: " << boost::format("        %1.10e") %gbfit << endl;
   log2 << "flocky optimization started!" << endl;
   log2.close();
 
@@ -3919,7 +3943,7 @@ if (core == 0 && verbose == true) {
     boost::filesystem::ofstream log("log.flocky", ofstream::app);
     log << "\n\nTraining completed successfuly!\n";
     log << "Total ReaxFF calls: " << funceval << endl;
-    log << "\nGlobal best ReaxFF fit: " << boost::format("%18.4f") %newSwarm.get_gbfit() << endl;
+    log << "\nGlobal best ReaxFF fit: " << boost::format("        %1.10e") %newSwarm.get_gbfit() << endl;
     log << "Global best ReaxFF parameters:" << endl;
     log << "[ ";
     for (int m = 0; m < dim; m++) {
@@ -4042,7 +4066,7 @@ if (verbose == true) {
   boost::filesystem::ofstream log("log.flocky", ofstream::app);
   log << "\n\nTraining completed successfuly!\n";
   log << "Total ReaxFF calls: " << funceval << endl;
-  log << "\nGlobal best ReaxFF fit: " << boost::format("%18.4f") %newSwarm.get_gbfit() << endl;
+  log << "\nGlobal best ReaxFF fit: " << boost::format("        %1.10e") %newSwarm.get_gbfit() << endl;
   log << "Global best ReaxFF parameters:" << endl;
   log << "[ "; 
   for (int m = 0; m < dim; m++) {
@@ -4250,8 +4274,8 @@ if (verbose == true) {
   // insert back to str
   tempstr >> str;
   // check if fitness is numeric or ******
-  if (str.at(0) == '*') {
-    currovfitness = numeric_limits < double > ::infinity();
+  if (str.at(0) == '*' || !isdigit(str.at(0))) {
+      currovfitness = numeric_limits < double > ::infinity();
   } else {
     // convert to double
     currovfitness = stod(str);
@@ -4404,8 +4428,8 @@ if (verbose == true) {
   // insert back to str
   tempstr >> str;
   // check if fitness is numeric or ******
-  if (str.at(0) == '*') {
-    currovfitness = numeric_limits < double > ::infinity();
+  if (str.at(0) == '*' || !isdigit(str.at(0))) {
+      currovfitness = numeric_limits < double > ::infinity();
   } else {
     // convert to double
     currovfitness = stod(str);
@@ -4497,7 +4521,7 @@ void Swarm::printopt(Swarm & newSwarm, int iter, int cycle, int fr) {
   ofstream outfileopt("opti_log.out." + std::to_string(cycle), ofstream::app);
   if (mod(iter, fr) == 0.0) {
     stringstream ss;
-    ss << boost::format("%5i %25.4f") %iter %newSwarm.get_gbfit(); 
+    ss << boost::format("%5i         %1.10e") %iter %newSwarm.get_gbfit(); 
     outfileopt << ss.str();
     outfileopt << endl;
     
@@ -4738,7 +4762,7 @@ if (core == 0 && verbose == true) {
               outfilepos << ss2.str();
               ss2.str("");
             };
-            ss3 << boost::format("%30.10f") %newSwarm.GetPar(p).get_fitness();
+            ss3 << boost::format("        %1.10e") %newSwarm.GetPar(p).get_fitness();
             outfilepos << ss3.str();
             ss3.str("");
             outfilepos << endl;
@@ -4771,7 +4795,7 @@ if (core == 0 && verbose == true) {
            outfilepos << ss2.str();
            ss2.str("");
          };
-         ss3 << boost::format("%25.4f") %newSwarm.GetPar(p).get_fitness();
+         ss3 << boost::format("        %1.10e") %newSwarm.GetPar(p).get_fitness();
          outfilepos << ss3.str();
          ss3.str("");
          outfilepos << endl;
@@ -4812,7 +4836,7 @@ if (verbose == true) {
         outfilepos << ss2.str();
         ss2.str("");
       };
-      ss3 << boost::format("%25.4f") %newSwarm.GetPar(p).get_fitness();
+      ss3 << boost::format("        %1.10e") %newSwarm.GetPar(p).get_fitness();
       outfilepos << ss3.str();
       ss3.str("");
       outfilepos << endl;
