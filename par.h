@@ -80,6 +80,7 @@ extern int freq;
 extern double levyscale;
 extern int parid_gbfit;
 extern int faili;
+extern int ninf;
 extern int iter;
 extern int maxiters;
 extern int cycle;
@@ -140,6 +141,7 @@ class Par { // declaration of a particle
   void set_pos(vector < double > pos_best_particle);
   void set_posdim(int i, double posx);
   void set_vel(vector < double > vel_best_particle);
+  void set_veldim(int i, double velx);
   void update_bpos();
   void update_pos_levy(vector < double > globpos, double time, double inertiaf);
   double get_levy_McCul(double time, double maxtime); // generate Levy deviate via McCullouch Algorithm
@@ -147,7 +149,7 @@ class Par { // declaration of a particle
   double get_fitness(); // get particle fitness
   void set_fitness(double fit); // set particle fitness
   double eval_fitness(const vector <double> &active_params, void *mydata); // evalulate fitness
-  int iterate();
+  void iterate();
   double minf;
   vector <double> x;
   vector <double> eval_numgrad(const vector <double> &active_params, void *mydata); // evaluate numerical gradients of fitness

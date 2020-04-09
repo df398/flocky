@@ -72,6 +72,7 @@ double inertiamin = 0.4;
 double levyscale = 1.0;
 double confac = 1.0;
 int    faili = 1;
+int    ninf = 0;
 
 /* define global variables for start
    and end lines of ffield sections
@@ -1752,7 +1753,7 @@ if (verbose == true) {
 };
 
 
-int Par::iterate() {
+void Par::iterate() {
 #ifdef WITH_MPI
 if (verbose == true) {
   cout << "CPU: " << core << " entered iterate()" << endl;
@@ -2548,6 +2549,10 @@ void Par::set_posdim(int i, double posx){
 
 void Par::set_vel(vector < double > vel_of_best_particle) {
   vel = vel_of_best_particle;
+};
+
+void Par::set_veldim(int i, double velx){
+  vel.at(i) = velx;
 };
 
 void Par::dropout (double dropprobability) {
@@ -3796,6 +3801,23 @@ if (core == 0 && verbose == true) {
           newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
         };
         //newSwarm.printdisp(newSwarm, iter, cycle, freq);
+
+        // reset swarm randomly if gbfit == INF for ninf consecutive iterations
+        if (gbfit == numeric_limits < double > ::infinity()) {
+           ninf = ninf + 1;
+           if (ninf == 10) {
+               std::uniform_real_distribution < double > dist2(0.0,1.0);
+               for (int p = 0; p < NumP; p++) {
+                  for (int i = 0; i < dim; i++) {
+                     newSwarm.GetPar(p).set_posdim(i, dist2(generator));
+                     newSwarm.GetPar(p).set_veldim(i, 0.5*dist2(generator) - newSwarm.GetPar(p).get_pos(i));
+                     newSwarm.GetPar(p).bpos.at(i) = newSwarm.GetPar(p).pos.at(i);
+                  };
+                  ninf = 0;
+               };
+           };
+        };
+
     }else { // done if ptrainset > 1
         //newSwarm.get_com(newSwarm);
 
@@ -3863,6 +3885,23 @@ if (core == 0 && verbose == true) {
           newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
         };
         //newSwarm.printdisp(newSwarm, iter, cycle, freq);
+
+        // reset swarm randomly if gbfit == INF for ninf consecutive iterations
+        if (gbfit == numeric_limits < double > ::infinity()) {
+           ninf = ninf + 1;
+           if (ninf == 10) {
+               std::uniform_real_distribution < double > dist2(0.0,1.0);
+               for (int p = 0; p < NumP; p++) {
+                  for (int i = 0; i < dim; i++) {
+                     newSwarm.GetPar(p).set_posdim(i, dist2(generator));
+                     newSwarm.GetPar(p).set_veldim(i, 0.5*dist2(generator) - newSwarm.GetPar(p).get_pos(i));
+                     newSwarm.GetPar(p).bpos.at(i) = newSwarm.GetPar(p).pos.at(i);
+                  };
+                  ninf = 0;
+               };
+           };
+        };
+
     };
   }; // done loop over iterations
 
