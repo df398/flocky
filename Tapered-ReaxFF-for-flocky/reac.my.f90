@@ -21,10 +21,9 @@
 !     - Tapered ReaxFF model (2019)                                  *
 !     - Low gradient (lg) correction of Liu et al. JCPA 2011 (2019)  *
 !     - Numerically stable dihedrals formulation (2019)              *
-!     - Evaluate energies only for (unique) training set             *
-!       structures (2020)                                            *
 !     - Added atomic forces to training set (2020)                   *
 !     - Numerically stable lone pairs formulation (2020)             *
+!     - Numerically stable sbo2 formulation in valence angles (2020) *                                                               *
 !                                                                    *
 !*********************************************************************
     subroutine reac
@@ -48,9 +47,6 @@
     integer :: icntrl(20)
     logical :: lperiod,lmolxtl,lcanon,ldefcel,lprtthrm,lnose, &
     lnpecan,ltmpdamp
-    logical :: file_exists
-    !df398
-    junique = 0
     if (ndebug == 1) then
         open (65,file='fort.65',status='unknown',position='append')
         write (65,*) 'In reac'
@@ -223,15 +219,7 @@
     end if
 
     if (ngeofor == 1) then
-        !df398
-        call gettrainstructs2
-        call gettrainstructs
         call readbgf(qfile(nprob),iend,naold)
-        INQUIRE(FILE="fort.111", EXIST=file_exists)
-        if (file_exists .EQV. .true.) then 
-           na=0
-           call readfbgf(qfile(nprob),iend,naold)
-        endif
         if (imodfile == 1) then
             if (ingeo == 0) then ! do not overwrite old geometry files
                 qromb=qfile(nprob)
@@ -8200,7 +8188,7 @@
     cutmol4=0.0d0
     cutmol5=0.0d0
     delvib=1.0d-4
-    convg=1.0d-6  !Convergence criterion for EEM conjugate gradient solve
+    convg=1.0d-16  !Convergence criterion for EEM conjugate gradient solve
     edeep=0.0d0   !Piston magnitude
     rdeep=0.0d0   !0: infinite piston; 1: Edeep piston
     pshft=0.0d0   !Piston position
@@ -8228,6 +8216,9 @@
     Hug_V0 = 0.d0 ! Reference volume
 !     Shear flow simulations for viscosity
     xImpVcm = 1.0d0 ! velocity applied in shear simulations (in nm/ps), left half mover at -xImpVcm and right at +xImpVcm
+    iLP = 1 ! form of number of lone pairs: 1. original 6. inverse tan+taper
+    iSBO2 = 0 ! form of SBO2 function. 0: original 1: new
+    iTors = 1 ! form of Torsion function. 0: original 1. new
 !***********************************************************************
 !                                                                      *
 !     Read control-file                                                *
@@ -8371,6 +8362,9 @@
     if (qident == 'vmami2') vmami2=vhulp
     if (qident == 'ibocha') ibocha=int(vhulp)
     if (qident == 'icolab') icolab=int(vhulp)
+    if (qident == 'iLP') iLP=int(vhulp)
+    if (qident == 'iSBO2') iSBO2=int(vhulp)
+    if (qident == 'iTors') iTors=int(vhulp)
     goto 10
     20 continue
     close (10)
@@ -9836,340 +9830,6 @@ end subroutine valtaper
     200 format (5i3)
     end subroutine outres
 !***********************************************************************
-!***********************************************************************
-
-   subroutine gettrainstructs2
-
-!***********************************************************************
-    include 'cbka.blk'
-    include 'opt.blk'
-    dimension ctemp(nat,3),dargdc(3,3),dhrdc(3,3),iat(5)
-    dimension vibreax(navib*3),vibqc(navib*3),errmatch(3*navib)
-    dimension imatch (3*navib)
-    character(80) :: qhulp
-    character(20) :: qkeyhulp
-    character(40) :: qfreqfile
-    character(20) :: qrom
-    logical :: redundant, file_exists
-
-    if (ndebug == 1) then
-        open (65,file='fort.65',status='unknown',position='append')
-        write (65,*) 'In gettrainstructs2'
-        call timer(65)
-        close (65)
-    end if
-!***********************************************************************
-!                                                                      *
-!     Output molecular data                                            *
-!                                                                      *
-!***********************************************************************
-    open (63,file='trainset.in',status='old',err=9000)
-    10 read (63,'(a80)',err=9010,end=500)qhulp
-    qstrana1(1:80)=qhulp
-    if (qhulp(1:1) == '#') goto 10
-    !if (qhulp(1:6) == 'STRESS') then
-    !***********************************************************************
-    !                                                                      *
-    !     Stress data                                                      *
-    !                                                                      *
-    !***********************************************************************
-    !    11 read (63,'(a80)',err=9010,end=500)qhulp
-    !    qstrana1(1:80)=qhulp
-    !    if (qhulp(1:9) == 'ENDSTRESS') goto 10
-    !    if (qhulp(1:1) == '#') goto 11
-    !    istart=1
-    !    call stranal(istart,iend,vout,iout,1)
-    !    qkeyhulp=qstrana2(1:20)
-    !    istart=iend
-    !    call stranal(istart,iend,vout,iout,1)
-    !    weight=vout
-    !    istart=iend
-    !        
-    !    ihulp=-6
-    !    vcomp=-350.0d0
-    !    call stranal(istart,iend,vout,iout,1)
-    !    if (istart >= iend) goto 12
-    !    if (qstrana2 == 'x') ihulp=1
-    !    if (qstrana2 == 'y') ihulp=2
-    !    if (qstrana2 == 'z') ihulp=3
-    !    istart=iend
-
-    !    call stranal(istart,iend,vout,iout,1)
-    !    if (istart >= iend) goto 12
-    !    vcomp=vout
-    !    12 continue
-
-    !    if (qkeyhulp == qkeyw(nprob)) then
-    !        ndata2=ndata2+1
-    !        if (ihulp == 1) then
-    !            caldat(ndata2)=presx/1000.0d0
-    !            write (qdatid(ndata2),180)qkeyhulp,iatn
-    !        end if
-    !        if (ihulp == 2) then
-    !            caldat(ndata2)=presy/1000.0d0
-    !            write (qdatid(ndata2),181)qkeyhulp,iatn
-    !        end if
-    !        if (ihulp == 3) then
-    !            caldat(ndata2)=presz/1000.0d0
-    !            write (qdatid(ndata2),182)qkeyhulp,iatn
-    !        end if
-    !        compdat(ndata2)=vcomp
-    !        weightdat(ndata2)=weight
-    !    end if
-
-    !    goto 11
-    !end if
-       
-    if (qhulp(1:6) == 'CHARGE') then
-    !***********************************************************************
-    !                                                                      *
-    !     Charge distribution data                                         *
-    !                                                                      *
-    !***********************************************************************
-        !df398
-        15 read (63,'(a80)',err=9010,end=500)qhulp
-        redundant = .false.
-        qstrana1(1:80)=qhulp
-        if (qhulp(1:9) == 'ENDCHARGE') goto 10
-        if (qhulp(1:1) == '#') goto 15
-        istart=1
-        call stranal(istart,iend,vout,iout,1)
-        qkeyhulp=qstrana2(1:30)
-        !df398 add unique structures to trainset_structs array
-        do j=1,nmolset
-           !write(*,*) 'qkeyhulp = ', qkeyhulp
-           if (trainset_structs(j) == qkeyhulp .or. (qkeyhulp(1:1) >= '0' .and. qkeyhulp(1:1) <= '9')) then
-              redundant = .true.
-              !write(*,*) 'redundant == true or not a structure description'
-              exit
-           endif
-        enddo
-        if (redundant .eqv. .false.) then
-           junique = junique + 1
-           trainset_structs(junique) = qkeyhulp
-           !write(*,*) 'CHARGES >>> trainset_struct(',junique,') = ', trainset_structs(junique)
-        endif
-        16 continue
-        goto 15
-    end if
-
-    !df398 added atomic forces to training set
-    INQUIRE(FILE="fort.111", EXIST=file_exists)
-    if (qhulp(1:6) == 'FORCES' .AND. file_exists .EQV. .true.) then
-    !***********************************************************************
-    !                                                                      *
-    !     Forces (minus grad) data                                         *
-    !                                                                      *
-    !***********************************************************************
-        !df398
-        28 read (63,'(a80)',err=9010,end=500)qhulp
-        redundant = .false.
-        qstrana1(1:80)=qhulp
-        if (qhulp(1:1) == '#') goto 28
-        if (qhulp(1:11) == 'ENDFORCES') goto 10
-        vcomp=zero
-        totforce=zero
-        iat(1)=0
-        istart=1
-
-        call stranal(istart,iend,vout,iout,1)
-        if (istart >= iend) goto 28
-        qkeyhulp=qstrana2(1:30)
-        istart=iend
-      
-        !df398 add unique structures to trainset_structs array
-        do j=1,nmolset
-           if (trainset_structs(j) == qkeyhulp .or. (qkeyhulp(1:1) >= '0' .and. qkeyhulp(1:1) <= '9')) then
-              redundant = .true.
-              !write(*,*) qkeyhulp, ': redundant == true or not a structure description'
-              exit
-           endif
-        enddo
-        if (redundant .eqv. .false.) then
-           junique = junique + 1
-           trainset_structs(junique) = qkeyhulp
-           !write(*,*) 'FORCES >>> trainset_struct(',junique,') = ', trainset_structs(junique)
-        endif
-      goto 28
-    endif
-
-    if (qhulp(1:8) == 'GEOMETRY') then
-    !***********************************************************************
-    !                                                                      *
-    !     Geometry data                                                    *
-    !                                                                      *
-    !***********************************************************************
-        !df398
-        20 read (63,'(a80)',err=9010,end=500)qhulp
-        redundant = .false.
-        qstrana1(1:80)=qhulp
-        if (qhulp(1:1) == '#') goto 20
-        if (qhulp(1:11) == 'ENDGEOMETRY') goto 10
-             
-        vcomp=zero
-        do i1=1,4
-            iat(i1)=0
-        end do
-
-        istart=1
-        call stranal(istart,iend,vout,iout,1)
-        qkeyhulp=qstrana2(1:20)
-        !df398 add unique structures to trainset_structs array
-        do j=1,nmolset
-           !write(*,*) 'qkeyhulp = ', qkeyhulp
-           if (trainset_structs(j) == qkeyhulp .or. (qkeyhulp(1:1) >= '0' .and. qkeyhulp(1:1) <= '9')) then
-              redundant = .true.
-              !write(*,*) 'redundant == true or not a structure description'
-              exit
-           endif
-        enddo
-        if (redundant .eqv. .false.) then
-           junique = junique + 1
-           trainset_structs(junique) = qkeyhulp
-           !write(*,*) 'GEOMETRY >>> trainset_struct(',junique,') = ', trainset_structs(junique)
-        endif
-
-        21 continue
-        goto 20
-    end if
-
-    if (qhulp(1:6) == 'HEATFO') then
-    !***********************************************************************
-    !                                                                      *
-    !     Heat of formation data                                           *
-    !                                                                      *
-    !***********************************************************************
-        25 read (63,'(a80)',err=9010,end=500)qhulp
-        redundant = .false.
-        qstrana1(1:80)=qhulp
-        if (qhulp(1:1) == '#') goto 25
-        if (qhulp(1:9) == 'ENDHEATFO') goto 10
-        istart=1
-        call stranal(istart,iend,vout,iout,1)
-        qkeyhulp=qstrana2(1:20)
-        !df398 add unique structures to trainset_structs array
-        do j=1,nmolset
-           !write(*,*) 'qkeyhulp = ', qkeyhulp
-           if (trainset_structs(j) == qkeyhulp .or. (qkeyhulp(1:1) >= '0' .and. qkeyhulp(1:1) <= '9')) then
-              redundant = .true.
-              !write(*,*) 'redundant == true or not a structure description'
-              exit
-           endif
-        enddo
-        if (redundant .eqv. .false.) then
-           junique = junique + 1
-           trainset_structs(junique) = qkeyhulp
-           !write(*,*) 'HEATFO >>> trainset_struct(',junique,') = ', trainset_structs(junique)
-        endif
-        goto 25
-    end if
-
-    if (qhulp(1:15) == 'CELL PARAMETERS') then
-    !***********************************************************************
-    !                                                                      *
-    !     Cell parameter data                                              *
-    !                                                                      *
-    !***********************************************************************
-        !df398
-        30 read (63,'(a80)',err=9010,end=500)qhulp
-        redundant = .false.
-        qstrana1(1:80)=qhulp
-        if (qhulp(1:1) == '#') goto 30
-        if (qhulp(1:18) == 'ENDCELL PARAMETERS') goto 10
-        istart=1
-        call stranal(istart,iend,vout,iout,1)
-        qkeyhulp=qstrana2(1:20)
-        !df398 add unique structures to trainset_structs array
-        do j=1,nmolset
-           !write(*,*) 'qkeyhulp = ', qkeyhulp
-           if (trainset_structs(j) == qkeyhulp .or. (qkeyhulp(1:1) >= '0' .and. qkeyhulp(1:1) <= '9')) then
-              redundant = .true.
-              !write(*,*) 'redundant == true or not a structure description'
-              exit
-           endif
-        enddo
-        if (redundant .eqv. .false.) then
-           junique = junique + 1
-           trainset_structs(junique) = qkeyhulp
-           !write(*,*) 'CELL PARAMETERS >>> trainset_struct(',junique,') = ', trainset_structs(junique)
-        endif
-        31 continue
-              
-        goto 30
-    end if
-
-    !if (qhulp(1:11) == 'FREQUENCIES') then
-    !    40 read (63,'(a80)',err=9010,end=500)qhulp
-    !    qstrana1(1:80)=qhulp
-    !    if (qhulp(1:1) == '#') goto 40
-    !    if (qhulp(1:14) == 'ENDFREQUENCIES') goto 10
-    !    istart=1
-    !    call stranal(istart,iend,vout,iout,1)
-    !    qkeyhulp=qstrana2(1:20)
-    !    istart=iend
-    !    call stranal(istart,iend,vout,iout,1)
-    !    weightf=vout
-    !    istart=iend
-    !    call stranal(istart,iend,vout,iout,1)
-    !    weightm=vout
-    !    istart=iend
-    !    call stranal(istart,iend,vout,iout,1)
-    !    qfreqfile=qstrana2
-    !    istart=iend
-
-    !    if (qkeyhulp == qkeyw(nprob)) then
-    !        itrain=1
-    !        call vibra(qfreqfile,vibreax,vibqc,imatch,errmatch,itrain,klinear)
-    !        do i1=1,na*3-6+klinear
-    !            ndata2=ndata2+1
-    !            caldat(ndata2)=vibreax(i1+6-klinear)
-    !            weightdat(ndata2)=weightf
-    !            compdat(ndata2)=vibqc(imatch(i1))
-    !            write (qdatid(ndata2),178)qkeyhulp,i1+6
-    !            ndata2=ndata2+1
-    !            caldat(ndata2)=1000.0d0*errmatch(i1)
-    !            weightdat(ndata2)=weightm
-    !            compdat(ndata2)=zero
-    !            write (qdatid(ndata2),179)qkeyhulp,i1+6
-    !        end do
-    !    end if
-
-    !    goto 40
-    !end if
-    goto 10
-    500 continue
-    close (63)
-    return
-    105 format (a20,' Charge atom:',i4)
-    106 format (a20,' Charge atom:',i4)
-    110 format (a20,' Torsion angle:',4i4)
-    120 format (a20,' Valence angle:',3i4)
-    130 format (a20,' Bond distance:',2i4)
-    144 format (a20,' Force on atom:',i4)
-    140 format (a20,' Position atom:',i4)
-    145 format (a20,' CRMS:',i4)
-    150 format (a20,' RMSG force:')
-    160 format (a20,' Heat of formation:')
-    170 format (a20,' a:')
-    171 format (a20,' b:')
-    172 format (a20,' c:')
-    175 format (a20,' alfa:')
-    176 format (a20,' beta:')
-    177 format (a20,' gamma:')
-    178 format (a20,' Frequency:',i4)
-    179 format (a20,' Error in mode:',i4)
-    180 format (a20,' pressure x:')
-    181 format (a20,' pressure y:')
-    182 format (a20,' pressure z:')
-    9000 continue
-    if (iopt == 1) stop 'Cannot open trainset.in'
-!     write (*,*) 'Cannot open trainset.in'
-    return
-    9010 stop 'Error reading trainset.in'
-
-    end subroutine gettrainstructs2
-!***********************************************************************
-!***********************************************************************
 
    subroutine outres2
 
@@ -10306,9 +9966,8 @@ end subroutine valtaper
         goto 15
     end if
 
-    !df398 added atomic forces to training set
-    INQUIRE(FILE="fort.111", EXIST=file_exists)
-    if (qhulp(1:6) == 'FORCES' .AND. file_exists .EQV. .true.) then
+   !df398 added atomic forces to training set
+    if (qhulp(1:6) == 'FORCES') then
     !***********************************************************************
     !                                                                      *
     !     Forces (minus grad) data                                         *
@@ -10338,9 +9997,13 @@ end subroutine valtaper
         24 continue
 
         if (qkeyhulp == qkeyw(nprob)) then
-          vcomp = sqrt(frefset(nprob,iat(1),1)*frefset(nprob,iat(1),1)+frefset(nprob,iat(1),2)*frefset(nprob,iat(1),2)+&
-                          frefset(nprob,iat(1),3)*frefset(nprob,iat(1),3))
-          totforce = sqrt(d(iat(1),1)*d(iat(1),1) + d(iat(1),2)*d(iat(1),2) + d(iat(1),3)*d(iat(1),3))
+          call readfbgf(qkeyhulp)
+
+          vcomp = sqrt(fref(iat(1),1)*fref(iat(1),1)+fref(iat(1),2)*fref(iat(1),2)+fref(iat(1),3)*fref(iat(1),3))
+          write(*,*) 'vcomp = ',vcomp, 'fref(iat(1),1)=',fref(iat(1),1)
+
+          totforce = sqrt(d(iat(1),1)*d(iat(1),1)+d(iat(1),2)*d(iat(1),2)+d(iat(1),3)*d(iat(1),3))
+          write(*,*) 'totforce = ',totforce, 'd(iat(1),1)=',d(iat(1),1)
 
           ndata2=ndata2+1
           caldat(ndata2)=totforce
@@ -10350,6 +10013,7 @@ end subroutine valtaper
         endif
         goto 28
     endif
+
 
     if (qhulp(1:8) == 'GEOMETRY') then
     !***********************************************************************
@@ -10731,165 +10395,6 @@ end subroutine valtaper
 !***********************************************************************
 !***********************************************************************
 
-    subroutine gettrainstructs
-
-!***********************************************************************
-    include 'cbka.blk'
-    include 'opt.blk'
-    dimension ctemp(nat,3),dargdc(3,3),dhrdc(3,3),vdiv(5)
-    dimension iat(2,5),ndiv(5),ist2(5),iend2(5),qkeyh(5), &
-    qsign(5),qdiv(5)
-    character(100) :: qhulp
-    character(30) :: qhulp2,qhulp3
-    character(20) :: qkeyh
-    character(5) :: qdiv
-    character(1) :: qsign
-    logical :: redundant
-!***********************************************************************
-!                                                                      *
-!     Output molecular energy data                                     *
-!                                                                      *
-!***********************************************************************
-    if (ndebug == 1) then
-        open (65,file='fort.65',status='unknown',position='append')
-        write (65,*) 'In gettrainstructs'
-        call timer(65)
-        close (65)
-    end if
-
-    iline=0
-    !df398
-    open (63,file='trainset.in',status='old',err=9000)
-    10 read (63,'(a100)',err=9010,end=500)qhulp
-    iline=iline+1
-    if (qhulp(1:1) == '#') goto 10
-    if (qhulp(1:6) == 'ENERGY') then
-        15 read (63,'(a100)',err=9010,end=500)qhulp
-        qstrana1(1:100)=qhulp
-        iline=iline+1
-        if (qhulp(1:1) == '#') goto 15
-        if (qhulp(1:9) == 'ENDENERGY') goto 10
-        vcomp=zero
-        istart=1
-        sumcalc=zero
-        sumcomp=zero
-
-        call stranal(istart,iend,vout,iout,2)
-        weight=vout
-        istart=iend
-
-        nhulp=0
-        do i1=1,5
-            qsign(i1)=' '
-            qkeyh(i1)=' '
-            qdiv(i1)=' '
-            ist2(i1)=iend
-            iend2(i1)=iend
-        end do
-        do i1=1,5
-            call stranal(istart,iend,vout,iout,2)
-            qsign(i1)=qstrana2(1:1)
-            if (qsign(i1) == '+' .OR. qsign(i1) == '-') &
-            istart=istart+1
-            call stranal(istart,iend,vout,iout,2)
-            ist2(i1)=istart
-            iend2(i1)=iend-1
-            qkeyh(i1)=qstrana2(1:30)
-            !df398 add unique structures to trainset_structs
-            redundant = .false.
-            do j=1,nmolset
-               if (trainset_structs(j) == qkeyh(i1) .or. (qkeyh(i1)(1:1) >= '0' .and. qkeyh(i1)(1:1) <= '9')) then
-                  redundant = .true.
-                  !write(*,*) 'redundant == true or not a structure description'
-                  exit
-               endif
-            enddo
-            if (redundant .eqv. .false.) then
-               junique = junique + 1
-               !write(*,*) 'SIZE of trainset_structs = ', size(trainset_structs)
-               trainset_structs(junique) = qkeyh(i1)
-               !write(*,*) 'ENERGY>>> trainset_struct(',junique,') = ', trainset_structs(junique)
-            endif
-            istart=iend
-            !call stranal(istart,iend,vout,iout,2)
-            !vdiv(i1)=vout
-            !if (abs(vdiv(i1)) > 0.0001d0) then
-            !    nhulp=nhulp+1
-            !    istart=iend
-            !    istart2=iend
-            !    !if (vdiv(i1) < 10.0d0) write (qdiv(nhulp), &
-            !    !'(a1,f4.2,a1)')'/',vdiv(i1),' '
-            !    if (vdiv(i1) < 10.0) write (qdiv(nhulp), '(a1,i3,a1)')'/',int(vdiv(i1)),' '
-
-            !    if (qsign(i1) /= '+' .AND. qsign(i1) /= '-') then
-            !        qsign(i1)='+'
-            !        write (*,*)'Warning: forgot operator symbol on line:' &
-            !        ,iline,';assume +'
-            !    end if
-
-            !else
-            !    qsign(i1)=' '
-            !    qkeyh(i1)=' '
-            !    ist2(i1)=iend
-            !    iend2(i1)=iend
-            !    goto 20
-            !end if
-        end do
-
-        20 continue
-        istart=istart2
-        call stranal(istart,iend,vout,iout,2)
-        vcomp=vout
-        istart=iend
-
-        !do i1=1,nhulp
-        !    isign=1
-        !    if (qsign(i1) == '-') isign=-1
-        !    ifound=0
-        !    do i2=1,nprob
-        !        if (qkeyh(i1) == qkeyw(i2)) then
-        !            sumcalc=sumcalc+isign*enmolend(i2)/vdiv(i1)
-        !            sumcomp=sumcomp+isign*enmolset(i2)/vdiv(i1)
-        !            ifound=1
-        !        end if
-        !    end do
-        !    if (ifound == 0) then
-        !        if (nsurp == 0) then
-        !            write (*,*)'Could not find data linked to keyword:', &
-        !            qkeyh(i1),';ignored'
-        !        end if
-        !        goto 15
-        !    end if
-        !end do
-        !ndata2=ndata2+1
-        !caldat(ndata2)=sumcalc
-        !compdat(ndata2)=sumcomp
-        !if (vcomp /= zero) compdat(ndata2)=vcomp
-        !weightdat(ndata2)=weight
-        !qdatid(ndata2)='Energy '//qsign(1)// &
-        !qhulp(ist2(1):iend2(1))//qdiv(1)//qsign(2)// &
-        !qhulp(ist2(2):iend2(2))//qdiv(2)//qsign(3)// &
-        !qhulp(ist2(3):iend2(3))//qdiv(3)//qsign(4)// &
-        !qhulp(ist2(4):iend2(4))//qdiv(4)//qsign(5)// &
-        !qhulp(ist2(5):iend2(5))//qdiv(5)
-
-
-        goto 15
-    end if
-
-    goto 10
-    500 continue
-    close (63)
-    return
-    9000 continue
-    if (iopt == 1) stop 'Cannot open trainset.in'
-    return
-    9010 stop 'Error reading trainset.in'
-
-    end subroutine gettrainstructs
-!***********************************************************************
-!***********************************************************************
-
     subroutine outresend
 
 !***********************************************************************
@@ -10903,7 +10408,6 @@ end subroutine valtaper
     character(30) :: qkeyh
     character(5) :: qdiv
     character(1) :: qsign
-    logical :: redundant
 !***********************************************************************
 !                                                                      *
 !     Output molecular energy data                                     *
@@ -11569,145 +11073,70 @@ end subroutine valtaper
 !***********************************************************************
 !***********************************************************************
 
-    subroutine readfbgf(qfileh,iendf,naold)
+    subroutine readfbgf(qfileh)
 
 !***********************************************************************
     include 'cbka.blk'
     include 'opt.blk'
-    character(80) :: qromb
-    character(2) :: qrom
-    character(5) :: quen
-    character(5) :: qlabhulp
-    character(25) :: qfileh
+    character(20) :: qfileh
+    character(20) :: forcesfile
     character(200) :: qhulp
-    !df398
-    logical :: match
-    character(200) :: temp
-!*********************************************************************
-!                                                                    *
-!     Read in BIOGRAF-geometry                                       *
-!                                                                    *
-!*********************************************************************
+!********************************************************************************
+!                                                                               *
+!     Read in BIOGRAF formatted forces file for a given struct in trainset.in   *
+!                                                                               *
+!********************************************************************************
     if (ndebug == 1) then
         open (65,file='fort.65',status='unknown',position='append')
-        write (65,*) 'In readfbgf'
+        write (65,*) 'In readFbgf'
         call timer(65)
         close (65)
     end if
-    iendf=0
-    ienread=0
     iredo=0
     qremark(1)=' '
-    !enmol=zero
-    !formol=zero
-    10 continue
-    read (111,'(a40)',end=900)qromb
-    ibity=0
-    if (qromb(1:6) == 'BIOGRF') ibity=1
-    if (qromb(1:6) == 'XTLGRF') ibity=2
-    inobio=0
-    if (ibity == 0) then
-        !write (*,*)qromb(1:6)
-    !     stop 'Unknown Biograf-file'
-        inobio=1
-    end if
-    if (inobio == 1) goto 10
-
-    read (qromb,'(6x,i4)')ibgfversion
-    if (ibity == 1) qr='C'
-    if (ibity == 2) qr='F'
-    iremark=0
-    iformat=0
     iline=0
-    iexco=0
-    iruid=1
-    ipropt=0
-    vvol=1.0d0
-    nmcharge=0
-    nmmax=nmmaxold
-    nfc=nfcold
-    ncha=nchaold
-    endpo=endpoold
-    icell=icellold
-    icelo2=icelo2old
-    axiss(1)=-1.0d0
+    itemp=0
+    forcesfile=trim(qfileh) // ".fbgf"
 
-    30 read (111,'(a200)',end=46,err=40)qhulp
+    open(unit=111,file=forcesfile,status='old',err=46)
+    30 read (111,'(a200)',end=45,err=40)qhulp
     qstrana1(1:200)=qhulp
     iline=iline+1
     irecog=0
 
-    if (qhulp(1:6) == 'DESCRP') then
-        read (qhulp,'(7x,a40)',end=46,err=46)temp
-        !irecog=1
-        !df398> only read structures that are present in trainset.in
-        match = .false.
-        do j=1,junique
-           if (temp == trainset_structs(j)) then
-               !write(*,*) 'match found! ', temp,' is indeed defined in trainset.in'
-               match = .true.
-               irecog=1
-               qmol = temp
-               exit
-           endif
-        enddo
-        if (match .eqv. .false.) then
-           irecog=0
-           goto 10
-           !write(*,*) 'temp(1:3) = ', temp(1:3)
-           !skip lines until we reach 'END' and then start reading
-           !a new structure
-           do while (temp(1:3) /= 'END')
-              read(111,'(a200)',end=46,err=40)temp
-              !write(*,*) 'temp(1:3) now is: ', temp(1:3)
-              if (temp(1:3) == 'END') then
-                 !write(*,*) 'temp = END. going to 30'
-                 if (nsurp /= 2) goto 900
-                 if (nsurp >= 2) then 
-                    goto 45 
-                 endif
-              !else
-              !   goto 45
-              end if
-           end do
-        endif
-    end if
-
-    if (qhulp(1:6) == 'REMARK') then
-        if (iremark < 20) iremark=iremark+1
-        read (qhulp,'(7x,a40)',end=46,err=46)qremark(iremark)
-        irecog=1
-    end if
     if (qhulp(1:6) == 'HETATM') then
+        irecog=1
         if (ibgfversion < 400) then
             read (qhulp, &
             '(7x,5x,1x,5x,1x,3x,1x,1x,1x,5x,3f15.10,1x,5x,3x,2x,1x,8x)' &
-            ,end=40,err=40) fref(na+1,1), fref(na+1,2), fref(na+1,3)
+            ,end=40,err=40) fref(itemp+1,1), fref(itemp+1,2), fref(itemp+1,3)
         else
             stop 'Unsupported forces file Biograf-version'
         end if
-        na=na+1
-        irecog=1
+        itemp=itemp+1
     end if
+
+    if (qhulp(1:6) == 'DESCRP') goto 30
+    if (qhulp(1:6) == 'REMARK') goto 30
     if (qhulp(1:6) == 'FFIELD') goto 30
     if (qhulp(1:6) == 'CONECT') goto 30
     if (qhulp(1:5) == 'ORDER') goto 30
     if (qhulp(1:1) == '#') goto 30
     if (qhulp(1:3) == 'END') goto 45
 
-    if (irecog == 0) then
-        write (*,*)'Warning: ignored line starting with: ',qhulp(1:10), 'in forces file'
-    end if
-     
+    !if (irecog == 0) then
+    !    write (*,*)'Warning: ignored line starting with: ',qhulp(1:10), 'in forces file'
+    !end if
+
     goto 30
-          
-    40 write (*,*)'Error on line ',iline+1,' of forces Biograf-input'
+
+    40 write (*,*) 'Error on line ',iline+1,' of forces Biograf-input'
     stop
-    45 read (111,*,err=46,end=46)
-    46 continue
-          
-    return
-    900 iendf=1
+
+    46 write(*,*) 'Could not open forces file in Biograf-input. File non-existent?'
+    stop
+
+    45 close(111)
     return
     end subroutine readfbgf
 !***********************************************************************
@@ -11786,39 +11215,8 @@ end subroutine valtaper
     irecog=0
 
     if (qhulp(1:6) == 'DESCRP') then
-        read (qhulp,'(7x,a40)',end=46,err=46)temp
-        !irecog=1
-        !df398> only read structures that are present in trainset.in
-        match = .false.
-        do j=1,junique
-           if (temp == trainset_structs(j)) then
-               !write(*,*) 'match found! ', temp,' is indeed defined in trainset.in'
-               match = .true.
-               irecog=1
-               qmol = temp
-               exit
-           endif
-        enddo
-        if (match .eqv. .false.) then
-           irecog=0
-           goto 10
-           !write(*,*) 'temp(1:3) = ', temp(1:3)
-           !skip lines until we reach 'END' and then start reading
-           !a new structure
-           do while (temp(1:3) /= 'END')
-              read(3,'(a200)',end=46,err=40)temp
-              !write(*,*) 'temp(1:3) now is: ', temp(1:3)
-              if (temp(1:3) == 'END') then
-                 !write(*,*) 'temp = END. going to 30'
-                 if (nsurp /= 2) goto 900
-                 if (nsurp >= 2) then 
-                    goto 45 
-                 endif
-              !else
-              !   goto 45
-              end if
-           end do
-        endif
+        read (qhulp,'(7x,a40)',end=46,err=46)qmol
+        irecog=1
     end if
 
     if (qhulp(1:6) == 'REMARK') then
@@ -13364,7 +12762,7 @@ end subroutine valtaper
     one = 1.0d0
     zero = 0.0d0
 !WRITE (*,*) 'size of EEM matrix:', lda,'x', n
-    maxiter = 150
+    maxiter = 350
 !     Form r=b-Ax
     call dgemv('N',n,n,one,a,lda,x,1,zero,r,1) ! r = Ax
     call DSCAL(n,-one,r,1)
@@ -13388,7 +12786,7 @@ end subroutine valtaper
         call dcopy(n,p,1,p_old,1)
         rho_old = rho
     enddo
-    !write(*,*)mdstep,'cgsolve:Warning:maxiter exceeded. Continuing.'
+    write(*,*)mdstep,'cgsolve:Warning: charges maxiter exceeded in "cgsolve". Results might be inaccurate.'
     666 continue
 !     write (*,*)mdstep,iter
 

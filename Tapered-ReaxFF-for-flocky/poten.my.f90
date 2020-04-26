@@ -21,10 +21,9 @@
 !     - Tapered ReaxFF model (2019)                                  *
 !     - Low gradient (lg) correction of Liu et al. JCPA 2011 (2019)  *
 !     - Numerically stable dihedrals formulation (2019)              *
-!     - Evaluate energies only for (unique) training set             *
-!       structures (2020)                                            *
 !     - Added atomic forces to training set (2020)                   *
 !     - Numerically stable lone pairs formulation (2020)             *
+!     - Numerically stable sbo2 formulation in valence angles (2020) *                                                               *
 !                                                                    *
 !*********************************************************************
 !*******************************************************************
@@ -435,51 +434,56 @@
     !     Determine number of lone pairs on atoms
     !                                                                    *
     !*********************************************************************
-        !df398 these belong to original ReaxFF (discontinuous staircase)
-        !ity=ia(i1,1)
-        !voptlp=0.50d0*(stlp(ity)-aval(ity))
-        !vlp(i1)=zero
-        !vund=abo(i1)-stlp(ity)
-        !vlph=2.0d0*int(vund/2.0d0)
-        !vlpex=vund-vlph
-        !vp16h=vpar(16)-1.0d0
 
-        !expvlp=exp(-vpar(16)*(2.0d0+vlpex)*(2.0d0+vlpex))
-        !vlp(i1)=expvlp-int(vund/2.0d0)
-        !dvlpdsbo(i1)=-vpar(16)*2.0d0*(2.0d0+vlpex)*expvlp
+        IF (iLP .EQ. 1) THEN
+           ity=ia(i1,1)
+    !        voptlp=0.50*(stlp(ity)-aval(ity))+vlp2(ity)       !For Si-lp
+           voptlp=0.50d0*(stlp(ity)-aval(ity))
+           vlp(i1)=zero
+           vund=abo(i1)-stlp(ity)
+           vlph=2.0d0*int(vund/2.0d0)
+           vlpex=vund-vlph
+           vp16h=vpar(16)-1.0d0
 
-        !df398 new form (smooth staircase)
-        ity=ia(i1,1)
-        voptlp=0.50d0*(stlp(ity)-aval(ity))
-        vlp(i1)=zero
-        xx=abo(i1)-stlp(ity)
-        prefac=20.0d0
-        intx=nint(xx/2.0d0)
-        intxm=nint(-xx/2.0d0)
-        Hx=1.0d0/(1.0d0 + exp(-prefac*(xx/2.0d0 - intx)))
-        Hxm=1.0d0/(1.0d0 + exp(-prefac*(-xx/2.0d0 - intxm)))
-        newintx= intx - 1.0d0 + Hx
-        newintxm= intxm - 1.0d0 + Hxm
+           expvlp=exp(-vpar(16)*(2.0d0+vlpex)*(2.0d0+vlpex))
+           dvlpdsbo(i1)=-vpar(16)*2.0d0*(2.0d0+vlpex)*expvlp
+           vlp(i1)=expvlp-int(vund/2.0d0)
+        ENDIF
 
-        y=1.0d0/(2.0d0*PI)
-        x=abo(i1)-stlp(ity)
-        !df398 vlp is a composite function: y=f(x) where f = x-sin(x) and x=x-sin(x) up to 4th generation. Also the step width and height are adjusted to match
-        !the step widths for ReaxFF lone pairs. 
-        vlp(i1) = y*(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0)& 
-                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0)) &
-                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0) &
-                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0))) &
-                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0) &
-                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0)) &
-                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0) &
-                     -sin(-(x-1.0d0)*2.0d0*PI/2.0d0-sin(-(x-1.0d0)*2.0d0*PI/2.0d0)))))
+        IF (iLP .EQ. 6) THEN
+            !df398 new functional form
+              vlp(i1)=zero
+              ity=ia(i1,1)
+              voptlp=0.50d0*(stlp(ity)-aval(ity))
+              y=1.0d0/(2.0d0*PI)
+              x=abo(i1)-stlp(ity)
+              factor = 0.950
+              leftmin = -2.20D0
+              leftmax = -2.0D0
+              rightmin = 2.0D0
+              rightmax = 2.2D0
 
-        !df398 derivative of vlp with respect to bond orders term.
-        dvlpdsbo(i1)=-(1.0d0+cos(PI*x)+(cos(PI*x)+1.0d0)*cos(sin(PI*x)+PI*x)+& 
-                       ((1.0d0+cos(PI*x))*cos(sin(PI*x)+PI*x)+cos(PI*x)+1.0d0) &
-                       *cos(sin(sin(PI*x)+PI*x)+sin(PI*x)+PI*x)+((1.0d0+cos(PI*x)+(cos(PI*x)+1.0d0)*cos(sin(PI*x)+PI*x)) &
-                       *cos(sin(sin(PI*x)+PI*x)+sin(PI*x)+PI*x)+(1.0d0+cos(PI*x))*cos(sin(PI*x)+PI*x)+cos(PI*x)+1.0d0) &
-                       *cos(sin(sin(sin(PI*x)+PI*x)+sin(PI*x)+PI*x)+sin(sin(PI*x)+PI*x)+sin(PI*x)+PI*x))/2
+              IF (x < leftmax) THEN
+                 call valtaper(.true.,x,leftmax,leftmin,fLeft,dfLdx)
+                 vlpL(i1) = -x/2.0d0 - 0.5d0 + (atan((-factor*(sin(PI*x)))/(1.0d0-factor*(cos(PI*x)))))/PI
+                 vlp(i1) = vlpL(i1)*fLeft
+                 dvlpLdx(i1) = -0.5d0 -((factor*PI*Cos(PI*x))/(1.0d0-factor*Cos(PI*x))-(PI*factor**2*Sin(PI*x)**2)/&
+                            (1.0d0-factor*Cos(PI*x))**2)/(PI*(1.0d0+(factor**2*Sin(PI*x)**2)/(1.0d0-factor*Cos(PI*x))**2))
+                 dvlpdsbo(i1) = dvlpLdx(i1)*fLeft + dfLdx*vlpL(i1)
+              ENDIF
+              IF (x >= leftmax .AND. x <= rightmin) THEN
+                 vlp(i1) = 0.0D0
+                 dvlpdsbo(i1)=0.0D0
+              ENDIF
+              IF (x > rightmin) THEN
+                 call valtaper(.false.,x,rightmin,rightmax,fRight,dfRdx)
+                 vlpR(i1) = -x/2.0d0 + 0.5d0 + (atan((factor*(sin(-PI*x)))/(1.0d0-factor*(cos(-PI*x)))))/PI
+                 vlp(i1) = vlpR(i1)*fRight
+                 dvlpRdx(i1) = -0.5d0 -((factor*PI*Cos(PI*x))/(1.0d0-factor*Cos(PI*x))-(PI*factor**2*Sin(PI*x)**2)/&
+                            (1.0d0-factor*Cos(PI*x))**2)/(PI*(1.0d0+(factor**2*Sin(PI*x)**2)/(1.0d0-factor*Cos(PI*x))**2))
+                 dvlpdsbo(i1) = dvlpRdx(i1)*fRight + dfRdx*vlpR(i1)
+              ENDIF
+        ENDIF
 
     !*********************************************************************
     !                                                                    *
@@ -487,12 +491,12 @@
     !                                                                    *
     !*********************************************************************
         diffvlp=voptlp-vlp(i1)
-        exphu1=exp(-prefac*diffvlp)
+        exphu1=exp(-75.0d0*diffvlp)
         hulp1=1.0d0/(1.0d0+exphu1)
         elph=vlp1(ity)*diffvlp*hulp1
         estrain(i1)=estrain(i1)+elph
 
-        delpdvlp=-vlp1(ity)*hulp1-vlp1(ity)*diffvlp*hulp1*hulp1*prefac*exphu1
+        delpdvlp=-vlp1(ity)*hulp1-vlp1(ity)*diffvlp*hulp1*hulp1*75.0d0*exphu1
 
         elp=elp+elph
         delpdsbo=delpdvlp*dvlpdsbo(i1)
@@ -1432,8 +1436,32 @@
         sbo2h=sbo2
         powv=vpar(17)
         if (sbo2 <= 0.0d0) sbo2h=0.0d0
-        if (sbo2 > 0.0d0 .AND. sbo2 <= 1.0d0) sbo2h=sbo2**powv
-        if (sbo2 > 1.0d0 .AND. sbo2 < 2.0d0) sbo2h=2.0d0-(2.0d0-sbo2)**powv
+        !df398 old discontinuous form
+        if (iSBO2 == 0) then
+           if (sbo2 > 0.0d0 .AND. sbo2 <= 1.0d0) sbo2h=sbo2**powv
+           if (sbo2 > 1.0d0 .AND. sbo2 < 2.0d0) sbo2h=2.0d0-(2.0d0-sbo2)**powv
+        endif
+        !df398 new form
+        if (iSBO2 == 1) then
+           if (sbo2 > 0.0d0 .AND. sbo2 <= 2.0d0) then
+               srmin=0.0d0
+               srmax=2.0d0
+               SSWA2=srmax**2
+               SSWB2=srmin**2
+               SSWA3=srmax**3
+               SSWB3=srmin**3
+
+               SSWC5=-6.0d0
+               SSWC4=(15.0d0*(srmin+srmax))
+               SSWC3=-(10.0d0*(srmin**2+4.0d0*srmax*srmin+srmax**2))
+               SSWC2=(30.0d0*srmax*srmin*(srmin+srmax))
+               SSWC1=-(30.0d0*srmax**2*srmin**2)
+               SSWC0=(srmin**3*(srmin**2-5.0d0*srmax*srmin+10.0d0*srmax**2))
+
+               sbo2h=2.0d0*(SSWC5*sbo2**5+SSWC4*sbo2**4+SSWC3*sbo2**3+SSWC2*sbo2**2+SSWC1*sbo2+SSWC0)/(srmin-srmax)**5
+               !dsbo2hdsbo2=2*(0.9375d0*sbo2**4-3.75d0*sbo2**3+3.75d0*sbo2**2)
+           endif
+        endif
         if (sbo2 > 2.0d0) sbo2h=2.0d0
         thba=th0(ity)
         expsbo=exp(-vpar(18)*(2.0d0-sbo2h))
@@ -1444,10 +1472,19 @@
         thdi2=thdif*thdif
         dthsbo=dgrrdn*thba*vpar(18)*expsbo
         if (sbo2 < 0.0d0) dthsbo=zero
-        if (sbo2 > 0.0d0 .AND. sbo2 <= 1.0d0) &
-        dthsbo=powv*(sbo2**(powv-1.0d0))*dgrrdn*thba*vpar(18)*expsbo
-        if (sbo2 > 1.0d0 .AND. sbo2 < 2.0d0) &
-        dthsbo=powv*((2.0d0-sbo2)**(powv-1.0d0))*dgrrdn*thba*vpar(18)*expsbo
+      !df398 old discontinuous form derivatives
+        if (iSBO2 == 0) then
+           if (sbo2 > 0.0d0 .AND. sbo2 <= 1.0d0) &
+           dthsbo=powv*(sbo2**(powv-1.0d0))*dgrrdn*thba*vpar(18)*expsbo
+           if (sbo2 > 1.0d0 .AND. sbo2 < 2.0d0) &
+           dthsbo=powv*((2.0d0-sbo2)**(powv-1.0d0))*dgrrdn*thba*vpar(18)*expsbo
+        endif
+        !df398 new derivative calculated above
+        if (iSBO2 == 1) then
+           if (sbo2 > 0.0d0 .AND. sbo2 <= 2.0d0) then
+              dthsbo=(2*(0.9375d0*sbo2**4-3.75d0*sbo2**3+3.75d0*sbo2**2))*dgrrdn*thba*vpar(18)*expsbo
+           endif
+        endif
         if (sbo2 > 2.0d0) dthsbo=zero
 
         exphu=vka(ity)*exp(-vka3(ity)*thdi2)
@@ -1465,8 +1502,6 @@
         exb2=(1.0d0-exb)
 
 	! df398 calculate taper functions        
-	!call ataper(.false.,bo(la),cutof2,4.0d0*cutof2,fij,dfijdBOij,d2fijdBO2ij,d3fijdBO3ij,.true.,.false.,.false.)
-	!call ataper(.false.,bo(lb),cutof2,4.0d0*cutof2,fik,dfikdBOik,d2fikdBO2ik,d3fikdBO3ik,.true.,.false.,.false.)
 	call valtaper(.false.,bo(la),cutof2,4.0D0*cutof2,fij,dfijdBOij)
 	call valtaper(.false.,bo(lb),cutof2,4.0D0*cutof2,fik,dfikdBOik)
 
@@ -2056,19 +2091,20 @@
         htov2=1.0d0+expov+expov2
         etboadj=htov1/htov2
 
-!etboadj = 0.0d0
-
      !    btb2=bopi(lb)-1.0+etboadj
      !    bo2t=1.0-btb2
         bo2t=2.0d0-bopi(lb)-etboadj
         bo2p=bo2t*bo2t
         bocor2=exp(v4(ity)*bo2p)
 
-        !df398 This form (original ReaxFF) suffers from numerical instability
-        !hsin=sinhd*sinhe
-        !df398 Numericaly stable form. Third-power sine decays much faster and ensures torsion energy and force go to zero when valence angles go to zero or pi. 
-        hsin=(sinhd**3)*(sinhe**3)
-
+        !df398 numerically stable dihedrals formulation
+        IF (iTors == 1) then
+           hsin=(sinhd*sinhe)**3
+        ENDIF
+        !df398 old formulation
+        IF (iTors .EQ. 0) then
+           hsin=sinhd*sinhe
+        ENDIF
 
         ethhulp=0.50d0*v1(ity)*(1.0d0+arg)+v2(ity)*bocor2*(1.0d0-arg2)+ &
                 v3(ity)*(0.50d0+2.0d0*arg2*arg-1.50d0*arg) ! df398 trigo identity for 0.5*cos(3x)
@@ -2078,10 +2114,10 @@
         exphub=exp(-vpar(24)*bob)
         exphuc=exp(-vpar(24)*boc)
 
-        !df398 2013 correction new form for f10
-!        exphua=exp(-2.0d0*vpar(24)*boa*boa) 
-!        exphub=exp(-2.0d0*vpar(24)*bob*bob)
-!        exphuc=exp(-2.0d0*vpar(24)*boc*boc)
+        !!! df398 test '2013 correction' for f10 (Schygol et al. 2019)
+        ! exphua=exp(-2.0d0*vpar(24)*boa*boa) 
+        ! exphub=exp(-2.0d0*vpar(24)*bob*bob)
+        ! exphuc=exp(-2.0d0*vpar(24)*boc*boc)
 
         bocor4=(1.0d0-exphua)*(1.0d0-exphub)*(1.0d0-exphuc) ! f10 equation
 
@@ -2090,23 +2126,26 @@
         estrain(j(2))=estrain(j(2))+0.50d0*eth*fij*fik*fjl
         estrain(j(3))=estrain(j(3))+0.50d0*eth*fij*fik*fjl
 
-        !df398 multiply by taper funcs, fij, fik, fjl
-        detdar=hsin*bocor4*(0.50d0*v1(ity)-2.0d0*v2(ity)*bocor2*arg+v3(ity)*(6.0d0*arg2-1.5d0))*fij*fik*fjl
-
-        ! df398 This form (original ReaxFF) suffers from numerical instability
-        !detdhd=coshd*sinhe*bocor4*ethhulp*fij*fik*fjl
-        !detdhe=sinhd*coshe*bocor4*ethhulp*fij*fik*fjl
-        ! This form is stable because sin^(x) decays much faster than sin(x)
-        ! Otherwise force discontinuities appear
-        detdhd=3.0d0*sinhd**2*coshd*sinhe**3*bocor4*ethhulp*fij*fik*fjl
-        detdhe=sinhd**3*3.0d0*sinhe**2*coshe*bocor4*ethhulp*fij*fik*fjl
+        !df398 multiply by taper funcs, fij, fik, fjl ! (...) is derivative of ethhulp wrt arg
+        detdar=hsin*bocor4*( 0.50d0*v1(ity) -2.0d0*v2(ity)*bocor2*arg +v3(ity)*(6.0d0*arg2-1.5d0) )*fij*fik*fjl
+        !df398 new derivatives for numerically stable dihedrals formulation
+        IF (iTors .EQ. 1) then
+           detdhd=(3*(sinhd*sinhe)**2)*coshd*sinhe*bocor4*ethhulp*fij*fik*fjl
+           detdhe=(3*(sinhd*sinhe)**2)*sinhd*coshe*bocor4*ethhulp*fij*fik*fjl
+        ENDIF
+        !df398 old derivatives
+        IF (iTors .EQ. 0) then
+           detdhd=coshd*sinhe*bocor4*ethhulp*fij*fik*fjl
+           detdhe=sinhd*coshe*bocor4*ethhulp*fij*fik*fjl
+        ENDIF
 
         !df398 multiply by taper funcs and add taper derivatives
         detdboa=vpar(24)*exphua*(1.0D0-exphub)*(1.0D0-exphuc)*ethhulp*hsin*fij*fik*fjl &  ! df398 original form
                 + eth*fik*fjl*dfijdBOij
 
-        ! df398 2013 correction new form
-!        detdboa=4.0d0*boa*vpar(24)*exphua*(1.0d0-exphub)*(1.0d0-exphuc)*ethhulp*hsin  
+        !!! df398 test 2013 correction form (Schygol et al. 2019)
+        ! detdboa=4.0d0*boa*vpar(24)*exphua*(1.0d0-exphub)*(1.0d0-exphuc)*ethhulp*hsin*fij*fik*fjl &
+        !         + eth*fik*fjl*dfijdBOij
 
         detdbopib=-bocor4*2.0d0*v4(ity)*v2(ity)*bo2t*bocor2*(1.0d0-arg2)*hsin*fij*fik*fjl
 
@@ -2116,13 +2155,13 @@
         detdboc=vpar(24)*exphuc*(1.0D0-exphua)*(1.0D0-exphub)*ethhulp*hsin*fij*fik*fjl & ! 
                 + eth*fij*fik*dfjldBOjl
 
-         !df398 2013 correction new forms for f10 derivative
-!        detdbob=4.0d0*bob*vpar(24)*exphub*(1.0d0-exphua)*(1.0d0-exphuc)*ethhulp*hsin  
-!        detdboc=4.0d0*boc*vpar(24)*exphuc*(1.0d0-exphua)*(1.0d0-exphub)*ethhulp*hsin 
+        !!! df398 2013 correction forms for f10 derivative (Schygol et al. 2019)
+         !detdbob=4.0d0*bob*vpar(24)*exphub*(1.0d0-exphua)*(1.0d0-exphuc)*ethhulp*hsin*fij*fik*fjl &
+         !        + eth*fij*fjl*dfikdBOik
+         !detdboc=4.0d0*boc*vpar(24)*exphuc*(1.0d0-exphua)*(1.0d0-exphub)*ethhulp*hsin*fij*fik*fjl &  
+         !        + eth*fij*fik*dfjldBOjl
 
         detdsbo1=-(detdbopib)*( vpar(25)*expov2/htov2 + htov1*(vpar(26)*expov-vpar(25)*expov2)/(htov2*htov2) )
-
-!        detdsbo1 = 0.0d0
 
 
         et=et+eth*fij*fik*fjl
@@ -2139,23 +2178,23 @@
         exphub1=exp(-vpar(28)*bb)     ! 
         exphuc1=exp(-vpar(28)*bc)     ! 
 
-        !!!df398 2013 correction new form 
-        !!!exphua1=sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)   
-        !!!exphub1=sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob) 
-        !!!exphuc1=sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc) 
+        !!!df398 2013 correction form (Schygol et al. 2019)
+        !exphua1=sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)   
+        !exphub1=sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob) 
+        !exphuc1=sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc) 
 
 
         sbo=exphua1*exphub1*exphuc1 ! this is equation f12
 
-	!df398 derivatives of sbo wrt BO
+        !df398 derivatives of sbo wrt BO
         dbohua=-2.0D0*(boa-1.50D0)*vpar(28)*exphua1*exphub1*exphuc1 ! df398 original form
         dbohub=-2.0D0*(bob-1.50D0)*vpar(28)*exphua1*exphub1*exphuc1 ! 
         dbohuc=-2.0D0*(boc-1.50D0)*vpar(28)*exphua1*exphub1*exphuc1 ! 
 
-	!!!df398 2013 correction new form
-        !!dbohua=4.0d0/3.0d0*pi*sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)*cos(pi/3.0d0*boa)*exphub1*exphuc1
-        !!dbohub=4.0d0/3.0d0*pi*sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob)*cos(pi/3.0d0*bob)*exphua1*exphuc1
-        !!dbohuc=4.0d0/3.0d0*pi*sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc)*cos(pi/3.0d0*boc)*exphua1*exphub1
+        !!! df398 2013 correction form (Schygol et al. 2019)
+        !dbohua=4.0d0/3.0d0*pi*sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)*sin(pi/3.0d0*boa)*cos(pi/3.0d0*boa)*exphub1*exphuc1
+        !dbohub=4.0d0/3.0d0*pi*sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob)*sin(pi/3.0d0*bob)*cos(pi/3.0d0*bob)*exphua1*exphuc1
+        !dbohuc=4.0d0/3.0d0*pi*sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc)*sin(pi/3.0d0*boc)*cos(pi/3.0d0*boc)*exphua1*exphub1
 
 
         arghu0=(arg2-1.0d0)*sinhd*sinhe
@@ -2166,14 +2205,14 @@
         estrain(j(2))=estrain(j(2)) + 0.50d0*ecoh*fij*fik*fjl
         estrain(j(3))=estrain(j(3)) + 0.50d0*ecoh*fij*fik*fjl
 
-	!df398 derivative wrt arg
+        !df398 derivative wrt arg
         decodar=sbo*vconj(ity)*2.0d0*arg*sinhd*sinhe*fij*fik*fjl
-        
+
         !df398 derivatives wrt BO
         decodbola=dbohua*ehulp*fij*fik*fjl + ecoh*fik*fjl*dfijdBOij
         decodbolb=dbohub*ehulp*fij*fik*fjl + ecoh*fij*fjl*dfikdBOik
         decodbolc=dbohuc*ehulp*fij*fik*fjl + ecoh*fij*fik*dfjldBOjl
-        
+
         !df398 derivatives wrt ht1 and ht2
         decodhd=coshd*sinhe*vconj(ity)*sbo*(arg2-1.0d0)*fij*fik*fjl
         decodhe=coshe*sinhd*vconj(ity)*sbo*(arg2-1.0d0)*fij*fik*fjl

@@ -22,6 +22,10 @@
       0 icheck     0: Normal run 1:Check first derivatives;2: Single run
       0 idebug     0: normal run 1: debug run
       3 ixmolo     0: only x,y,z-coordinates in xmolout  1: x,y,z + velocities + molnr. in xmolout 2:x,y,z+mol.nr.  3: x,y,z+mol.nr.+Estrain
+#note: for some systems, the new forms may be preferred for better numerical stability
+      1 iLP        1: original formulation for lone pairs 6: inverse tan lone pairs formulation
+      0 iSBO2      0: original SBO2 function 1: new SBO2 function
+      1 iTors      0: original Torsion 1: new Torsion
 # MD-parameters
       1 imdmet     MD-method. 1:NVT/Berendsen thermostat 2:do not use;3:NVE 4: NPT/Berendsen thermo/barostat
   0.050 tstep      MD-time step (fs)

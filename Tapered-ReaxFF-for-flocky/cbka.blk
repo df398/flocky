@@ -133,7 +133,7 @@
     /cbka/ nubon(nat,nat),nubon1(nat,mbond),nubon2(nat,mbond), &
     nmolat(nmolmax,nat),nmolat2(nmolmax,nat), &
     ia(nat,mbond+3),idbo(nbomax,2*mbond),iagold(nat,mbond+3), &
-    iag(nat,mbond+3),ib(nbomax,3),iv(nvamax,6),it(ntomax,8), &
+    iref(nat),iag(nat,mbond+3),ib(nbomax,3),iv(nvamax,6),it(ntomax,8), &
     ioop(nopmax,9),ihb(nhbmax,8),nhbs(nhbtym,3),id(nat,3), &
     nbs(nbotym,2),nts(ntotym,4),nvs(nvatym,3),ijk(nat,4), &
     irap(50),irdo(50,2),irstraset(nmolset,mrestra,2), &

@@ -21,10 +21,9 @@
 !     - Tapered ReaxFF model (2019)                                  *
 !     - Low gradient (lg) correction of Liu et al. JCPA 2011 (2019)  *
 !     - Numerically stable dihedrals formulation (2019)              *
-!     - Evaluate energies only for (unique) training set             *
-!       structures (2020)                                            *
 !     - Added atomic forces to training set (2020)                   *
 !     - Numerically stable lone pairs formulation (2020)             *
+!     - Numerically stable sbo2 formulation in valence angles (2020) *                                                               *
 !                                                                    *
 !*********************************************************************
     subroutine version
