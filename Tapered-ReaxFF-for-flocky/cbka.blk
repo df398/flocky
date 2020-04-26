@@ -122,7 +122,9 @@
     swc7,ft,dftdBO,d2ftdBO2,dft3dBO3,fij,dfijdBOij,d2fijdBO2ij, &
     d3fijdBO3ij,fik,dfikdBOik,d2fikdBO2ik,d3fikdBO3ik,fjl,dfjldBOjl, &
     d2fjldBO2jl, d3fjldBO3jl, pressu,presx, fHB, dfHBdBO, d2fHBdBO2, &
-    d3fHBdBO3, frHB, dfrHBdr, d2frHBdr2, d3frHBdr3, presy,presz,plr, &
+    d3fHBdBO3, frHB, dfrHBdr, d2frHBdr2, d3frHBdr3, vlpL(nat), vlpR(nat), &
+    dvlpLdx(nat), dvlpRdx(nat), fLeft, dfLdx, fRright, dfRdx, leftmin, leftmax,&
+    rightmin, rightmax,presy,presz,plr, &
     endpo2,ccpar,dseed, c1,c4,estrc,estrmin,zero,half,one,two,three, &
     endpo,accincr, endpoold,axis1,axis2,axis3,xadd,yadd,zadd,addist, &
     taddmol, dcentm, angle1,angle2,angle3,cutmol1,cutmol2,cutmol3,cutmol4, &
