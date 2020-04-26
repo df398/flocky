@@ -23,7 +23,7 @@
 !     - Numerically stable dihedrals formulation (2019)              *
 !     - Added atomic forces to training set (2020)                   *
 !     - Numerically stable lone pairs formulation (2020)             *
-!     - Numerically stable sbo2 formulation in valence angles (2020) *                                                               *
+!     - Numerically stable sbo2 formulation in valence angles (2020) *
 !                                                                    *
 !*********************************************************************
 !*******************************************************************
