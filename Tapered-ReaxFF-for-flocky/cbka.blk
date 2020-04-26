@@ -176,7 +176,7 @@
     nmolo5o,nthree,nradcount,nsav3,nhop2,nmollset,iflga, &
     iortho,iperiod,ibgfversion,iremark,ixmolo,inpt,iconne, &
     imolde,kx,ky,kz,iexco,iruid,ianaly,ibity,nvlist,nvpair, &
-    nvlself,ioldchg,ityrad,iredo,iexx,iexy,iexz,ncellopt, &
+    nvlself,ioldchg,ityrad,iredo,iexx,iexy,iexz,iLP,iTors,iSBO2,ncellopt, &
     ndata2,nboty2,nprob,nit,i5758,icell,ingeo,nmoloold,itemp, &
     icgeo,ifreq,ishock_type,icpres,ipresm,isymm,ilavel,ipdir, &
     ikeep,ireflx,irefly,ireflz,imfreq,iflext,icentp,ipropt, &
