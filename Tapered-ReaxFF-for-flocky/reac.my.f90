@@ -11079,6 +11079,7 @@ end subroutine valtaper
     character(20) :: qfileh
     character(20) :: forcesfile
     character(200) :: qhulp
+    CHARACTER(len=255) :: cwd
 !********************************************************************************
 !                                                                               *
 !     Read in BIOGRAF formatted forces file for a given struct in trainset.in   *
@@ -11095,8 +11096,9 @@ end subroutine valtaper
     iline=0
     itemp=0
     forcesfile=trim(qfileh) // ".fbgf"
-
-    open(unit=111,file=forcesfile,status='old',err=46)
+    CALL getcwd(cwd)
+    ! expecting the *.fbgf files to be located in the present working dir's/../fbgf directory.
+    open(unit=111,file=trim(adjustl(cwd))//"/../fbgf/"//forcesfile,status='old',err=46)
     30 read (111,'(a200)',end=45,err=40)qhulp
     qstrana1(1:200)=qhulp
     iline=iline+1
