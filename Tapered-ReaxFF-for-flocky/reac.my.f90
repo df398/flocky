@@ -11108,7 +11108,7 @@ end subroutine valtaper
         irecog=1
         if (ibgfversion < 400) then
             read (qhulp, &
-            '(7x,5x,1x,5x,1x,3x,1x,1x,1x,5x,3f15.10,1x,5x,3x,2x,1x,8x)' &
+            '(7x,5x,1x,5x,1x,3x,1x,1x,1x,5x,3f20.10,1x,5x,3x,2x,1x,8x)' &
             ,end=40,err=40) fref(itemp+1,1), fref(itemp+1,2), fref(itemp+1,3)
         else
             stop 'Unsupported forces file Biograf-version'
