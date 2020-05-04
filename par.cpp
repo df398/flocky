@@ -102,6 +102,13 @@ int mod(int x, int m) {
   return (x % m + m) % m;
 }
 
+// check if str is numeric
+bool is_numeric(std::string const& str)
+{
+    std::string::const_iterator first(str.begin()), last(str.end());
+    return boost::spirit::qi::parse(first, last, boost::spirit::double_)
+        && first == last;
+}
 
 // return L2-norm (magnitude) of a vector. uses a range-based loop.
 double l2_norm(vector < double > const & u) {
@@ -352,6 +359,168 @@ if (verbose == true) {
     };
     fin.close();
   };
+};
+
+void Par::write_geo() {
+#ifdef WITH_MPI
+if (verbose == true) {
+  cout << "CPU: " << core << " entered write_geo()" << endl;
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+  cout << "entered write_geo()" << endl;
+};
+#endif
+
+#ifdef WITH_MPI
+  string str_core = std::to_string(core);
+  std::ifstream fin("CPU."+str_core+"/geo");
+  if (fin.fail()) {
+    cout << "Error: unable to open 'geo' file in CPU" << core << " \n";
+    fin.close();
+    MPI_Abort(MPI_COMM_WORLD,1);
+  } else {
+    std::string line;
+    int numlines = 0;
+    vector <string> keywords;
+    vector <string> mykeywords;
+    int numstructs = 0;
+    int blockID = 0;
+    vector <vector <string>> geodata;
+    vector <string> geodata_nonsplit;
+    struct bgfblock {
+       int myblockID;
+       string mydescrp;
+       int mystart;
+       int myend;
+       vector <vector <string>> mygeodata;
+       vector <string> mygeodata_nonsplit;
+    };
+
+    // find total number of structures in geo file
+    while (std::getline(fin, line)) {
+       boost::split(keywords, line, boost::is_any_of(" "));
+       geodata_nonsplit.push_back(line);
+       geodata.push_back(keywords);
+       if (keywords.at(0) == "DESCRP")  {
+          numstructs++;
+       };
+    };
+    // create a total of #numstructs myblock structs of type 'bgfblock' to hold blocks separately
+    bgfblock myblock[numstructs];
+
+    // store geo lines in geodata
+    // and for each line in geo find start and end line numbers of blocks
+    for (auto line : geodata_nonsplit) {
+       numlines++;
+       boost::split(keywords, line, boost::is_any_of(" "));
+ 
+       if (keywords.at(0) == "BIOGRF" || keywords.at(0) == "XTLGRF") {
+         myblock[blockID].mystart = numlines;
+       };
+
+       if (keywords.at(0) == "DESCRP") {
+         myblock[blockID].mydescrp = keywords.at(1);
+       };
+
+       if (keywords.at(0) == "END") {
+         myblock[blockID].myend = numlines;
+         blockID++;
+       };
+       
+    };
+
+    for (int i=0; i < numstructs; i++) {
+        for (int j=myblock[i].mystart-1; j < myblock[i].myend; j++) {
+            if (!geodata_nonsplit.at(j).empty()) {
+               myblock[i].mygeodata_nonsplit.push_back(geodata_nonsplit.at(j));
+            };
+        };
+    };
+
+
+    // sanity check: blockID should be equal to numstructs
+    if (blockID != numstructs) {
+#ifdef WITH_MPI
+    cout << "Error: blockID " << blockID << " not equal to numstructs " << numstructs << " on CPU" << core << "\n";
+    fin.close();
+    MPI_Abort(MPI_COMM_WORLD,9);
+#endif
+#ifndef WITH_MPI
+    cout << "Error: blockID not equal to numstructs \n";
+    fin.close();
+    exit(EXIT_FAILURE);
+#endif
+    };
+
+    // compose unique DESCRP entries from trainset.in
+    string str_core = std::to_string(core);
+    std::ifstream fin("CPU."+str_core+"/trainset.in");
+    std::string geoline;
+    vector <string> traindata;
+    vector <string> traindata_nonsplit;
+    vector <string> geokeywords;
+
+    if (fin.fail()) {
+      cout << "Error: unable to open 'trainset.in' file on CPU" << core << " \n";
+      fin.close();
+      MPI_Abort(MPI_COMM_WORLD,1);
+    } else {
+        // store only structure names from trainset.in lines in traindata vector
+        geokeywords.clear();
+        traindata.clear();
+        traindata_nonsplit.clear();
+        while (std::getline(fin, geoline)) {
+           // ignore lines with zero length or start with a comment
+           if (geoline.length() != 0 && geoline[0] != '#') {
+             traindata_nonsplit.push_back(geoline);
+             // split to separate words with delimeters
+             boost::split(geokeywords, geoline, boost::is_any_of("=!@$*&^%:;)(/.+- "));
+             // filter out words
+             for (int i=0; i < geokeywords.size(); i++) {
+               boost::trim(geokeywords.at(i));
+               if (geokeywords.at(i) != "CHARGE"      && geokeywords.at(i) != "GEOMETRY"  && 
+                   geokeywords.at(i) != "ENDGEOMETRY" && geokeywords.at(i) != "FORCES"    &&
+                   geokeywords.at(i) != "ENDENERGY"   && geokeywords.at(i) != "ENERGY"    &&
+                   geokeywords.at(i) != "HEATFO"      && geokeywords.at(i) != "CELL"      &&
+                   geokeywords.at(i) != "ENDCHARGE"   && geokeywords.at(i) != "END"       &&
+                   geokeywords.at(i) != "ENDFORCES"   && geokeywords.at(i) != "ENDHEATFO" &&
+                   geokeywords.at(i) != "PARAMETERS"  && geokeywords.at(i) != "ENDCELL"   &&
+                   geokeywords.at(i) != "RMS"         && geokeywords.at(i) != "CRMS"      &&
+                   geokeywords.at(i) != "Weight"      && geokeywords.at(i) != "Atom"      &&
+                   geokeywords.at(i) != "\n"          && geokeywords.at(i) != ""          &&
+                   geokeywords.at(i) != " "           && !is_numeric(geokeywords.at(i))   &&
+                   !boost::contains(geokeywords.at(i),"#") && !boost::contains(geokeywords.at(i),",")) {
+                   traindata.push_back(geokeywords.at(i));
+               };
+             };
+           };
+        };
+        // remove duplicate entries in keywords
+        std::sort(traindata.begin(), traindata.end());
+        traindata.erase(std::unique(traindata.begin(), traindata.end()), traindata.end());
+    };
+
+    // print all blocks that pertain to unique trainset entries
+    // into respective newgeo files and rename to geo
+    ofstream newgeofile;
+    newgeofile.open("CPU." + str_core + "/newgeo", ios::out);
+    for (int i=0; i < numstructs; i++) {
+       if ( find(traindata.begin(), traindata.end(), myblock[i].mydescrp) != traindata.end() ) {
+          for (int m=0; m < myblock[i].mygeodata_nonsplit.size(); m++) {
+             newgeofile << myblock[i].mygeodata_nonsplit.at(m) << endl;
+          };
+          newgeofile << endl;
+       };
+    };
+    newgeofile.close();
+    // rename the new geo file
+    boost::filesystem::path pwd(boost::filesystem::current_path());
+    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/newgeo",
+    pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
+  };
+#endif
 };
 
 void Par::write_trainset() {
@@ -2022,9 +2191,6 @@ if (verbose == true) {
              };
          };
      };
-
-     // generate trainset subsets
-     write_trainset();
   };
 
   // check if ffield is LG or not. execute correct tapreaxff accordingly
@@ -3170,7 +3336,7 @@ if (core == 0 && verbose == true) {
          MPI_Comm_rank( PASSIVESWARM, &mycore_reaxffcore);
          MPI_Comm_size( PASSIVESWARM, &size_reaxffcores);
     };
-    
+
 
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
@@ -3208,6 +3374,13 @@ if (core == 0 && verbose == true) {
       gbpos.push_back(0.0);
 
     };
+
+    if (ptrainset > 1) {
+     // generate trainset and geo subsets
+     newSwarm.GetPar(p).write_trainset();
+     newSwarm.GetPar(p).write_geo();
+    };
+    
 
     if (core == 0) {
       // If contff == y, then take force field's current values for the position of particle 0 (others are random)

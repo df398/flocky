@@ -24,6 +24,8 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <boost/spirit/include/qi_parse.hpp>
+#include <boost/spirit/include/qi_numeric.hpp>
 #include <sstream>
 #include <algorithm>
 #include <iterator>
@@ -127,6 +129,7 @@ class Par { // declaration of a particle
   double get_min_dim();
   void read_ffield(); // read ffield file into matrix
   void write_trainset();
+  void write_geo();
   void write_ffield_lg(const vector <double> &active_params, int cycle, int iter, int parid);
   void write_ffield(const vector <double> &active_params, int cycle, int iter, int parid);
 
