@@ -376,7 +376,7 @@ if (verbose == true) {
 #ifdef WITH_MPI
   boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
-  std::ifstream fin(pwd.string() + "CPU."+str_core+"/geo");
+  std::ifstream fin(pwd.string() + "/CPU."+str_core+"/geo");
   if (fin.fail()) {
     cout << "Error: unable to open 'geo' file in CPU" << core << " \n";
     fin.close();
