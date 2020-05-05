@@ -374,9 +374,11 @@ if (verbose == true) {
 #endif
 
 #ifdef WITH_MPI
-  boost::filesystem::path pwd(boost::filesystem::current_path());
+  // note: pwd is not portable for mounted partitions that are not accessible directly
+  // so it's better to omit it as it's not really needed(?)
+  //boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
-  std::ifstream fin(pwd.string() + "/CPU."+str_core+"/geo");
+  std::ifstream fin("CPU."+str_core+"/geo");
   if (fin.fail()) {
     cout << "Error: unable to open 'geo' file in CPU" << core << " \n";
     fin.close();
@@ -457,7 +459,7 @@ if (verbose == true) {
 
     // compose unique DESCRP entries from trainset.in
     string str_core = std::to_string(core);
-    std::ifstream fin(pwd.string() + "CPU."+str_core+"/trainset.in");
+    std::ifstream fin("CPU."+str_core+"/trainset.in");
     std::string geoline;
     vector <string> traindata;
     vector <string> traindata_nonsplit;
@@ -506,7 +508,7 @@ if (verbose == true) {
     // print all blocks that pertain to unique trainset entries
     // into respective newgeo files
     ofstream newgeofile;
-    newgeofile.open(pwd.string() + "CPU." + str_core + "/newgeo", ios::out);
+    newgeofile.open("CPU." + str_core + "/newgeo", ios::out);
     for (int i=0; i < numstructs; i++) {
        if ( find(traindata.begin(), traindata.end(), myblock[i].mydescrp) != traindata.end() ) {
           for (int m=0; m < myblock[i].mygeodata_nonsplit.size(); m++) {
@@ -517,10 +519,10 @@ if (verbose == true) {
     };
     newgeofile.close();
     // rename the new geo file
-    boost::filesystem::path pwd(boost::filesystem::current_path());
-    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/newgeo",
-    pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
-    boost::filesystem::remove(pwd.string() + "CPU." + str_core + "/newgeo");
+    //boost::filesystem::path pwd(boost::filesystem::current_path());
+    boost::filesystem::copy_file("CPU." + str_core + "/newgeo",
+    "CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::remove("CPU." + str_core + "/newgeo");
   };
 #endif
 };
@@ -538,11 +540,11 @@ if (verbose == true) {
 #endif
 
 #ifdef WITH_MPI
-  boost::filesystem::path pwd(boost::filesystem::current_path());
+  //boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
-  std::ifstream fin(pwd.string() + "/CPU."+str_core+"/trainset.in");
+  std::ifstream fin("CPU."+str_core+"/trainset.in");
   if (fin.fail()) {
-    cout << "Error: unable to open 'trainset.in' file on CPU" << core << " \n";
+    cout << "Error: unable to open 'trainset.in' file on CPU" << core << " \n ";
     fin.close();
     MPI_Abort(MPI_COMM_WORLD,1);
   } else {
@@ -1215,13 +1217,13 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
   output_file.close();
 
   // replace ffield file with the new ffield (ffield.tmp.cycle.iter.parid)
-  boost::filesystem::path pwd(boost::filesystem::current_path());
+  //boost::filesystem::path pwd(boost::filesystem::current_path());
 #ifdef WITH_MPI
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+  boost::filesystem::copy_file("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
     pwd.string() + "/CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
 #endif
 #ifndef WITH_MPI
-  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+  boost::filesystem::copy_file("ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
     pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
 #endif
 };
@@ -1562,16 +1564,16 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
   output_file.close();
 
   // replace ffield file with the new ffield (ffield.tmp.cycle.iter.parid)
-  boost::filesystem::path pwd(boost::filesystem::current_path());
+  //boost::filesystem::path pwd(boost::filesystem::current_path());
 #ifdef WITH_MPI
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
-    pwd.string() + "/CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+    "CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
   // remove temporary ffield so other particles do not append to the file
   //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp.*");
 #endif
 #ifndef WITH_MPI
-  boost::filesystem::copy_file(pwd.string() + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
-    pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+    "ffield", boost::filesystem::copy_option::overwrite_if_exists);
   // remove temporary ffield so other particles do not append to the file
   //boost::filesystem::remove(pwd.string() + "/ffield.tmp.*");
 #endif
@@ -2175,8 +2177,8 @@ if (verbose == true) {
   funceval = funceval + 1;
 
   // prepare fort.3 files
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
-     pwd.string() + "/CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
+     "CPU." + str_core + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
   // if we parallelize the training set, each swarmcore sets the positions of its reaxffcores
   if (ptrainset > 1) {
@@ -2219,15 +2221,15 @@ if (verbose == true) {
      MPI_Abort(MPI_COMM_WORLD,3);
   };
   fin5.close();
-  boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield",
-      pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("CPU." + str_core + "/ffield",
+      "CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   if (fixcharges == true){
-     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/charges",
-       pwd.string() + "/CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+     boost::filesystem::copy_file("CPU." + str_core + "/charges",
+       "CPU." + str_core + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
   };
   // cd to each CPU.x directory
   string old_path = pwd.string();
-  boost::filesystem::path p(pwd.string() + "/CPU." + str_core);
+  boost::filesystem::path p("CPU." + str_core);
   boost::filesystem::current_path(p);
   //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
   char *args[3] = { "./tapreaxff", "", NULL} ;
@@ -2406,7 +2408,7 @@ if (verbose == true) {
   iter = state.iter;
   parid = state.parid;
 
-  boost::filesystem::path pwd(boost::filesystem::current_path());
+  //boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_parID = std::to_string(parid);
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
@@ -2415,8 +2417,8 @@ if (verbose == true) {
   funceval = funceval + 1;
 
   // prepare fort.3 files
-  boost::filesystem::copy_file(pwd.string() + "/geo." + str_cycle + "." + str_parID,
-    pwd.string() + "/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("geo." + str_cycle + "." + str_parID,
+    "fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
   // check if ffield is LG or not. execute correct tapreaxff accordingly
   if (lg_yn == true) {
@@ -2435,12 +2437,12 @@ if (verbose == true) {
   fin5.close();
 
   // prepare mandatory files before executing tapreaxff
-  boost::filesystem::copy_file(pwd.string() + "/ffield",
-      pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("ffield",
+      "fort.4", boost::filesystem::copy_option::overwrite_if_exists);
 
   if (fixcharges == true){
-      boost::filesystem::copy_file(pwd.string() + "/charges",
-      pwd.string() + "/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+      boost::filesystem::copy_file("charges",
+      "fort.26", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
   /* execute tapreaxff */
@@ -2592,9 +2594,9 @@ if (verbose == true) {
   myfdata.p = parid;
 
   // save fort.4 before writing new ffield
-  if (boost::filesystem::exists(pwd.string() + "/CPU." + str_core + "/fort.4")) {
-      boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.4",
-         pwd.string() + "/CPU." + str_core + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
+  if (boost::filesystem::exists("CPU." + str_core + "/fort.4")) {
+      boost::filesystem::copy_file("CPU." + str_core + "/fort.4",
+         "CPU." + str_core + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
   // perform central finite difference
@@ -2626,9 +2628,9 @@ if (verbose == true) {
   funceval = funceval + 2*dim;
 
   // retrive back saved ffield
-  if (boost::filesystem::exists(pwd.string() + "/CPU." + str_core + "/fort.4.save")) {
-      boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.4.save",
-        pwd.string() + "/CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  if (boost::filesystem::exists("CPU." + str_core + "/fort.4.save")) {
+      boost::filesystem::copy_file("CPU." + str_core + "/fort.4.save",
+        "CPU." + str_core + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
   return grad;
@@ -2667,8 +2669,8 @@ if (verbose == true) {
   myfdata.p = parid;
 
   // save fort.4 before writing new ffield
-  boost::filesystem::copy_file(pwd.string() + "/fort.4",
-    pwd.string() + "/fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("fort.4",
+    "fort.4.save", boost::filesystem::copy_option::overwrite_if_exists);
 
   // perform central finite difference
   for (int i = 0; i < dim; i++) {
@@ -2696,8 +2698,8 @@ if (verbose == true) {
   funceval = funceval + 2*dim;
 
   // retrive back saved ffield
-  boost::filesystem::copy_file(pwd.string() + "/fort.4.save",
-    pwd.string() + "/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("fort.4.save",
+    "fort.4", boost::filesystem::copy_option::overwrite_if_exists);
 
   return grad;
 #endif
@@ -2996,13 +2998,13 @@ if (verbose == true) {
 
   // prepare dirs for each CPU process
   boost::filesystem::create_directory("CPU." + str_core);
-  boost::filesystem::copy_file(pwd.string() + "/tapreaxff", pwd.string() + "/CPU." + str_core + "/tapreaxff",
+  boost::filesystem::copy_file("tapreaxff", "CPU." + str_core + "/tapreaxff",
       boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/ffield", pwd.string() + "/CPU." + str_core + "/ffield",
+  boost::filesystem::copy_file("ffield", "CPU." + str_core + "/ffield",
       boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/control", pwd.string() + "/CPU." + str_core + "/control",
+  boost::filesystem::copy_file("control", "CPU." + str_core + "/control",
       boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file(pwd.string() + "/geo", pwd.string() + "/CPU." + str_core + "/geo",
+  boost::filesystem::copy_file("geo", "CPU." + str_core + "/geo",
       boost::filesystem::copy_option::overwrite_if_exists);
   // prepare fort.111 (forces) file for each CPU process once if it exists (for training FORCES in trainset)
   //if (boost::filesystem::exists(pwd.string() + "/forgeo")) {
@@ -3011,19 +3013,19 @@ if (verbose == true) {
   //};
 
   if (fixcharges == true) {
-    boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
+    boost::filesystem::copy_file("charges", "CPU." + str_core + "/charges",
       boost::filesystem::copy_option::overwrite_if_exists);
   // fixcharges = true;
   };
   charge_file.close();
 
   // create fort.20 file needed by tapreaxff
-  boost::filesystem::ofstream iopt_file(pwd.string() + "/CPU." + str_core + "/fort.20");
+  boost::filesystem::ofstream iopt_file("CPU." + str_core + "/fort.20");
   iopt_file << "0";
   iopt_file.close();
 
   // create fort.35 file needed by tapreaxff
-  ofstream fort35_file(pwd.string() + "/CPU." + str_core + "/fort.35");
+  ofstream fort35_file("CPU." + str_core + "/fort.35");
   fort35_file << "23434.1" << endl;
   fort35_file.close();
 
@@ -3032,7 +3034,7 @@ if (verbose == true) {
   MPI_Bcast( & lg_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ptrainset, 1, MPI_INT, 0, MPI_COMM_WORLD);
   if (ptrainset == 1) {
-    boost::filesystem::copy_file(pwd.string() + "/trainset.in", pwd.string() + "/CPU." + str_core + "/trainset.in",
+    boost::filesystem::copy_file("trainset.in", "CPU." + str_core + "/trainset.in",
         boost::filesystem::copy_option::overwrite_if_exists);
   };
   if (ptrainset > 1) {
@@ -3142,9 +3144,9 @@ if (verbose == true) {
   fort35_file.close();
 
   // prepare fort.111 (forces) file if it exists (for training FORCES in trainset)
-  if (boost::filesystem::exists(pwd.string() + "/forgeo")) {
-     boost::filesystem::copy_file(pwd.string() + "/forgeo", pwd.string() + "/fort.111",
-         boost::filesystem::copy_option::overwrite_if_exists);
+  //if (boost::filesystem::exists("forgeo")) {
+  //   boost::filesystem::copy_file("forgeo", "fort.111",
+  //       boost::filesystem::copy_option::overwrite_if_exists);
   };
 
 
@@ -3381,8 +3383,8 @@ if (core == 0 && verbose == true) {
     };
 
     // cp geo to geo.parID so each particle works with its own geo file
-    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
-      pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + parID,
+    boost::filesystem::copy_file("CPU." + str_core + "/geo",
+      "CPU." + str_core + "/geo." + str_cycle + "." + parID,
         boost::filesystem::copy_option::overwrite_if_exists);
     
 
@@ -3513,7 +3515,7 @@ if (core == 0 && verbose == true) {
          if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
             //cout << "CPU: " << core << " (cpuid_gbfit) writing ffield_gbest: ffield.tmp."+to_string(cycle)+"."+"0."+to_string(parid_gbfit) << endl;
             write_ffield_gbest(cpuid_gbfit, cycle, 0, parid_gbfit);
-            boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
+            boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
          };
 
         if (core == 0) {
@@ -3592,7 +3594,7 @@ if (core == 0 && verbose == true) {
 
      if (core == cpuid_gbfit) {
         write_ffield_gbest(cpuid_gbfit, cycle, 0, parid_gbfit);
-        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
+        boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
      };
 
      if (core == 0) {
@@ -3663,8 +3665,7 @@ if (verbose == true) {
     };
 
     // cp geo to geo.parID so each particle works with its own geo file
-    boost::filesystem::copy_file(pwd.string() + "/geo",
-      pwd.string() + "/geo." + str_cycle + "." + parID,
+    boost::filesystem::copy_file("geo","geo." + str_cycle + "." + parID,
         boost::filesystem::copy_option::overwrite_if_exists);
 
     if (core == 0) {
@@ -3976,7 +3977,7 @@ if (core == 0 && verbose == true) {
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
            //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
         };
-        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+        boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
 
         if (ofit == true){
           if (gbfitfound == true) {
@@ -4063,7 +4064,7 @@ if (core == 0 && verbose == true) {
            write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
            //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
         };
-        boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+        boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
 
         if (ofit == true){
           if (gbfitfound == true) {
@@ -4283,17 +4284,16 @@ if (verbose == true) {
   string str_iter = std::to_string(iter);
   string str_parID = std::to_string(par);
 
-  boost::filesystem::ifstream test_ffieldtmp(pwd.string() + "ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
+  boost::filesystem::ifstream test_ffieldtmp("ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID);
   if (!test_ffieldtmp.fail()) {
-    boost::filesystem::copy_file(pwd.string() + "/ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID,
+    boost::filesystem::copy_file("ffield.tmp." + str_cycle + "." + str_iter + "." + str_parID,
     "ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID, boost::filesystem::copy_option::overwrite_if_exists);
   };
   test_ffieldtmp.close();
 
-  boost::filesystem::ifstream test_fort99(pwd.string() + "/fort.99");
+  boost::filesystem::ifstream test_fort99("fort.99");
   if (!test_fort99.fail()) {
-    boost::filesystem::copy_file(pwd.string() + "/fort.99",
-      "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::copy_file("fort.99", "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   };
   test_fort99.close();
 
@@ -4309,16 +4309,16 @@ if (verbose == true) {
   string str_iter = std::to_string(iter);
   string str_parID = std::to_string(par);
 
-  boost::filesystem::ifstream test_ffieldtmp(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
+  boost::filesystem::ifstream test_ffieldtmp("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
   if (!test_ffieldtmp.fail()) {
-      boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
+      boost::filesystem::copy_file("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
         "ffield.gbest." + str_cycle + "." + str_iter+"."+str_parID, boost::filesystem::copy_option::overwrite_if_exists);
   };
   test_ffieldtmp.close();
 
-  boost::filesystem::ifstream test_fort99(pwd.string() + "/CPU." + str_core + "/fort.99");
+  boost::filesystem::ifstream test_fort99("CPU." + str_core + "/fort.99");
   if (!test_fort99.fail()) {
-     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/fort.99",
+     boost::filesystem::copy_file("CPU." + str_core + "/fort.99",
        "results.out." + str_cycle, boost::filesystem::copy_option::overwrite_if_exists);
   };
   test_fort99.close();
@@ -4349,41 +4349,39 @@ if (verbose == true) {
   // prepare mandatory files for reaxff in 'testovfit' directory
   if (firstovfit == true) {
       boost::filesystem::create_directory("testovfit");
-      boost::filesystem::copy_file(pwd.string() + "/ffield.initial." + str_cycle,
-        pwd.string() + "/testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+      boost::filesystem::copy_file("ffield.initial." + str_cycle,
+        "testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   } else {
-    boost::filesystem::copy_file(pwd.string() + "/ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID,
-      pwd.string() + "/testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::copy_file("ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID,
+      "testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
-  boost::filesystem::copy_file(pwd.string() + "/geo.val",
-    pwd.string() + "/testovfit/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("geo.val", "testovfit/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
   if (fixcharges == true){
-    boost::filesystem::copy_file(pwd.string() + "/charges_val",
-      pwd.string() + "/testovfit/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::copy_file("charges_val","testovfit/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
-  boost::filesystem::copy_file(pwd.string() + "/control", pwd.string() + "/testovfit/control",
+  boost::filesystem::copy_file("control", "testovfit/control",
     boost::filesystem::copy_option::overwrite_if_exists);
 
-  boost::filesystem::copy_file(pwd.string() + "/valset.in", pwd.string() + "/testovfit/trainset.in",
+  boost::filesystem::copy_file("valset.in", "testovfit/trainset.in",
     boost::filesystem::copy_option::overwrite_if_exists);
 
-  boost::filesystem::ofstream iopt_file(pwd.string() + "/testovfit/fort.20");
+  boost::filesystem::ofstream iopt_file("testovfit/fort.20");
   iopt_file << "0";
   iopt_file.close();
-  ofstream outfile35(pwd.string() + "/testovfit/fort.35");
+  ofstream outfile35("testovfit/fort.35");
   outfile35 << "23434.1" << endl;
   outfile35.close();
 
   // cd to testovfit directory
   string old_path = pwd.string();
-  boost::filesystem::path p(pwd.string() + "/testovfit");
+  boost::filesystem::path p("testovfit");
   boost::filesystem::current_path(p);
 
   // execute tapreaxff
-  boost::filesystem::copy_file(pwd.string() + "/tapreaxff", pwd.string() + "/testovfit/tapreaxff",
+  boost::filesystem::copy_file("tapreaxff", "testovfit/tapreaxff",
   boost::filesystem::copy_option::overwrite_if_exists);
   //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
   char *args[3] = { "./tapreaxff", "", NULL} ;
@@ -4503,41 +4501,41 @@ if (verbose == true) {
   // prepare mandatory files for reaxff in 'testovfit' directory
   if (firstovfit == true) {
       boost::filesystem::create_directory("testovfit");
-      boost::filesystem::copy_file(pwd.string() + "/ffield.initial." + str_cycle,
-        pwd.string() + "/testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+      boost::filesystem::copy_file("ffield.initial." + str_cycle,
+        "testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   } else {
-    boost::filesystem::copy_file(pwd.string() + "/ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID,
-      pwd.string() + "/testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::copy_file("ffield.gbest." + str_cycle + "." + str_iter + "." + str_parID,
+      "testovfit/fort.4", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
-  boost::filesystem::copy_file(pwd.string() + "/geo.val",
-    pwd.string() + "/testovfit/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
+  boost::filesystem::copy_file("geo.val",
+    "testovfit/fort.3", boost::filesystem::copy_option::overwrite_if_exists);
 
   if (fixcharges == true){
-    boost::filesystem::copy_file(pwd.string() + "/charges_val",
-      pwd.string() + "/testovfit/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::copy_file("charges_val",
+      "testovfit/fort.26", boost::filesystem::copy_option::overwrite_if_exists);
   };
 
-  boost::filesystem::copy_file(pwd.string() + "/control", pwd.string() + "/testovfit/control",
+  boost::filesystem::copy_file("control", "testovfit/control",
     boost::filesystem::copy_option::overwrite_if_exists);
 
-  boost::filesystem::copy_file(pwd.string() + "/valset.in", pwd.string() + "/testovfit/trainset.in",
+  boost::filesystem::copy_file("valset.in", "testovfit/trainset.in",
     boost::filesystem::copy_option::overwrite_if_exists);
 
-  boost::filesystem::ofstream iopt_file(pwd.string() + "/testovfit/fort.20");
+  boost::filesystem::ofstream iopt_file("testovfit/fort.20");
   iopt_file << "0";
   iopt_file.close();
-  ofstream outfile35(pwd.string() + "/testovfit/fort.35");
+  ofstream outfile35("testovfit/fort.35");
   outfile35 << "23434.1" << endl;
   outfile35.close();
 
   // cd to testovfit directory
   string old_path = pwd.string();
-  boost::filesystem::path p(pwd.string() + "/testovfit");
+  boost::filesystem::path p("testovfit");
   boost::filesystem::current_path(p);
 
   // execute tapreaxff
-  boost::filesystem::copy_file(pwd.string() + "/tapreaxff", pwd.string() + "/testovfit/tapreaxff",
+  boost::filesystem::copy_file("tapreaxff", "testovfit/tapreaxff",
   boost::filesystem::copy_option::overwrite_if_exists);
   //arguments for tapreaxff, will run: tapreaxff                                                                                                                                  
   char *args[3] = { "./tapreaxff", "", NULL} ;
