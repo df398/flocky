@@ -459,7 +459,7 @@ if (verbose == true) {
 
     // compose unique DESCRP entries from trainset.in
     string str_core = std::to_string(core);
-    std::ifstream fin("trainset.in");
+    std::ifstream fin("CPU."+str_core+"/trainset.in");
     std::string geoline;
     vector <string> traindata;
     vector <string> traindata_nonsplit;
@@ -542,7 +542,7 @@ if (verbose == true) {
 #ifdef WITH_MPI
   //boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
-  std::ifstream fin("CPU."+str_core+"/trainset.in");
+  std::ifstream fin("trainset.in");
   if (fin.fail()) {
     cout << "Error: unable to open 'trainset.in' file on CPU" << core << " \n ";
     fin.close();
