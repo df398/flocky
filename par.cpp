@@ -459,7 +459,7 @@ if (verbose == true) {
 
     // compose unique DESCRP entries from trainset.in
     string str_core = std::to_string(core);
-    std::ifstream fin("CPU."+str_core+"/trainset.in");
+    std::ifstream fin("trainset.in");
     std::string geoline;
     vector <string> traindata;
     vector <string> traindata_nonsplit;
