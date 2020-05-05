@@ -538,8 +538,9 @@ if (verbose == true) {
 #endif
 
 #ifdef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
-  std::ifstream fin("trainset.in");
+  std::ifstream fin(pwd.string() + "/CPU."+str_core+"/trainset.in");
   if (fin.fail()) {
     cout << "Error: unable to open 'trainset.in' file on CPU" << core << " \n";
     fin.close();
