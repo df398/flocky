@@ -1220,11 +1220,11 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
   //boost::filesystem::path pwd(boost::filesystem::current_path());
 #ifdef WITH_MPI
   boost::filesystem::copy_file("CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
-    pwd.string() + "/CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
+    "CPU." + str_core + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
 #endif
 #ifndef WITH_MPI
   boost::filesystem::copy_file("ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID,
-    pwd.string() + "/ffield", boost::filesystem::copy_option::overwrite_if_exists);
+    "ffield", boost::filesystem::copy_option::overwrite_if_exists);
 #endif
 };
 
