@@ -374,8 +374,9 @@ if (verbose == true) {
 #endif
 
 #ifdef WITH_MPI
+  boost::filesystem::path pwd(boost::filesystem::current_path());
   string str_core = std::to_string(core);
-  std::ifstream fin("CPU."+str_core+"/geo");
+  std::ifstream fin(pwd.string() + "CPU."+str_core+"/geo");
   if (fin.fail()) {
     cout << "Error: unable to open 'geo' file in CPU" << core << " \n";
     fin.close();
@@ -456,7 +457,7 @@ if (verbose == true) {
 
     // compose unique DESCRP entries from trainset.in
     string str_core = std::to_string(core);
-    std::ifstream fin("CPU."+str_core+"/trainset.in");
+    std::ifstream fin(pwd.string() + "CPU."+str_core+"/trainset.in");
     std::string geoline;
     vector <string> traindata;
     vector <string> traindata_nonsplit;
@@ -503,9 +504,9 @@ if (verbose == true) {
     };
 
     // print all blocks that pertain to unique trainset entries
-    // into respective newgeo files and rename to geo
+    // into respective newgeo files
     ofstream newgeofile;
-    newgeofile.open("CPU." + str_core + "/newgeo", ios::out);
+    newgeofile.open(pwd.string() + "CPU." + str_core + "/newgeo", ios::out);
     for (int i=0; i < numstructs; i++) {
        if ( find(traindata.begin(), traindata.end(), myblock[i].mydescrp) != traindata.end() ) {
           for (int m=0; m < myblock[i].mygeodata_nonsplit.size(); m++) {
@@ -519,6 +520,7 @@ if (verbose == true) {
     boost::filesystem::path pwd(boost::filesystem::current_path());
     boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/newgeo",
     pwd.string() + "/CPU." + str_core + "/geo", boost::filesystem::copy_option::overwrite_if_exists);
+    boost::filesystem::remove(pwd.string() + "CPU." + str_core + "/newgeo");
   };
 #endif
 };
@@ -3002,10 +3004,10 @@ if (verbose == true) {
   boost::filesystem::copy_file(pwd.string() + "/geo", pwd.string() + "/CPU." + str_core + "/geo",
       boost::filesystem::copy_option::overwrite_if_exists);
   // prepare fort.111 (forces) file for each CPU process once if it exists (for training FORCES in trainset)
-  if (boost::filesystem::exists(pwd.string() + "/forgeo")) {
-     boost::filesystem::copy_file(pwd.string() + "/forgeo", pwd.string() + "/CPU." + str_core + "/fort.111",
-         boost::filesystem::copy_option::overwrite_if_exists);
-  };
+  //if (boost::filesystem::exists(pwd.string() + "/forgeo")) {
+  //   boost::filesystem::copy_file(pwd.string() + "/forgeo", pwd.string() + "/CPU." + str_core + "/fort.111",
+  //       boost::filesystem::copy_option::overwrite_if_exists);
+  //};
 
   if (fixcharges == true) {
     boost::filesystem::copy_file(pwd.string() + "/charges", pwd.string() + "/CPU." + str_core + "/charges",
@@ -3359,10 +3361,6 @@ if (core == 0 && verbose == true) {
   for (int p = 0; p < NumP; p++) {
     string parID = std::to_string(p);
     string str_cycle = std::to_string(cycle);
-    // cp geo to geo.parID so each particle works with its own geo file
-    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
-      pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + parID,
-        boost::filesystem::copy_option::overwrite_if_exists);
 
     Par NewPar;
     newSwarm.AddPar(NewPar);
@@ -3380,6 +3378,11 @@ if (core == 0 && verbose == true) {
      newSwarm.GetPar(p).write_trainset();
      newSwarm.GetPar(p).write_geo();
     };
+
+    // cp geo to geo.parID so each particle works with its own geo file
+    boost::filesystem::copy_file(pwd.string() + "/CPU." + str_core + "/geo",
+      pwd.string() + "/CPU." + str_core + "/geo." + str_cycle + "." + parID,
+        boost::filesystem::copy_option::overwrite_if_exists);
     
 
     if (core == 0) {
@@ -3647,11 +3650,6 @@ if (verbose == true) {
     string parID = std::to_string(p);
     string str_cycle = std::to_string(cycle);
     
-    // cp geo to geo.parID so each particle works with its own geo file
-    boost::filesystem::copy_file(pwd.string() + "/geo",
-      pwd.string() + "/geo." + str_cycle + "." + parID,
-        boost::filesystem::copy_option::overwrite_if_exists);
-    
     Par NewPar;
     newSwarm.AddPar(NewPar);
 
@@ -3662,6 +3660,11 @@ if (verbose == true) {
     for (int m=0; m < dim; m++){
       gbpos.push_back(0.0);
     };
+
+    // cp geo to geo.parID so each particle works with its own geo file
+    boost::filesystem::copy_file(pwd.string() + "/geo",
+      pwd.string() + "/geo." + str_cycle + "." + parID,
+        boost::filesystem::copy_option::overwrite_if_exists);
 
     if (core == 0) {
       // If contff == y, then take force field's current values for the position of particle 0 (others are random)
@@ -3683,6 +3686,7 @@ if (verbose == true) {
          contff = false;
     };
       
+    
     // evaluate fitness and set bfit = curfit
     vector <double> numgrad;
     newSwarm.GetPar(p).state.cycle = cycle;
