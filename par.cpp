@@ -479,7 +479,7 @@ if (verbose == true) {
            if (geoline.length() != 0 && geoline[0] != '#') {
              traindata_nonsplit.push_back(geoline);
              // split to separate words with delimeters
-             boost::split(geokeywords, geoline, boost::is_any_of("=!@$*&^%:;)(/.+- "));
+             boost::split(geokeywords, geoline, boost::is_any_of("=!@$*&^%:;)(/+- "));
              // filter out words
              for (int i=0; i < geokeywords.size(); i++) {
                boost::trim(geokeywords.at(i));
