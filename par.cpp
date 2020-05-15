@@ -60,6 +60,7 @@ bool   ofit = false;
 bool   uq = false;
 bool   gbfitfound = false;
 bool   firstovfit = true;
+bool   ensembleave = false;
 double ovfitness = 0.0;
 double currovfitness = 0.0;
 double initial_disp = 0.0;
@@ -2983,6 +2984,8 @@ if (verbose == true) {
     istringstream(tempinput.at(21)) >> freq;
     istringstream(tempinput.at(22)) >> maxiters;
     istringstream(tempinput.at(23)) >> maxcycles;
+    istringstream(tempinput.at(24)) >> ensembleave;
+
   };  // close if core==0
  
   // check if reaxff was set to run with fixed charges and require charges file
@@ -3068,6 +3071,7 @@ if (verbose == true) {
   MPI_Bcast( & hlambda, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ofit, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & ensembleave, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
 
 #endif
 
@@ -3122,6 +3126,7 @@ if (verbose == true) {
     istringstream(tempinput.at(21)) >> freq;
     istringstream(tempinput.at(22)) >> maxiters;
     istringstream(tempinput.at(23)) >> maxcycles;
+    istringstream(tempinput.at(24)) >> ensembleave;
 
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -3299,6 +3304,71 @@ if (verbose == true) {
   return particle_id;
 };
 
+
+void Swarm::MakeEnsembleFF(Swarm & newSwarm) {
+#ifdef WITH_MPI
+if (core == 0) {
+  if (verbose == true) {
+     cout << "CPU: " << core << " entered MakeEnsembleFF()" << endl;
+  };
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+   cout << "entered MakeEnsembleFF()" << endl;
+};
+#endif
+
+#ifdef WITH_MPI
+if (core == 0) {
+   if (ensembleave == true) {
+   string str_core = std::to_string(core);
+   boost::filesystem::ofstream log("log.flocky", ofstream::app);
+   log << "\n";
+   log << "Preparing an ensemble-averaged force field. Please wait." << endl;
+   log.close();
+   
+   const std::string target_path( "ffbags" );
+   //const boost::regex my_filter( "ffield.gbest.*" );
+
+   const std::regex my_filter ( "ffield.gbest.*" );
+
+   int   numffbags;
+   numffbags = 0;
+   std::vector< std::string > all_matching_files;
+   
+   boost::filesystem::directory_iterator end_itr; // Default ctor yields past-the-end
+   for( boost::filesystem::directory_iterator i( target_path ); i != end_itr; ++i )
+   {
+       // Skip if not a file
+       if( !boost::filesystem::is_regular_file( i->status() ) ) continue;
+       
+       std::smatch what;
+       //boost::smatch what;
+   
+       // Skip if no match for version 2 of boost::filesystem:
+       //if( !boost::regex_match( i->leaf(), what, my_filter ) ) continue;
+       // For version 3:
+       //if( !boost::regex_match( i->path().filename().string(), what, my_filter ) ) continue;
+       if (!regex_search (i->path().filename().string(),what,my_filter)) continue;
+
+       // File matches, store it
+       //all_matching_files.push_back( i->leaf() );
+       // For version 3:
+       all_matching_files.push_back( i->path().filename().string() );
+       numffbags++;
+   }
+   log << "flocky found " << numffbags << " global-best force fields to average" << endl;
+   MPI_Finalize(); 
+   
+   };
+};
+#endif
+
+
+#ifndef WITH_MPI
+#endif
+};
 
 void Swarm::Populate(Swarm & newSwarm, int cycle) {
 #ifdef WITH_MPI

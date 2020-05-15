@@ -24,3 +24,4 @@
 1      ! frequency of output
 10     ! Max number of optimization iterations per cycle
 1      ! Max number of training cycles
+0      ! 1: perform ensemble averageing 0: normal run

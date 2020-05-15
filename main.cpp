@@ -57,9 +57,11 @@ int main(int argc, char * argv[]) {
     log << "*                       University of Cambridge                     *\n";
     log << "*                  Copyright (C) 2018-2020 GPL-3.0                  *\n";
     log << "*                                                                   *\n";
-    log << "*       Publications using flocky are requested to cite:            *\n";
-    log << "*       Furman, David; Carmeli, Benny; Zeiri, Yehuda;               *\n";
-    log << "*       Kosloff, Ronnie, J. Chem. Theory Comput., 2018, 14 (6)      *\n";
+    log << "*       Users using flocky are requested to cite:                   *\n";
+    log << "*       1. Furman, David; Carmeli, Benny; Zeiri, Yehuda;            *\n";
+    log << "*       Kosloff, Ronnie, J. Chem. Theory Comput. 2018, 14 (6)       *\n";
+    log << "*       2. Furman, David; Wales J. David, J. Phys. Chem. Lett.      *\n";
+    log << "*       2019, 10 (22)                                               *\n";
     log << "*                                                                   *\n";
     log << "*                    https://www.furmanlab.com                      *\n";
     log << "*                                                                   *\n";
@@ -115,6 +117,7 @@ int main(int argc, char * argv[]) {
     
     Swarm MySwarm;
     MySwarm.get_userinp();
+    MySwarm.MakeEnsembleFF(MySwarm);
     MySwarm.Populate(MySwarm, cycle);
     MySwarm.Propagate(MySwarm, cycle);
 
@@ -141,6 +144,7 @@ int main(int argc, char * argv[]) {
 #endif
 
 #ifndef WITH_MPI
+
     log << "*********************************************************************\n";
     log << "*                __   _                  _                          *\n";
     log << "*               / _| | |                | |                         *\n";
@@ -157,17 +161,18 @@ int main(int argc, char * argv[]) {
     log << "*                                                                   *\n";
     log << "*                David Furman, PhD ; df398@cam.ac.uk                *\n";
     log << "*                       University of Cambridge                     *\n";
-    log << "*                  Copyright (C) 2018-2019 GPL-3.0                  *\n";
+    log << "*                  Copyright (C) 2018-2020 GPL-3.0                  *\n";
     log << "*                                                                   *\n";
-    log << "*       Publications using flocky are requested to cite:            *\n";
-    log << "*       Furman, David; Carmeli, Benny; Zeiri, Yehuda;               *\n";
-    log << "*       Kosloff, Ronnie, J. Chem. Theory Comput., 2018, 14 (6)      *\n";
+    log << "*       Users using flocky are requested to cite:                   *\n";
+    log << "*       1. Furman, David; Carmeli, Benny; Zeiri, Yehuda;            *\n";
+    log << "*       Kosloff, Ronnie, J. Chem. Theory Comput. 2018, 14 (6)       *\n";
+    log << "*       2. Furman, David; Wales J. David, J. Phys. Chem. Lett.      *\n";
+    log << "*       2019, 10 (22)                                               *\n";
     log << "*                                                                   *\n";
     log << "*                    https://www.furmanlab.com                      *\n";
     log << "*                                                                   *\n";
     log << "*********************************************************************\n";
     log.close();
-
 
   for (cycle = 0; cycle < maxcycles; cycle++) {
     string cyclecount = std::to_string(cycle);
