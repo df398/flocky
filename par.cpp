@@ -46,6 +46,7 @@ int    maxiters = 0;
 int    parid_gbfit = 0;
 int    localmin = 0;
 int    lm_iter_max = 10;
+int    numffbags = 0;
 double lm_err_tol = 1.0E-6;
 bool   fixcharges = false;
 bool   lg_yn = false;
@@ -281,27 +282,28 @@ if (verbose == true) {
 
 Par::Par() {
 
-  // read ffield file into matrix ffieldmat. split by each entry.
-  read_ffield();
+  if  (ensembleave == false) {
+     // read ffield file into matrix ffieldmat. split by each entry.
+     read_ffield();
 
-  // set min/max domains from params.mod file
-  read_bounds();
+     // set min/max domains from params.mod file
+     read_bounds();
 
-  for (int m = 0; m < dim; m++) {
-    // physical domains
-    std::uniform_real_distribution < double > dist2(mindomain.at(m), maxdomain.at(m));
-    double x = dist2(generator);
-    double v = 0.5 * (dist2(generator) - x);
-    // initialize particle's position vector
-    pos.push_back(x);
-    // standardize the position
-    pos.at(m) = (pos.at(m) - mindomain.at(m))/(maxdomain.at(m) - mindomain.at(m));
-    // initialize particle's velocity vector
-    vel.push_back(v);
-    // initialize particle's best own position vector
-    bpos = pos;
+     for (int m = 0; m < dim; m++) {
+       // physical domains
+       std::uniform_real_distribution < double > dist2(mindomain.at(m), maxdomain.at(m));
+       double x = dist2(generator);
+       double v = 0.5 * (dist2(generator) - x);
+       // initialize particle's position vector
+       pos.push_back(x);
+       // standardize the position
+       pos.at(m) = (pos.at(m) - mindomain.at(m))/(maxdomain.at(m) - mindomain.at(m));
+       // initialize particle's velocity vector
+       vel.push_back(v);
+       // initialize particle's best own position vector
+       bpos = pos;
+     };
   };
-
 
 };
 
@@ -927,6 +929,1001 @@ if (verbose == true) {
 #endif
 };
 
+void Par::write_aveffield_lg() {
+  // write averaged ffield
+  ofstream output_file;
+  // current ffield file stream
+  ifstream ffield_file;
+  string comment;
+#ifdef WITH_MPI
+if (core == 0) {
+  output_file.open("ffield.ensemble", ios::out);
+  ffield_file.open("ffield", ios:: in );
+};
+#endif
+#ifndef WITH_MPI
+  output_file.open("ffield.ensemble", ios::out);
+  ffield_file.open("ffield", ios:: in );
+#endif
+
+  // store all ffield lines
+  vector < string > ffield_lines;
+  // store temporary lines of averaged ffield
+  vector < string > averageffieldline;
+  // stringstream object to convert double to formatted string
+  std::stringstream ss;
+
+  while (getline(ffield_file, comment)) {
+    ffield_lines.push_back(comment);
+  };
+  ffield_file.close();
+  /* -------------------------------------
+   * WRITE HEADER LINE FOR FFIELD
+   * -------------------------------------
+   */
+  for (int m = 0; m < 2; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  /* -------------------------------------
+   * WRITE GENERAL PARAMS SECTION
+   * -------------------------------------
+   */
+
+  for (int m = 2; m < 41; m++) {
+    boost::format f("%10.4f %s");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           ss << boost::format("%10.4f") %average;
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it); // feeding strings into formatter
+    };
+    output_file << f << endl; // print the result of formatter
+  };
+  /* ------------------------------------
+   * WRITE ATOM PARAMS HEADERS
+   * ------------------------------------
+   */
+  for (int m = 41; m < 45; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  using boost::is_any_of;
+  // the line that contains the number of elements
+  string numel_line = ffield_lines.at(41);
+  // vector to store the words after split
+  vector < string > results;
+  boost::trim(numel_line);
+  boost::split(results, numel_line, is_any_of("\t "));
+  numel = stoi(results.at(0));
+  max_line_atompar = 5 * numel + 45;
+
+  /* -------------------------------------
+   * WRITE ATOM PARAMS SECTION
+   * -------------------------------------
+   */
+
+  int m = 45;
+  while (m < max_line_atompar) {
+    boost::format f("% s%   9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions( f.exceptions() &
+    ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           ss << boost::format("%9.4f") %average;
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           ss << boost::format("%s") %ffensemble.at(0).at(m).at(col);
+           averageffieldline.push_back( ss.str() );
+           ss.str("");
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector<std::string>::iterator it=averageffield.at(m).begin();it!=averageffield.at(m).end();++it){
+            f = f % (*it);
+    };
+    output_file << f << endl;
+
+    for (int i = 1; i < 4; i++){
+      m = m + 1;
+      boost::format f("%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+      f.exceptions( f.exceptions() &
+      ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+
+      double average = 0;
+      ss << boost::format("   ");
+      for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+          if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+             for (int k = 0; k < ffensemble.size(); k++) {
+                 average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+             };
+             ss << boost::format("%9.4f") %average;
+             averageffieldline.push_back(ss.str());
+             average = 0;
+             ss.str("");
+          }else{
+             ss << boost::format("%s") %ffensemble.at(0).at(m).at(col);
+             averageffieldline.push_back( ss.str() );
+             ss.str("");
+          };
+      };
+      averageffield.push_back(averageffieldline);
+      averageffieldline.clear();
+
+      for (std::vector<std::string>::iterator it=averageffield.at(m).begin();it!=averageffield.at(m).end();++it){
+              f = f % (*it);
+      };
+      output_file << f << endl;
+    };
+
+    m = m + 1;
+    boost::format f2("   %9.4f%9.4f");
+    f2.exceptions( f2.exceptions() &
+    ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+
+    average = 0;
+    //ss << boost::format("   ");
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           ss << boost::format("%9.4f") %average;
+           averageffieldline.push_back(ss.str());
+           average = 0;
+           ss.str("");
+        }else{
+           ss << boost::format("%s") %ffensemble.at(0).at(m).at(col);
+           averageffieldline.push_back( ss.str() );
+           ss.str("");
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector<std::string>::iterator it=averageffield.at(m).begin();it!=averageffield.at(m).end();++it){
+            f2 = f2 % (*it);
+    };
+    output_file << f2 << endl;
+    m = m + 1;
+  };
+
+  /* ------------------------------------
+   * WRITE BONDS PARAMS HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_atompar; m < max_line_atompar + 2; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+ };
+
+  using boost::is_any_of;
+  // the line the contains the number of bond types
+  string numbty_line = ffield_lines.at(max_line_atompar);
+  // vector to store the words after split
+  vector < string > results_bonds;
+  boost::trim(numbty_line);
+  boost::split(results_bonds, numbty_line, is_any_of("\t "));
+  numbty = stoi(results_bonds.at(0));
+  max_line_bondpar = 2 * numbty + max_line_atompar;
+
+  /* ------------------------------------
+   * WRITE BONDS PARAMS SECTION
+   * ------------------------------------
+   */
+
+  for (int m = max_line_atompar + 2; m < max_line_bondpar + 2; m++) {
+    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           ss << boost::format("%s") %ffensemble.at(0).at(m).at(col);
+           averageffieldline.push_back( ss.str() );
+           ss.str("");
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+
+    output_file << f << endl;
+    m = m + 1;
+    boost::format f2("      %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f2.exceptions(f2.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+
+    average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           ss << boost::format("%9.4f") %average;
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           ss << boost::format("%i") %ffensemble.at(0).at(m).at(col);
+           averageffieldline.push_back( ss.str() );
+           ss.str("");
+
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f2 = f2 % ( * it);
+    };
+
+    output_file << f2 << endl;
+  };
+
+
+  /* ------------------------------------
+   * WRITE OFF-DIAG HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_bondpar + 2; m < max_line_bondpar + 3; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  /* ------------------------------------
+   * WRITE OFF-DIAG PARAMS SECTION
+   * ------------------------------------
+   */
+
+  using boost::is_any_of;
+  // the line that contains the number of off-diag types
+  string numodty_line = ffield_lines.at(max_line_bondpar + 2);
+  // vector to store the words after split
+  vector < string > results_offdiag;
+  boost::trim(numodty_line);
+  boost::split(results_offdiag, numodty_line, is_any_of("\t "));
+  numodty = stoi(results_offdiag.at(0));
+  max_line_offdpar = max_line_bondpar + 3 + numodty;
+
+  for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
+    // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
+    // So, to prevent it sticking to the left column
+    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           if (col == ffensemble.at(0).at(m).size()-1) {
+              ss << boost::format("%10.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+    output_file << f << endl;
+  };
+  /* ------------------------------------
+   * WRITE ANGLE HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_offdpar; m < max_line_offdpar + 1; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  /* ------------------------------------
+   * WRITE ANGLE PARAMS SECTION
+   * ------------------------------------
+   */
+
+  using boost::is_any_of;
+  // the line that contains the number of angle types
+  string numaty_line = ffield_lines.at(max_line_offdpar);
+  // vector to store the words after split
+  vector < string > results_angle;
+  boost::trim(numaty_line);
+  boost::split(results_angle, numaty_line, is_any_of("\t "));
+  numaty = stoi(results_angle.at(0));
+  max_line_angles = max_line_offdpar + 1 + numaty;
+
+  for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
+    boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1) || (col == 2)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+    output_file << f << endl;
+  };
+  /* ------------------------------------
+   * WRITE TORSION HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_angles; m < max_line_angles + 1; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  /* ------------------------------------
+   * WRITE TORSION PARAMS SECTION
+   * ------------------------------------
+   */
+
+  using boost::is_any_of;
+  // the line that contains the number of torsion types
+  string numtoty_line = ffield_lines.at(max_line_angles);
+  // vector to store the words after split
+  vector < string > results_tors;
+  boost::trim(numtoty_line);
+  boost::split(results_tors, numtoty_line, is_any_of("\t "));
+  numtoty = stoi(results_tors.at(0));
+  max_line_tors = max_line_angles + 1 + numtoty;
+
+  for (int m = max_line_angles + 1; m < max_line_tors; m++) {
+    boost::format f("  %i  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1) || (col == 2) || (col == 3)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+    output_file << f << endl;
+  };
+  /* ------------------------------------
+   * WRITE H-BOND HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_tors; m < max_line_tors + 1; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+ };
+
+  /* ------------------------------------
+   * WRITE H-BOND PARAMS SECTION
+   * ------------------------------------
+   */
+
+  using boost::is_any_of;
+  // the line that contains the number of Hbond types
+  string numhbty_line = ffield_lines.at(max_line_tors);
+  // vector to store the words after split
+  vector < string > results_hb;
+  boost::trim(numhbty_line);
+  boost::split(results_hb, numhbty_line, is_any_of("\t "));
+  numhbty = stoi(results_hb.at(0));
+  max_line_hbs = max_line_tors + 1 + numhbty;
+
+  for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
+    boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1) || (col == 2)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+    output_file << f << endl;
+  };
+
+  output_file.close();
+
+};
+
+void Par::write_aveffield() {
+  // write averaged ffield
+  ofstream output_file;
+  // current ffield file stream
+  ifstream ffield_file;
+  string comment;
+#ifdef WITH_MPI
+if (core == 0) {
+  output_file.open("ffield.ensemble", ios::out);
+  ffield_file.open("ffield", ios:: in );
+};
+#endif
+#ifndef WITH_MPI
+  output_file.open("ffield.ensemble", ios::out);
+  ffield_file.open("ffield", ios:: in );
+#endif
+
+  // store all ffield lines
+  vector < string > ffield_lines;
+  // store temporary lines of averaged ffield
+  vector < string > averageffieldline;
+  // stringstream object to convert double to formatted string
+  std::stringstream ss;
+
+  while (getline(ffield_file, comment)) {
+    ffield_lines.push_back(comment);
+  };
+  ffield_file.close();
+  /* -------------------------------------
+   * WRITE HEADER LINE FOR FFIELD
+   * -------------------------------------
+   */
+  for (int m = 0; m < 2; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  /* -------------------------------------
+   * WRITE GENERAL PARAMS SECTION
+   * -------------------------------------
+   */
+
+  for (int m = 2; m < 41; m++) {
+    boost::format f("%10.4f %s");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           ss << boost::format("%10.4f") %average;
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it); // feeding strings into formatter
+    };
+    output_file << f << endl; // print the result of formatter
+  };
+  /* ------------------------------------
+   * WRITE ATOM PARAMS HEADERS
+   * ------------------------------------
+   */
+  for (int m = 41; m < 45; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  using boost::is_any_of;
+  // the line that contains the number of elements
+  string numel_line = ffield_lines.at(41);
+  // vector to store the words after split
+  vector < string > results;
+  boost::trim(numel_line);
+  boost::split(results, numel_line, is_any_of("\t "));
+  numel = stoi(results.at(0));
+  max_line_atompar = 4 * numel + 45;
+  /* -------------------------------------
+   * WRITE ATOM PARAMS SECTION
+   * -------------------------------------
+   */
+
+  int m = 45;
+  while (m < max_line_atompar) {
+    boost::format f("% s%   9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions( f.exceptions() &
+    ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           ss << boost::format("%9.4f") %average;
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           ss << boost::format("%s") %ffensemble.at(0).at(m).at(col);
+           averageffieldline.push_back( ss.str() );
+           ss.str("");
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector<std::string>::iterator it=averageffield.at(m).begin();it!=averageffield.at(m).end();++it){
+            f = f % (*it);
+    };
+    output_file << f << endl;
+
+    for (int i = 1; i < 4; i++){
+      m = m + 1;
+      boost::format f("%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+      f.exceptions( f.exceptions() &
+      ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
+
+      double average = 0;
+      ss << boost::format("   ");
+      for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+          if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+             for (int k = 0; k < ffensemble.size(); k++) {
+                 average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+             };
+             ss << boost::format("%9.4f") %average;
+             averageffieldline.push_back(ss.str());
+             average = 0;
+             ss.str("");
+          }else{
+             ss << boost::format("%s") %ffensemble.at(0).at(m).at(col);
+             averageffieldline.push_back( ss.str() );
+             ss.str("");
+          };
+      };
+      averageffield.push_back(averageffieldline);
+      averageffieldline.clear();
+
+      for (std::vector<std::string>::iterator it=averageffield.at(m).begin();it!=averageffield.at(m).end();++it){
+              f = f % (*it);
+      };
+      output_file << f << endl;
+    };
+    m = m + 1;
+  };
+
+  /* ------------------------------------
+   * WRITE BONDS PARAMS HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_atompar; m < max_line_atompar + 2; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+ };
+
+  using boost::is_any_of;
+  // the line the contains the number of bond types
+  string numbty_line = ffield_lines.at(max_line_atompar);
+  // vector to store the words after split
+  vector < string > results_bonds;
+  boost::trim(numbty_line);
+  boost::split(results_bonds, numbty_line, is_any_of("\t "));
+  numbty = stoi(results_bonds.at(0));
+  max_line_bondpar = 2 * numbty + max_line_atompar;
+
+  /* ------------------------------------
+   * WRITE BONDS PARAMS SECTION
+   * ------------------------------------
+   */
+
+  for (int m = max_line_atompar + 2; m < max_line_bondpar + 2; m++) {
+    if (mod(m, 2) != 0) {
+      boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+      f.exceptions(f.exceptions() &
+        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+      double average = 0;
+      for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+          if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+             for (int k = 0; k < ffensemble.size(); k++) {
+                 average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+             };
+             if ((col == 0) || (col == 1)) {
+                ss << boost::format("%i") %average;
+             }else{
+                ss << boost::format("%9.4f") %average;
+             };
+             averageffieldline.push_back(ss.str());
+             ss.str("");
+             average = 0;
+          }else{
+             ss << boost::format("%s") %ffensemble.at(0).at(m).at(col);
+             averageffieldline.push_back( ss.str() );
+             ss.str("");
+          };
+      };
+      averageffield.push_back(averageffieldline);
+      averageffieldline.clear();
+
+      for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+        f = f % ( * it);
+      };
+      output_file << f << endl;
+    } else {
+      boost::format f("      %9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+      f.exceptions(f.exceptions() &
+        ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+      double average = 0;
+      for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+          if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+             for (int k = 0; k < ffensemble.size(); k++) {
+                 average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+             };
+             ss << boost::format("%9.4f") %average;
+             averageffieldline.push_back( ss.str() );
+             ss.str("");
+             average = 0;
+          }else{
+             ss << boost::format("%i") %ffensemble.at(0).at(m).at(col);
+             averageffieldline.push_back( ss.str() );
+             ss.str("");
+             
+          };
+      };
+      averageffield.push_back(averageffieldline);
+      averageffieldline.clear();
+
+      for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+        f = f % ( * it);
+      };
+      output_file << f << endl;
+    };
+  };
+  /* ------------------------------------
+   * WRITE OFF-DIAG HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_bondpar + 2; m < max_line_bondpar + 3; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  /* ------------------------------------
+   * WRITE OFF-DIAG PARAMS SECTION
+   * ------------------------------------
+   */
+
+  using boost::is_any_of;
+  // the line that contains the number of off-diag types
+  string numodty_line = ffield_lines.at(max_line_bondpar + 2);
+  // vector to store the words after split
+  vector < string > results_offdiag;
+  boost::trim(numodty_line);
+  boost::split(results_offdiag, numodty_line, is_any_of("\t "));
+  numodty = stoi(results_offdiag.at(0));
+  max_line_offdpar = max_line_bondpar + 3 + numodty;
+
+  for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
+    // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
+    // So, to prevent it sticking to the left column
+    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+    output_file << f << endl;
+  };
+  /* ------------------------------------
+   * WRITE ANGLE HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_offdpar; m < max_line_offdpar + 1; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  /* ------------------------------------
+   * WRITE ANGLE PARAMS SECTION
+   * ------------------------------------
+   */
+
+  using boost::is_any_of;
+  // the line that contains the number of angle types
+  string numaty_line = ffield_lines.at(max_line_offdpar);
+  // vector to store the words after split
+  vector < string > results_angle;
+  boost::trim(numaty_line);
+  boost::split(results_angle, numaty_line, is_any_of("\t "));
+  numaty = stoi(results_angle.at(0));
+  max_line_angles = max_line_offdpar + 1 + numaty;
+
+  for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
+    boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1) || (col == 2)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+    output_file << f << endl;
+  };
+  /* ------------------------------------
+   * WRITE TORSION HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_angles; m < max_line_angles + 1; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+  };
+
+  /* ------------------------------------
+   * WRITE TORSION PARAMS SECTION
+   * ------------------------------------
+   */
+
+  using boost::is_any_of;
+  // the line that contains the number of torsion types
+  string numtoty_line = ffield_lines.at(max_line_angles);
+  // vector to store the words after split
+  vector < string > results_tors;
+  boost::trim(numtoty_line);
+  boost::split(results_tors, numtoty_line, is_any_of("\t "));
+  numtoty = stoi(results_tors.at(0));
+  max_line_tors = max_line_angles + 1 + numtoty;
+
+  for (int m = max_line_angles + 1; m < max_line_tors; m++) {
+    boost::format f("  %i  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1) || (col == 2) || (col == 3)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+    output_file << f << endl;
+  };
+  /* ------------------------------------
+   * WRITE H-BOND HEADERS
+   * ------------------------------------
+   */
+
+  for (int m = max_line_tors; m < max_line_tors + 1; m++) {
+    output_file << ffield_lines.at(m) << endl;
+    averageffield.push_back(ffensemble.at(0).at(m));
+ };
+
+  /* ------------------------------------
+   * WRITE H-BOND PARAMS SECTION
+   * ------------------------------------
+   */
+
+  using boost::is_any_of;
+  // the line that contains the number of Hbond types
+  string numhbty_line = ffield_lines.at(max_line_tors);
+  // vector to store the words after split
+  vector < string > results_hb;
+  boost::trim(numhbty_line);
+  boost::split(results_hb, numhbty_line, is_any_of("\t "));
+  numhbty = stoi(results_hb.at(0));
+  max_line_hbs = max_line_tors + 1 + numhbty;
+
+  for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
+    boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f");
+    f.exceptions(f.exceptions() &
+      ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
+
+    double average = 0;
+    for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
+        if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
+           for (int k = 0; k < ffensemble.size(); k++) {
+               average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
+           };
+           if ((col == 0) || (col == 1) || (col == 2)) {
+              ss << boost::format("%i") %average;
+           }else{
+              ss << boost::format("%9.4f") %average;
+           };
+           averageffieldline.push_back(ss.str());
+           ss.str("");
+           average = 0;
+        }else{
+           averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
+        };
+    };
+    averageffield.push_back(averageffieldline);
+    averageffieldline.clear();
+
+    for (std::vector < std::string > ::iterator it = averageffield.at(m).begin(); it != averageffield.at(m).end(); ++it) {
+      f = f % ( * it);
+    };
+    output_file << f << endl;
+  };
+
+  output_file.close();
+
+};
+
 void Par::write_ffield(const vector <double> &active_params, int cycle, int iter, int parid) {
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
@@ -935,8 +1932,7 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
   int index = 0;
   double tempphys;
   // for each line value in ffline and corresponding column value
-  // in ffcol cp corresponding pos value into ffieldmat. Range-based for
-  // statement --> Following: https://msdn.microsoft.com/en-us/library/jj203382.aspx
+  // in ffcol cp corresponding pos value into ffieldmat.
   for (int line: ffline) {
     // buffer for sprintf
     char buffer[50];
@@ -1228,9 +2224,6 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
     "ffield", boost::filesystem::copy_option::overwrite_if_exists);
 #endif
 };
-
-
-
 
 
 void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int iter, int parid) {
@@ -2939,7 +3932,7 @@ if (verbose == true) {
     //      of not parallelising the training set. 
         ptrainset = 1;
     };
-    if (ptrainset > numcores) {
+    if (ptrainset > numcores && ensembleave == false) {
       cout << "Error: Number of allocated processors < number of training set sub-units" << endl;
       MPI_Abort(MPI_COMM_WORLD,7);
     }else if (ptrainset > 1) {
@@ -2964,16 +3957,19 @@ if (verbose == true) {
     istringstream(tempinput.at(12)) >> ofit;
     istringstream(tempinput.at(13)) >> uq;
     istringstream(tempinput.at(14)) >> NumP;
-    if (NumP < numcores) {
-      cout << "Error: Number of swarm members < number of allocated processors." << endl;
-      MPI_Abort(MPI_COMM_WORLD,7);
-    } else {
-      totmembers = NumP;
-      NumP = int(floor(NumP / numcores));
-    };
-    if (ptrainset < 0 || (ptrainset > 1 && mod(totmembers,ptrainset) != 0)) {
-       cout << "Error: Number of training set sub-units < 0 or not a divisor of number of allocated processors." << endl;
-       MPI_Abort(MPI_COMM_WORLD,7);
+    if (ensembleave == false) {
+       if (NumP < numcores) {
+         cout << "Error: Number of swarm members < number of allocated processors." << endl;
+         MPI_Abort(MPI_COMM_WORLD,7);
+       } else {
+         totmembers = NumP;
+         NumP = int(floor(NumP / numcores));
+       };
+
+       if (ptrainset < 0 || (ptrainset > 1 && mod(totmembers,ptrainset) != 0)) {
+          cout << "Error: Number of training set sub-units < 0 or not a divisor of number of allocated processors." << endl;
+          MPI_Abort(MPI_COMM_WORLD,7);
+       };
     };
     istringstream(tempinput.at(15)) >> c1;
     istringstream(tempinput.at(16)) >> c2;
@@ -2988,66 +3984,11 @@ if (verbose == true) {
 
   };  // close if core==0
  
-  // check if reaxff was set to run with fixed charges and require charges file
-  read_icharg_control();
-  boost::filesystem::ifstream charge_file("charges");
-  //fixcharges = true;
-  if (fixcharges == true && charge_file.fail()) {
-    cout << "Error: 'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
-    charge_file.close();
-    MPI_Abort(MPI_COMM_WORLD,8);
-  };
-  charge_file.close();
-
-  // prepare dirs for each CPU process
-  boost::filesystem::create_directory("CPU." + str_core);
-  boost::filesystem::copy_file("tapreaxff", "CPU." + str_core + "/tapreaxff",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file("ffield", "CPU." + str_core + "/ffield",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file("control", "CPU." + str_core + "/control",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  boost::filesystem::copy_file("geo", "CPU." + str_core + "/geo",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  // prepare fort.111 (forces) file for each CPU process once if it exists (for training FORCES in trainset)
-  //if (boost::filesystem::exists(pwd.string() + "/forgeo")) {
-  //   boost::filesystem::copy_file(pwd.string() + "/forgeo", pwd.string() + "/CPU." + str_core + "/fort.111",
-  //       boost::filesystem::copy_option::overwrite_if_exists);
-  //};
-
-  if (fixcharges == true) {
-    boost::filesystem::copy_file("charges", "CPU." + str_core + "/charges",
-      boost::filesystem::copy_option::overwrite_if_exists);
-  // fixcharges = true;
-  };
-  charge_file.close();
-
-  // create fort.20 file needed by tapreaxff
-  boost::filesystem::ofstream iopt_file("CPU." + str_core + "/fort.20");
-  iopt_file << "0";
-  iopt_file.close();
-
-  // create fort.35 file needed by tapreaxff
-  ofstream fort35_file("CPU." + str_core + "/fort.35");
-  fort35_file << "23434.1" << endl;
-  fort35_file.close();
 
   // broadcast between all processes from process 0
   // MPI_Bcast must be visible to all processes!
   MPI_Bcast( & lg_yn, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ptrainset, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  if (ptrainset == 1) {
-    boost::filesystem::copy_file("trainset.in", "CPU." + str_core + "/trainset.in",
-        boost::filesystem::copy_option::overwrite_if_exists);
-  };
-  if (ptrainset > 1) {
-    // define size of vectors for all the rest of the cores
-    swarmcores.resize(numcores/ptrainset);
-    reaxffcores.resize(numcores - (numcores/ptrainset));
-    // now is possible to bcast swarmcores.data() and reaxffcores.data()
-    MPI_Bcast( swarmcores.data(), swarmcores.size(), MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast( reaxffcores.data(), reaxffcores.size(), MPI_INT, 0, MPI_COMM_WORLD);
-  };
   MPI_Bcast( & verbose, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & contff, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & NumP, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -3065,7 +4006,6 @@ if (verbose == true) {
   MPI_Bcast( & localmin, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & lm_iter_max, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & lm_err_tol, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  //MPI_Bcast( & fixcharges, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & regular, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast( & dropvalue, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast( & hlambda, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -3073,6 +4013,66 @@ if (verbose == true) {
   MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ensembleave, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
 
+  // after broadcasting ensembleave all CPUs have the value of ensembleave
+  // now it is possible to perform the following on every CPU
+  if (ptrainset == 1 && (ensembleave == false)) {
+    boost::filesystem::copy_file("trainset.in", "CPU." + str_core + "/trainset.in",
+        boost::filesystem::copy_option::overwrite_if_exists);
+  };
+  if (ptrainset > 1 && (ensembleave == false)) {
+    // define size of vectors for all the rest of the cores
+    swarmcores.resize(numcores/ptrainset);
+    reaxffcores.resize(numcores - (numcores/ptrainset));
+    // now is possible to bcast swarmcores.data() and reaxffcores.data()
+    MPI_Bcast( swarmcores.data(), swarmcores.size(), MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast( reaxffcores.data(), reaxffcores.size(), MPI_INT, 0, MPI_COMM_WORLD);
+  };
+
+  // prepare dirs for each CPU process
+  if (ensembleave == false) {
+     boost::filesystem::create_directory("CPU." + str_core);
+     boost::filesystem::copy_file("tapreaxff", "CPU." + str_core + "/tapreaxff",
+         boost::filesystem::copy_option::overwrite_if_exists);
+     boost::filesystem::copy_file("ffield", "CPU." + str_core + "/ffield",
+         boost::filesystem::copy_option::overwrite_if_exists);
+     boost::filesystem::copy_file("control", "CPU." + str_core + "/control",
+         boost::filesystem::copy_option::overwrite_if_exists);
+     boost::filesystem::copy_file("geo", "CPU." + str_core + "/geo",
+         boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
+  if (ensembleave == false) {
+     // check if reaxff was set to run with fixed charges and require charges file
+     read_icharg_control();
+
+     boost::filesystem::ifstream charge_file("charges");
+     //fixcharges = true;
+     if (fixcharges == true && charge_file.fail()) {
+       cout << "Error: 'control' uses icharg=5 (fixed charges) but no 'charges' file was found!" << endl;
+       charge_file.close();
+       MPI_Abort(MPI_COMM_WORLD,8);
+     };
+     charge_file.close();
+  };
+
+  if (fixcharges == true && (ensembleave == false)) {
+    boost::filesystem::copy_file("charges", "CPU." + str_core + "/charges",
+      boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
+  // create fort.20 file needed by tapreaxff
+  if (ensembleave == false) {
+     boost::filesystem::ofstream iopt_file("CPU." + str_core + "/fort.20");
+     iopt_file << "0";
+     iopt_file.close();
+  };
+
+  // create fort.35 file needed by tapreaxff
+  if (ensembleave == false) {
+     ofstream fort35_file("CPU." + str_core + "/fort.35");
+     fort35_file << "23434.1" << endl;
+     fort35_file.close();
+  };
 #endif
 
 #ifndef WITH_MPI
@@ -3318,53 +4318,84 @@ if (verbose == true) {
    cout << "entered MakeEnsembleFF()" << endl;
 };
 #endif
-
 #ifdef WITH_MPI
 if (core == 0) {
    if (ensembleave == true) {
-   string str_core = std::to_string(core);
-   boost::filesystem::ofstream log("log.flocky", ofstream::app);
-   log << "\n";
-   log << "Preparing an ensemble-averaged force field. Please wait." << endl;
-   log.close();
-   
-   const std::string target_path( "ffbags" );
-   //const boost::regex my_filter( "ffield.gbest.*" );
+      for (int p = 0; p < 1; p++) {
+         Par NewPar;
+         newSwarm.AddPar(NewPar);
+      };
 
-   const std::regex my_filter ( "ffield.gbest.*" );
+      boost::filesystem::ofstream log("log.flocky", ofstream::app);
+      log << "\n";
+      log << "Preparing an ensemble-averaged force field." << endl;
 
-   int   numffbags;
-   numffbags = 0;
-   std::vector< std::string > all_matching_files;
-   
-   boost::filesystem::directory_iterator end_itr; // Default ctor yields past-the-end
-   for( boost::filesystem::directory_iterator i( target_path ); i != end_itr; ++i )
-   {
-       // Skip if not a file
-       if( !boost::filesystem::is_regular_file( i->status() ) ) continue;
-       
-       std::smatch what;
-       //boost::smatch what;
-   
-       // Skip if no match for version 2 of boost::filesystem:
-       //if( !boost::regex_match( i->leaf(), what, my_filter ) ) continue;
-       // For version 3:
-       //if( !boost::regex_match( i->path().filename().string(), what, my_filter ) ) continue;
-       if (!regex_search (i->path().filename().string(),what,my_filter)) continue;
+      const std::string target_path( "ffbags" );
+      const std::regex my_filter ( "ffield.gbest.*" );
 
-       // File matches, store it
-       //all_matching_files.push_back( i->leaf() );
-       // For version 3:
-       all_matching_files.push_back( i->path().filename().string() );
-       numffbags++;
-   }
-   log << "flocky found " << numffbags << " global-best force fields to average" << endl;
-   MPI_Finalize(); 
-   
+      vector <vector <string>> myffield;
+      
+      numffbags = 0;
+      vector <string> all_matching_files;
+      
+      boost::filesystem::directory_iterator end_itr; // Default ctor yields past-the-end
+      for( boost::filesystem::directory_iterator i( target_path ); i != end_itr; ++i )
+      {
+          // Skip if not a file
+          if( !boost::filesystem::is_regular_file( i->status() ) ) continue;
+          
+          std::smatch what;
+          // skip if no match
+          if (!regex_search (i->path().filename().string(),what,my_filter)) continue;
+
+          // File matches, store it
+          all_matching_files.push_back( i->path().filename().string() );
+          numffbags++;
+      }
+      log << "\nflocky found an ensemble of " << numffbags << " gbest force fields to average." << endl;
+
+      // loop over files of gbest ffields and store them
+      newSwarm.GetPar(0).ffensemble.clear();
+      for (auto myfile : all_matching_files) {
+         myffield.clear();
+         std::ifstream fin("ffbags/"+myfile);
+         
+         std::string line;
+         int numlines = 0;
+    
+         // for each line
+         while (std::getline(fin, line)) {
+           //cout << line << endl;
+           numlines++;
+           // create a new row
+           std::vector < string > lineData;
+           string val;
+           std::istringstream lineStream(line);
+           // for each value in line
+           while (lineStream >> val) {
+             // add to the current row
+             lineData.push_back(val);
+           };
+           // add row to ffieldmat matrix
+           myffield.push_back(lineData);
+         };
+         fin.close();
+         // store gbest ffields in ffensemble
+         newSwarm.GetPar(0).ffensemble.push_back(myffield);
+      };
+      
+      if (lg_yn == true) {
+         newSwarm.GetPar(0).write_aveffield_lg();
+      }else{
+         newSwarm.GetPar(0).write_aveffield();
+      };
+
+      log << "\n";
+      log << "An ensemble-averaged force field is ready!\n" << endl;
+      log.close();
    };
 };
 #endif
-
 
 #ifndef WITH_MPI
 #endif
@@ -3383,122 +4414,140 @@ if (verbose == true) {
 #endif
 
 #ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered Populate!" << endl; 
-};
-
- // define a new sub-communicator for reaxffcores and swarmcores //
-    MPI_Comm ACTIVESWARM;  // swarmcores
-    MPI_Comm PASSIVESWARM; // reaxffcores
-    MPI_Comm *newcomm;
-    int color;
-    if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-        color = 444;
-        newcomm = &ACTIVESWARM;
+if (ensembleave == false) {
+    if (core == 0 && verbose == true) {
+       cout << "CPU: " << core << " entered Populate!" << endl; 
     };
-    if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
-        color = 333;
-        newcomm = &PASSIVESWARM;
-    };
-    MPI_Comm_split( MPI_COMM_WORLD, color, core, newcomm );
-
-    if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-         MPI_Comm_rank( ACTIVESWARM, &mycore_swarmcore);
-         MPI_Comm_size( ACTIVESWARM, &size_swarmcores);
-    };
-
-    if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
-         MPI_Comm_rank( PASSIVESWARM, &mycore_reaxffcore);
-         MPI_Comm_size( PASSIVESWARM, &size_reaxffcores);
-    };
-
-
-  boost::filesystem::path pwd(boost::filesystem::current_path());
-  string str_core = std::to_string(core);
-  if (core == 0) {
-    boost::filesystem::ofstream log("log.flocky", ofstream::app);
-    log << "\n";
-    log << "Swarm generation started. Please wait." << endl;
-    log.close();
-  };
-  funceval = 0; // clear counter for cycles
-
-  // find inverse parameters and store them in inversep
-  if (regular == 1 || regular == 2) {
-     get_inversep();
-  };
-
-  // ---------------------------------------------- //
-  //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
-  // ---------------------------------------------- //
-  for (int p = 0; p < NumP; p++) {
-    string parID = std::to_string(p);
-    string str_cycle = std::to_string(cycle);
-
-    Par NewPar;
-    newSwarm.AddPar(NewPar);
-    // initial gbfit is INF for all processes and all swarm members
-    gbfit = numeric_limits < double > ::infinity();
-    // initial gbpos is 0.0 for all processes and all swarm members
-    gbpos.clear();
-    for (int m=0; m < dim; m++){
-      gbpos.push_back(0.0);
-
-    };
-
-    if (ptrainset > 1) {
-     // generate trainset and geo subsets
-     newSwarm.GetPar(p).write_trainset();
-     newSwarm.GetPar(p).write_geo();
-    };
-
-    // cp geo to geo.parID so each particle works with its own geo file
-    boost::filesystem::copy_file("CPU." + str_core + "/geo",
-      "CPU." + str_core + "/geo." + str_cycle + "." + parID,
-        boost::filesystem::copy_option::overwrite_if_exists);
     
-
-    if (core == 0) {
-      // If contff == y, then take force field's current values for the position of particle 0 (others are random)
-      if (contff == true) {
-        vector < double > ffpos;
-        double tempstand;
-        ffpos.clear();
-        for (int m = 0; m < dim; m++) {
-            ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
+     // define a new sub-communicator for reaxffcores and swarmcores //
+        MPI_Comm ACTIVESWARM;  // swarmcores
+        MPI_Comm PASSIVESWARM; // reaxffcores
+        MPI_Comm *newcomm;
+        int color;
+        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+            color = 444;
+            newcomm = &ACTIVESWARM;
         };
-        newSwarm.GetPar(0).set_pos(ffpos);
-        // reset parameters if outside domain before standardization possible
-        newSwarm.GetPar(0).check_bounds_contff();
-        // standardize positions
-        for (int m = 0; m < dim; m++) {
-            newSwarm.GetPar(0).pos.at(m) = ( newSwarm.GetPar(0).pos.at(m) - newSwarm.GetPar(0).mindomain.at(m) ) / ( newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)  );
+        if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+            color = 333;
+            newcomm = &PASSIVESWARM;
         };
+        MPI_Comm_split( MPI_COMM_WORLD, color, core, newcomm );
+    
+        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+             MPI_Comm_rank( ACTIVESWARM, &mycore_swarmcore);
+             MPI_Comm_size( ACTIVESWARM, &size_swarmcores);
+        };
+    
+        if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+             MPI_Comm_rank( PASSIVESWARM, &mycore_reaxffcore);
+             MPI_Comm_size( PASSIVESWARM, &size_reaxffcores);
+        };
+    
+    
+      boost::filesystem::path pwd(boost::filesystem::current_path());
+      string str_core = std::to_string(core);
+      if (core == 0) {
+        boost::filesystem::ofstream log("log.flocky", ofstream::app);
+        log << "\n";
+        log << "Swarm generation started. Please wait." << endl;
+        log.close();
       };
-      contff = false;
-    };
-
-    // evaluate fitness and set bfit = curfit
-    newSwarm.GetPar(p).state.cycle = cycle;
-    iter = 0;
-    newSwarm.GetPar(p).state.iter = iter;
-    newSwarm.GetPar(p).state.parid = p;
-
-    // dropout
-    if (regular == 3) {
-       newSwarm.GetPar(p).dropout(dropvalue);
-    };
-
-    // local minimization
-    if (localmin == 1 || localmin == 2) {
-       newSwarm.GetPar(p).iterate();
-    }else{
-       newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
-    };
-
-    // if we parallelize the training set, update gbfit and gbpos only among swarmcores
-    if (ptrainset > 1) {
-       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+      funceval = 0; // clear counter for cycles
+    
+      // find inverse parameters and store them in inversep
+      if (regular == 1 || regular == 2) {
+         get_inversep();
+      };
+    
+      // ---------------------------------------------- //
+      //     POPULATE: MAIN LOOP OVER SWARM MEMBERS
+      // ---------------------------------------------- //
+      for (int p = 0; p < NumP; p++) {
+        string parID = std::to_string(p);
+        string str_cycle = std::to_string(cycle);
+    
+        Par NewPar;
+        newSwarm.AddPar(NewPar);
+        // initial gbfit is INF for all processes and all swarm members
+        gbfit = numeric_limits < double > ::infinity();
+        // initial gbpos is 0.0 for all processes and all swarm members
+        gbpos.clear();
+        for (int m=0; m < dim; m++){
+          gbpos.push_back(0.0);
+    
+        };
+    
+        if (ptrainset > 1) {
+         // generate trainset and geo subsets
+         newSwarm.GetPar(p).write_trainset();
+         newSwarm.GetPar(p).write_geo();
+        };
+    
+        // cp geo to geo.parID so each particle works with its own geo file
+        boost::filesystem::copy_file("CPU." + str_core + "/geo",
+          "CPU." + str_core + "/geo." + str_cycle + "." + parID,
+            boost::filesystem::copy_option::overwrite_if_exists);
+        
+    
+        if (core == 0) {
+          // If contff == y, then take force field's current values for the position of particle 0 (others are random)
+          if (contff == true) {
+            vector < double > ffpos;
+            double tempstand;
+            ffpos.clear();
+            for (int m = 0; m < dim; m++) {
+                ffpos.push_back(stod(newSwarm.GetPar(0).ffieldmat.at(newSwarm.GetPar(0).ffline.at(m)).at(newSwarm.GetPar(0).ffcol.at(m))));
+            };
+            newSwarm.GetPar(0).set_pos(ffpos);
+            // reset parameters if outside domain before standardization possible
+            newSwarm.GetPar(0).check_bounds_contff();
+            // standardize positions
+            for (int m = 0; m < dim; m++) {
+                newSwarm.GetPar(0).pos.at(m) = ( newSwarm.GetPar(0).pos.at(m) - newSwarm.GetPar(0).mindomain.at(m) ) / ( newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)  );
+            };
+          };
+          contff = false;
+        };
+    
+        // evaluate fitness and set bfit = curfit
+        newSwarm.GetPar(p).state.cycle = cycle;
+        iter = 0;
+        newSwarm.GetPar(p).state.iter = iter;
+        newSwarm.GetPar(p).state.parid = p;
+    
+        // dropout
+        if (regular == 3) {
+           newSwarm.GetPar(p).dropout(dropvalue);
+        };
+    
+        // local minimization
+        if (localmin == 1 || localmin == 2) {
+           newSwarm.GetPar(p).iterate();
+        }else{
+           newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
+        };
+    
+        // if we parallelize the training set, update gbfit and gbpos only among swarmcores
+        if (ptrainset > 1) {
+           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+              newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
+              if (newSwarm.GetPar(p).get_fitness() < gbfit) {
+                gbfitfound = true;
+                parid_gbfit = p;
+                gbfit = newSwarm.GetPar(p).get_fitness();
+                gbpos.clear();
+                gbpos = newSwarm.GetPar(p).get_pos_vec();
+                //write_ffield_gbest(core, cycle, iter, p);
+              }else{
+                 gbfitfound = false;
+              };
+              // cleaning ffield.tmp.* files after write_ffield_gbest already
+              // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
+              //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
+           };
+        }else {
+          newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
           newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
           if (newSwarm.GetPar(p).get_fitness() < gbfit) {
             gbfitfound = true;
@@ -3513,187 +4562,171 @@ if (core == 0 && verbose == true) {
           // cleaning ffield.tmp.* files after write_ffield_gbest already
           // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
           //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
-       };
-    }else {
-      newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).get_fitness());
-      newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
-      if (newSwarm.GetPar(p).get_fitness() < gbfit) {
-        gbfitfound = true;
-        parid_gbfit = p;
-        gbfit = newSwarm.GetPar(p).get_fitness();
-        gbpos.clear();
-        gbpos = newSwarm.GetPar(p).get_pos_vec();
-        //write_ffield_gbest(core, cycle, iter, p);
-      }else{
-         gbfitfound = false;
-      };
-      // cleaning ffield.tmp.* files after write_ffield_gbest already
-      // copied the correct ffield.tmp.* file as the ffield.gbest.*.0.*
-      //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp." + str_cycle+".0." + "." + parID);
-    };
-
-  }; // done loop on members
-
-  // if we parallelize the training set, do the following only among swarmcores
-  if (ptrainset > 1) {
-        // pair struct to hold the global best fitness across processes and its core rank
-        struct {
-          double tmp_fit;
-          int tmp_cpu;
-        }  min_vals_in[1], min_vals_out[1];
-        // store current fit on each process
-        min_vals_in[0].tmp_fit = gbfit;
-        // store core id of that current process
-        min_vals_in[0].tmp_cpu = mycore_swarmcore; 
-        // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
-        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-           MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
         };
-        // global best fitness across all processes
-        gbfit = min_vals_out[0].tmp_fit;
-        // core rank the above fitness came from
-        cpuid_gbfit = min_vals_out[0].tmp_cpu;
-        // broadcast contents of gbpos vector from rank cpuid_gbfit
-        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-           MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, ACTIVESWARM);
-        };
-
-        // pair struct to hold the global best fitness across processes and its parID
+    
+      }; // done loop on members
+    
+      // if we parallelize the training set, do the following only among swarmcores
+      if (ptrainset > 1) {
+            // pair struct to hold the global best fitness across processes and its core rank
+            struct {
+              double tmp_fit;
+              int tmp_cpu;
+            }  min_vals_in[1], min_vals_out[1];
+            // store current fit on each process
+            min_vals_in[0].tmp_fit = gbfit;
+            // store core id of that current process
+            min_vals_in[0].tmp_cpu = mycore_swarmcore; 
+            // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
+            if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+               MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
+            };
+            // global best fitness across all processes
+            gbfit = min_vals_out[0].tmp_fit;
+            // core rank the above fitness came from
+            cpuid_gbfit = min_vals_out[0].tmp_cpu;
+            // broadcast contents of gbpos vector from rank cpuid_gbfit
+            if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+               MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, ACTIVESWARM);
+            };
+    
+            // pair struct to hold the global best fitness across processes and its parID
+             // The parID is required in detection of overfitting to cp the correct ffield.gbest file
+             struct {
+               double tmp_fit2;
+               int tmp_parid;
+             } /*min_vals_in2, min_vals_out2;*/ min_vals_in2[1], min_vals_out2[1];
+    
+             // store current fit on each process
+              min_vals_in2[0].tmp_fit2 = gbfit;
+             // store par id of that current process
+              min_vals_in2[0].tmp_parid = parid_gbfit;
+             // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
+             if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+                MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
+             };
+             // parid of the gbfit
+             parid_gbfit = min_vals_out2[0].tmp_parid;
+    
+             // now convert cpuid_gbfit value from ACTIVESWARM to MPI_COMM_WORLD
+             if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end() && gbfitfound == true) {
+                 cpuid_gbfit = swarmcores.at(cpuid_gbfit);
+             };
+    
+             // do write_ffield_gbest
+             if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+                //cout << "CPU: " << core << " (cpuid_gbfit) writing ffield_gbest: ffield.tmp."+to_string(cycle)+"."+"0."+to_string(parid_gbfit) << endl;
+                write_ffield_gbest(cpuid_gbfit, cycle, 0, parid_gbfit);
+                boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
+             };
+    
+            if (core == 0) {
+              // clean up any old files belonging to previous job
+              if ( boost::filesystem::exists( "opti_log.out." + std::to_string(cycle)) ){
+                boost::filesystem::remove( "opti_log.out." + std::to_string(cycle) );
+              };
+              if ( boost::filesystem::exists( "disp_log.out." + std::to_string(cycle)) ){
+                boost::filesystem::remove( "disp_log.out." + std::to_string(cycle) );
+              };
+    
+              newSwarm.printopt(newSwarm, 0, cycle, 1);
+              boost::filesystem::ofstream log("log.flocky", ofstream::app);
+              log << "\nSwarm generation completed." << endl;
+              log << "Initial global best fit: " << boost::format("        %1.10e") %gbfit << endl;
+              log << "flocky optimization started!" << endl;
+              log.close();
+           };
+    
+              //newSwarm.printdisp(newSwarm, 0, cycle, 1);
+              newSwarm.printpos(newSwarm, 0, cycle, 1);
+              if (uq == true) {
+                newSwarm.printUQFF(newSwarm, 0, cycle, 1);
+                newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
+              };
+            
+    
+            // ---- free the sub-communicators ------ //
+            for (const int& swarmcore : swarmcores) {
+              if (core == swarmcore) {
+                  newcomm = &ACTIVESWARM;
+                  MPI_Comm_free(newcomm);
+              };
+            };
+            for (const int& reaxffcore : reaxffcores) {
+              if (core == reaxffcore) {
+                  newcomm = &PASSIVESWARM;
+                  MPI_Comm_free(newcomm);
+              };
+            };
+            // -------------------------------------- //
+      }else {
+         // pair struct to hold the global best fitness across processes and its core rank
+         struct {
+           double tmp_fit;
+           int tmp_cpu;
+         } min_vals_in[1], min_vals_out[1];
+         // store current fit on each process
+         min_vals_in[0].tmp_fit = gbfit;
+         // store core id of that current process
+         min_vals_in[0].tmp_cpu = core;
+         // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
+         MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+         // global best fitness across all processes
+         gbfit = min_vals_out[0].tmp_fit;
+         // core rank the above fitness came from
+         cpuid_gbfit = min_vals_out[0].tmp_cpu;
+         // broadcast contents of gbpos vector from rank cpuid_gbfit
+         MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
+    
+         // pair struct to hold the global best fitness across processes and its parID
          // The parID is required in detection of overfitting to cp the correct ffield.gbest file
          struct {
            double tmp_fit2;
            int tmp_parid;
-         } /*min_vals_in2, min_vals_out2;*/ min_vals_in2[1], min_vals_out2[1];
-
+         } min_vals_in2[1], min_vals_out2[1];
+    
          // store current fit on each process
-          min_vals_in2[0].tmp_fit2 = gbfit;
+         min_vals_in2[0].tmp_fit2 = gbfit;
          // store par id of that current process
-          min_vals_in2[0].tmp_parid = parid_gbfit;
+         min_vals_in2[0].tmp_parid = parid_gbfit;
          // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
-         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-            MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
-         };
+         MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
          // parid of the gbfit
          parid_gbfit = min_vals_out2[0].tmp_parid;
-
-         // now convert cpuid_gbfit value from ACTIVESWARM to MPI_COMM_WORLD
-         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end() && gbfitfound == true) {
-             cpuid_gbfit = swarmcores.at(cpuid_gbfit);
-         };
-
-         // do write_ffield_gbest
-         if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-            //cout << "CPU: " << core << " (cpuid_gbfit) writing ffield_gbest: ffield.tmp."+to_string(cycle)+"."+"0."+to_string(parid_gbfit) << endl;
+    
+         if (core == cpuid_gbfit) {
             write_ffield_gbest(cpuid_gbfit, cycle, 0, parid_gbfit);
             boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
          };
-
-        if (core == 0) {
-          // clean up any old files belonging to previous job
-          if ( boost::filesystem::exists( "opti_log.out." + std::to_string(cycle)) ){
-            boost::filesystem::remove( "opti_log.out." + std::to_string(cycle) );
-          };
-          if ( boost::filesystem::exists( "disp_log.out." + std::to_string(cycle)) ){
-            boost::filesystem::remove( "disp_log.out." + std::to_string(cycle) );
-          };
-
-          newSwarm.printopt(newSwarm, 0, cycle, 1);
-          boost::filesystem::ofstream log("log.flocky", ofstream::app);
-          log << "\nSwarm generation completed." << endl;
-          log << "Initial global best fit: " << boost::format("        %1.10e") %gbfit << endl;
-          log << "flocky optimization started!" << endl;
-          log.close();
-       };
-
-          //newSwarm.printdisp(newSwarm, 0, cycle, 1);
-          newSwarm.printpos(newSwarm, 0, cycle, 1);
-          if (uq == true) {
-            newSwarm.printUQFF(newSwarm, 0, cycle, 1);
-            newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
-          };
-        
-
-        // ---- free the sub-communicators ------ //
-        for (const int& swarmcore : swarmcores) {
-          if (core == swarmcore) {
-              newcomm = &ACTIVESWARM;
-              MPI_Comm_free(newcomm);
-          };
-        };
-        for (const int& reaxffcore : reaxffcores) {
-          if (core == reaxffcore) {
-              newcomm = &PASSIVESWARM;
-              MPI_Comm_free(newcomm);
-          };
-        };
-        // -------------------------------------- //
-  }else {
-     // pair struct to hold the global best fitness across processes and its core rank
-     struct {
-       double tmp_fit;
-       int tmp_cpu;
-     } min_vals_in[1], min_vals_out[1];
-     // store current fit on each process
-     min_vals_in[0].tmp_fit = gbfit;
-     // store core id of that current process
-     min_vals_in[0].tmp_cpu = core;
-     // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
-     MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
-     // global best fitness across all processes
-     gbfit = min_vals_out[0].tmp_fit;
-     // core rank the above fitness came from
-     cpuid_gbfit = min_vals_out[0].tmp_cpu;
-     // broadcast contents of gbpos vector from rank cpuid_gbfit
-     MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-
-     // pair struct to hold the global best fitness across processes and its parID
-     // The parID is required in detection of overfitting to cp the correct ffield.gbest file
-     struct {
-       double tmp_fit2;
-       int tmp_parid;
-     } min_vals_in2[1], min_vals_out2[1];
-
-     // store current fit on each process
-     min_vals_in2[0].tmp_fit2 = gbfit;
-     // store par id of that current process
-     min_vals_in2[0].tmp_parid = parid_gbfit;
-     // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
-     MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
-     // parid of the gbfit
-     parid_gbfit = min_vals_out2[0].tmp_parid;
-
-     if (core == cpuid_gbfit) {
-        write_ffield_gbest(cpuid_gbfit, cycle, 0, parid_gbfit);
-        boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+"0."+std::to_string(parid_gbfit));
-     };
-
-     if (core == 0) {
-       // clean up any old files belonging to previous job
-       if ( boost::filesystem::exists( "opti_log.out." + std::to_string(cycle)) ){
-         boost::filesystem::remove( "opti_log.out." + std::to_string(cycle) );
-       };
-       if ( boost::filesystem::exists( "disp_log.out." + std::to_string(cycle)) ){
-         boost::filesystem::remove( "disp_log.out." + std::to_string(cycle) );
-       };
-
-       newSwarm.printopt(newSwarm, 0, cycle, 1);
-       boost::filesystem::ofstream log("log.flocky", ofstream::app);
-       log << "\nSwarm generation completed." << endl;
-       log << "Initial global best fit: " << boost::format("        %1.10e") %gbfit << endl;
-       log << "flocky optimization started!" << endl;
-       log.close();
-     };
-
-     //newSwarm.printdisp(newSwarm, 0, cycle, 1);
-     newSwarm.printpos(newSwarm, 0, cycle, 1);
-     if (uq == true) {
-       newSwarm.printUQFF(newSwarm, 0, cycle, 1);
-       newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
-     };
-  };
-
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " left Populate!" << endl;
+    
+         if (core == 0) {
+           // clean up any old files belonging to previous job
+           if ( boost::filesystem::exists( "opti_log.out." + std::to_string(cycle)) ){
+             boost::filesystem::remove( "opti_log.out." + std::to_string(cycle) );
+           };
+           if ( boost::filesystem::exists( "disp_log.out." + std::to_string(cycle)) ){
+             boost::filesystem::remove( "disp_log.out." + std::to_string(cycle) );
+           };
+    
+           newSwarm.printopt(newSwarm, 0, cycle, 1);
+           boost::filesystem::ofstream log("log.flocky", ofstream::app);
+           log << "\nSwarm generation completed." << endl;
+           log << "Initial global best fit: " << boost::format("        %1.10e") %gbfit << endl;
+           log << "flocky optimization started!" << endl;
+           log.close();
+         };
+    
+         //newSwarm.printdisp(newSwarm, 0, cycle, 1);
+         newSwarm.printpos(newSwarm, 0, cycle, 1);
+         if (uq == true) {
+           newSwarm.printUQFF(newSwarm, 0, cycle, 1);
+           newSwarm.printUQQoI(newSwarm, 0, cycle, 1);
+         };
+      };
+    
+    if (core == 0 && verbose == true) {
+       cout << "core " << core << " left Populate!" << endl;
+    };
 };
 #endif
 
@@ -3832,7 +4865,7 @@ if (verbose == true) {
 void Swarm::Propagate(Swarm & newSwarm, int cycle) {
 #ifdef WITH_MPI
 if (verbose == true) {
-   cout << "core " << core << " entered Propagate()" << endl;
+   cout << "CPU: " << core << " entered Propagate()" << endl;
 };
 #endif
 #ifndef WITH_MPI
@@ -3841,386 +4874,388 @@ if (verbose == true) {
 };
 #endif
 #ifdef WITH_MPI
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " entered Propagate!" << endl;
-};
-
- // define a new sub-communicator for reaxffcores and swarmcores //
-    MPI_Comm ACTIVESWARM;  // swarmcores
-    MPI_Comm PASSIVESWARM; // reaxffcores
-    MPI_Comm *newcomm;
-    int color;
-
-    if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-        color = 444;
-        newcomm = &ACTIVESWARM;
-    };
-    if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
-        color = 333;
-        newcomm = &PASSIVESWARM;
-    };
-    MPI_Comm_split( MPI_COMM_WORLD, color, core, newcomm );
-
-    if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-         MPI_Comm_rank( ACTIVESWARM, &mycore_swarmcore);
-         MPI_Comm_size( ACTIVESWARM, &size_swarmcores);
-    };
-
-    if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
-         MPI_Comm_rank( PASSIVESWARM, &mycore_reaxffcore);
-         MPI_Comm_size( PASSIVESWARM, &size_reaxffcores);
-    };
- // ------------ end definition of new communicator ---------- //
-
-  boost::filesystem::path pwd(boost::filesystem::current_path());
-  string str_core = std::to_string(core);
-
-  // ---------------------------------------------------------------- //
-  //         PROPAGATE: main loop over iterations
-  // ---------------------------------------------------------------- //
-  for (iter = 1; iter < maxiters; iter++) {
-    inertiafac = inertiamax - iter * (inertiamax - inertiamin) / maxiters;
-    //
-    // main loop over swarm members
-    //
-    for (int p = 0; p < NumP; p++) {
-       // if we parallelize the training set, do the following only among swarmcores
-       if (ptrainset > 1) {
-          if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-              // Update velocities and positions
-              newSwarm.GetPar(p).update_vel(inertiafac, confac, gbpos, iter);
-              if (newSwarm.GetPar(p).fails > faili) {
-                newSwarm.GetPar(p).update_pos_levy(gbpos, iter, inertiafac);
-                newSwarm.GetPar(p).fails = 0;
-              } else {
-                newSwarm.GetPar(p).update_pos();
-              };
-          };
-          newSwarm.GetPar(p).state.cycle = cycle;
-          newSwarm.GetPar(p).state.iter = iter;
-          newSwarm.GetPar(p).state.parid = p;
-
-          // evaluate fitness. if doing localmin with ptrainset > 1, the generation of trainset subsets
-          // is performed inside eval_fitness. If not doing localmin, generation of trainset subsets is performed here.
-
-          // dropout
-          if (regular == 3) {
-             newSwarm.GetPar(p).dropout(dropvalue);
-          };
-
-          if (localmin == 1 || localmin == 2) {
-             newSwarm.GetPar(p).iterate();
-          }else{
-             newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
-          };
-
-          if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-             // Update personal best positions and fitness
-             if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
-               newSwarm.GetPar(p).update_bpos();
-               newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
-               newSwarm.GetPar(p).fails = 0;
-               if (newSwarm.GetPar(p).get_bfit() < gbfit) {
-                 gbfitfound = true;
-                 parid_gbfit = p;
-                 gbfit = newSwarm.GetPar(p).get_bfit();
-                 gbpos.clear();
-                 gbpos = newSwarm.GetPar(p).get_pos_vec();
-                 //write_ffield_gbest(core, cycle, iter, p);
-               };
-             } else {
-               gbfitfound = false;
-               newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
+if (ensembleave == false) {
+   if (core == 0 && verbose == true) {
+      cout << "CPU: " << core << " entered Propagate!" << endl;
+   };
+   
+    // define a new sub-communicator for reaxffcores and swarmcores //
+       MPI_Comm ACTIVESWARM;  // swarmcores
+       MPI_Comm PASSIVESWARM; // reaxffcores
+       MPI_Comm *newcomm;
+       int color;
+   
+       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+           color = 444;
+           newcomm = &ACTIVESWARM;
+       };
+       if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+           color = 333;
+           newcomm = &PASSIVESWARM;
+       };
+       MPI_Comm_split( MPI_COMM_WORLD, color, core, newcomm );
+   
+       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+            MPI_Comm_rank( ACTIVESWARM, &mycore_swarmcore);
+            MPI_Comm_size( ACTIVESWARM, &size_swarmcores);
+       };
+   
+       if (find(reaxffcores.begin(), reaxffcores.end(), core) != reaxffcores.end()) {
+            MPI_Comm_rank( PASSIVESWARM, &mycore_reaxffcore);
+            MPI_Comm_size( PASSIVESWARM, &size_reaxffcores);
+       };
+    // ------------ end definition of new communicator ---------- //
+   
+     boost::filesystem::path pwd(boost::filesystem::current_path());
+     string str_core = std::to_string(core);
+   
+     // ---------------------------------------------------------------- //
+     //         PROPAGATE: main loop over iterations
+     // ---------------------------------------------------------------- //
+     for (iter = 1; iter < maxiters; iter++) {
+       inertiafac = inertiamax - iter * (inertiamax - inertiamin) / maxiters;
+       //
+       // main loop over swarm members
+       //
+       for (int p = 0; p < NumP; p++) {
+          // if we parallelize the training set, do the following only among swarmcores
+          if (ptrainset > 1) {
+             if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+                 // Update velocities and positions
+                 newSwarm.GetPar(p).update_vel(inertiafac, confac, gbpos, iter);
+                 if (newSwarm.GetPar(p).fails > faili) {
+                   newSwarm.GetPar(p).update_pos_levy(gbpos, iter, inertiafac);
+                   newSwarm.GetPar(p).fails = 0;
+                 } else {
+                   newSwarm.GetPar(p).update_pos();
+                 };
              };
-             // cleaning ffield.tmp.* files after write_ffield_gbest already
-             // copied the correct ffield.tmp.* file as the ffield.gbest.*
-             string str_cycle = std::to_string(cycle);
-             string str_iter = std::to_string(iter);
-             string str_parID = std::to_string(p);
-             //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
-          };
-       }else {
-              // Update velocities and positions
-              newSwarm.GetPar(p).update_vel(inertiafac, confac, gbpos, iter);
-              if (newSwarm.GetPar(p).fails > faili) {
-                newSwarm.GetPar(p).update_pos_levy(gbpos, iter, inertiafac);
-                newSwarm.GetPar(p).fails = 0;
-              } else {
-                newSwarm.GetPar(p).update_pos();
-              };
-
-              newSwarm.GetPar(p).state.cycle = cycle;
-              newSwarm.GetPar(p).state.iter = iter;
-              newSwarm.GetPar(p).state.parid = p;
-
+             newSwarm.GetPar(p).state.cycle = cycle;
+             newSwarm.GetPar(p).state.iter = iter;
+             newSwarm.GetPar(p).state.parid = p;
+   
+             // evaluate fitness. if doing localmin with ptrainset > 1, the generation of trainset subsets
+             // is performed inside eval_fitness. If not doing localmin, generation of trainset subsets is performed here.
+   
              // dropout
              if (regular == 3) {
                 newSwarm.GetPar(p).dropout(dropvalue);
              };
-
-              if (localmin == 1 || localmin == 2) {
-                 newSwarm.GetPar(p).iterate();
-              } else {
-                 vector <double> numgrad;
-                 newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
-              };
-              // Update personal best positions and fitness
-              if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
-                newSwarm.GetPar(p).update_bpos();
-                newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
-                newSwarm.GetPar(p).fails = 0;
-                if (newSwarm.GetPar(p).get_bfit() < gbfit) {
-                  gbfitfound = true;
-                  parid_gbfit = p;
-                  gbfit = newSwarm.GetPar(p).get_bfit();
-                  gbpos.clear();
-                  gbpos = newSwarm.GetPar(p).get_pos_vec();
-                  //write_ffield_gbest(core, cycle, iter, p);
+   
+             if (localmin == 1 || localmin == 2) {
+                newSwarm.GetPar(p).iterate();
+             }else{
+                newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
+             };
+   
+             if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+                // Update personal best positions and fitness
+                if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
+                  newSwarm.GetPar(p).update_bpos();
+                  newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
+                  newSwarm.GetPar(p).fails = 0;
+                  if (newSwarm.GetPar(p).get_bfit() < gbfit) {
+                    gbfitfound = true;
+                    parid_gbfit = p;
+                    gbfit = newSwarm.GetPar(p).get_bfit();
+                    gbpos.clear();
+                    gbpos = newSwarm.GetPar(p).get_pos_vec();
+                    //write_ffield_gbest(core, cycle, iter, p);
+                  };
+                } else {
+                  gbfitfound = false;
+                  newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
                 };
-              } else {
-                gbfitfound = false;
-                newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
-              };
-              // cleaning ffield.tmp.* files after write_ffield_gbest already
-              // copied the correct ffield.tmp.* file as the ffield.gbest.*
-              string str_cycle = std::to_string(cycle);
-              string str_iter = std::to_string(iter);
-              string str_parID = std::to_string(p);
-              //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
-       };
-    }; // done loop over swarm members
-
-    // if we parallelize the training set, do the following only among swarmcores
-    if (ptrainset > 1) {
-        //newSwarm.get_com(newSwarm);
-
-        // pair struct to hold the global best fitness across processes and its core rank
-        struct {
-          double tmp_fit;
-          int tmp_cpu;
-        } min_vals_in[1], min_vals_out[1];
-
-        // store current fit on each process
-        min_vals_in[0].tmp_fit = gbfit;
-        // store core id of that current process
-        min_vals_in[0].tmp_cpu = mycore_swarmcore;
-        // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
-        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-           MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
-        };
-
-        // pair struct to hold the global best fitness across processes and its parID
-        // The parID is required in detection of overfitting to cp the correct ffield.gbest file
-        struct {
-          double tmp_fit2;
-          int tmp_parid;
-        } min_vals_in2[1], min_vals_out2[1];
-
-        // store current fit on each process
-        min_vals_in2[0].tmp_fit2 = gbfit;
-        // store par id of that current process
-        min_vals_in2[0].tmp_parid = parid_gbfit;
-        // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
-        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-           MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
-        };
-        // parid of the gbfit
-        parid_gbfit = min_vals_out2[0].tmp_parid;
-
-        // global best fitness across all processes
-        gbfit = min_vals_out[0].tmp_fit;
-        // core rank the above fitness came from
-        cpuid_gbfit = min_vals_out[0].tmp_cpu;
-        // broadcast contents of gbpos vector from rank cpuid_gbfit
-        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-           MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, ACTIVESWARM);
-        };
-
-        // now convert cpuid_gbfit value from ACTIVESWARM to MPI_COMM_WORLD
-        if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-           cpuid_gbfit = swarmcores.at(cpuid_gbfit);
-        };
-
-        // do write_ffield_gbest
-        if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end() && gbfitfound == true) {
-           //cout << "CPU: " << core << " (cpuid_gbfit) writes ffield.gbest: " << "ffield.tmp." + to_string(cycle)+"."+to_string(iter)+"."+to_string(parid_gbfit) << endl;
-           write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
-           //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
-        };
-        boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
-
-        if (ofit == true){
-          if (gbfitfound == true) {
-            // detect overfitting by evaluating fitness on validation set
-            if (core == cpuid_gbfit){
-              boost::filesystem::ofstream log("log.flocky", ofstream::app);
-              newSwarm.detovfit(newSwarm, cpuid_gbfit, cycle, iter, parid_gbfit);
-              log.close();
-            };
-            firstovfit = false;
+                // cleaning ffield.tmp.* files after write_ffield_gbest already
+                // copied the correct ffield.tmp.* file as the ffield.gbest.*
+                string str_cycle = std::to_string(cycle);
+                string str_iter = std::to_string(iter);
+                string str_parID = std::to_string(p);
+                //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
+             };
+          }else {
+                 // Update velocities and positions
+                 newSwarm.GetPar(p).update_vel(inertiafac, confac, gbpos, iter);
+                 if (newSwarm.GetPar(p).fails > faili) {
+                   newSwarm.GetPar(p).update_pos_levy(gbpos, iter, inertiafac);
+                   newSwarm.GetPar(p).fails = 0;
+                 } else {
+                   newSwarm.GetPar(p).update_pos();
+                 };
+   
+                 newSwarm.GetPar(p).state.cycle = cycle;
+                 newSwarm.GetPar(p).state.iter = iter;
+                 newSwarm.GetPar(p).state.parid = p;
+   
+                // dropout
+                if (regular == 3) {
+                   newSwarm.GetPar(p).dropout(dropvalue);
+                };
+   
+                 if (localmin == 1 || localmin == 2) {
+                    newSwarm.GetPar(p).iterate();
+                 } else {
+                    vector <double> numgrad;
+                    newSwarm.GetPar(p).set_fitness(newSwarm.GetPar(p).eval_fitness(newSwarm.GetPar(p).get_pos_vec(), this));
+                 };
+                 // Update personal best positions and fitness
+                 if (newSwarm.GetPar(p).get_fitness() < newSwarm.GetPar(p).get_bfit()) {
+                   newSwarm.GetPar(p).update_bpos();
+                   newSwarm.GetPar(p).set_bfit(newSwarm.GetPar(p).get_fitness());
+                   newSwarm.GetPar(p).fails = 0;
+                   if (newSwarm.GetPar(p).get_bfit() < gbfit) {
+                     gbfitfound = true;
+                     parid_gbfit = p;
+                     gbfit = newSwarm.GetPar(p).get_bfit();
+                     gbpos.clear();
+                     gbpos = newSwarm.GetPar(p).get_pos_vec();
+                     //write_ffield_gbest(core, cycle, iter, p);
+                   };
+                 } else {
+                   gbfitfound = false;
+                   newSwarm.GetPar(p).fails = newSwarm.GetPar(p).fails + 1;
+                 };
+                 // cleaning ffield.tmp.* files after write_ffield_gbest already
+                 // copied the correct ffield.tmp.* file as the ffield.gbest.*
+                 string str_cycle = std::to_string(cycle);
+                 string str_iter = std::to_string(iter);
+                 string str_parID = std::to_string(p);
+                 //boost::filesystem::remove(pwd.string() + "/CPU." + str_core + "/ffield.tmp."+str_cycle+"."+str_iter+"."+str_parID);
           };
+       }; // done loop over swarm members
+   
+       // if we parallelize the training set, do the following only among swarmcores
+       if (ptrainset > 1) {
+           //newSwarm.get_com(newSwarm);
+   
+           // pair struct to hold the global best fitness across processes and its core rank
+           struct {
+             double tmp_fit;
+             int tmp_cpu;
+           } min_vals_in[1], min_vals_out[1];
+   
+           // store current fit on each process
+           min_vals_in[0].tmp_fit = gbfit;
+           // store core id of that current process
+           min_vals_in[0].tmp_cpu = mycore_swarmcore;
+           // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
            if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-              MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, ACTIVESWARM);
+              MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
            };
-          //MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, ACTIVESWARM);
-        };
-
-        if (core == 0) {
-          newSwarm.printopt(newSwarm, iter, cycle, freq);
-        };
-        newSwarm.printpos(newSwarm, iter, cycle, freq);
-        if (uq == true){
-          newSwarm.printUQFF(newSwarm, iter, cycle, freq);
-          newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
-        };
-        //newSwarm.printdisp(newSwarm, iter, cycle, freq);
-
-        // reset swarm randomly if gbfit == INF for ninf consecutive iterations
-        if (gbfit == numeric_limits < double > ::infinity()) {
-           ninf = ninf + 1;
-           if (ninf == 10) {
-               std::uniform_real_distribution < double > dist2(0.0,1.0);
-               for (int p = 0; p < NumP; p++) {
-                  for (int i = 0; i < dim; i++) {
-                     newSwarm.GetPar(p).set_posdim(i, dist2(generator));
-                     newSwarm.GetPar(p).set_veldim(i, 0.5*dist2(generator) - newSwarm.GetPar(p).get_pos(i));
-                     newSwarm.GetPar(p).bpos.at(i) = newSwarm.GetPar(p).pos.at(i);
-                  };
-                  ninf = 0;
+   
+           // pair struct to hold the global best fitness across processes and its parID
+           // The parID is required in detection of overfitting to cp the correct ffield.gbest file
+           struct {
+             double tmp_fit2;
+             int tmp_parid;
+           } min_vals_in2[1], min_vals_out2[1];
+   
+           // store current fit on each process
+           min_vals_in2[0].tmp_fit2 = gbfit;
+           // store par id of that current process
+           min_vals_in2[0].tmp_parid = parid_gbfit;
+           // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
+           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+              MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, ACTIVESWARM);
+           };
+           // parid of the gbfit
+           parid_gbfit = min_vals_out2[0].tmp_parid;
+   
+           // global best fitness across all processes
+           gbfit = min_vals_out[0].tmp_fit;
+           // core rank the above fitness came from
+           cpuid_gbfit = min_vals_out[0].tmp_cpu;
+           // broadcast contents of gbpos vector from rank cpuid_gbfit
+           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+              MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, ACTIVESWARM);
+           };
+   
+           // now convert cpuid_gbfit value from ACTIVESWARM to MPI_COMM_WORLD
+           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+              cpuid_gbfit = swarmcores.at(cpuid_gbfit);
+           };
+   
+           // do write_ffield_gbest
+           if (core == cpuid_gbfit && find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end() && gbfitfound == true) {
+              //cout << "CPU: " << core << " (cpuid_gbfit) writes ffield.gbest: " << "ffield.tmp." + to_string(cycle)+"."+to_string(iter)+"."+to_string(parid_gbfit) << endl;
+              write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
+              //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+           };
+           boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+   
+           if (ofit == true){
+             if (gbfitfound == true) {
+               // detect overfitting by evaluating fitness on validation set
+               if (core == cpuid_gbfit){
+                 boost::filesystem::ofstream log("log.flocky", ofstream::app);
+                 newSwarm.detovfit(newSwarm, cpuid_gbfit, cycle, iter, parid_gbfit);
+                 log.close();
                };
+               firstovfit = false;
+             };
+              if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+                 MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, ACTIVESWARM);
+              };
+             //MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, ACTIVESWARM);
            };
-        };
-
-    }else { // done if ptrainset > 1
-        //newSwarm.get_com(newSwarm);
-
-        // pair struct to hold the global best fitness across processes and its core rank
-        struct {
-          double tmp_fit;
-          int tmp_cpu;
-        } min_vals_in[1], min_vals_out[1];
-
-        // store current fit on each process
-        min_vals_in[0].tmp_fit = gbfit;
-        // store core id of that current process
-        min_vals_in[0].tmp_cpu = core;
-        // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
-        MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
-
-        // pair struct to hold the global best fitness across processes and its parID
-        // The parID is required in detection of overfitting to cp the correct ffield.gbest file
-        struct {
-          double tmp_fit2;
-          int tmp_parid;
-        } min_vals_in2[1], min_vals_out2[1];
-
-        // store current fit on each process
-        min_vals_in2[0].tmp_fit2 = gbfit;
-        // store par id of that current process
-        min_vals_in2[0].tmp_parid = parid_gbfit;
-        // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
-        MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
-        // parid of the gbfit
-        parid_gbfit = min_vals_out2[0].tmp_parid;
-
-        // global best fitness across all processes
-        gbfit = min_vals_out[0].tmp_fit;
-        // core rank the above fitness came from
-        cpuid_gbfit = min_vals_out[0].tmp_cpu;
-        // broadcast contents of gbpos vector from rank cpuid_gbfit
-        MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
-
-        if (core == cpuid_gbfit && gbfitfound == true) {
-           write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
-           //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
-        };
-        boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
-
-        if (ofit == true){
-          if (gbfitfound == true) {
-            // detect overfitting by evaluating fitness on validation set
-            if (core == cpuid_gbfit){
-              boost::filesystem::ofstream log("log.flocky", ofstream::app);
-              newSwarm.detovfit(newSwarm, cpuid_gbfit, cycle, iter, parid_gbfit);
-              log.close();
-            };
-            firstovfit = false;
-          };
-          MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, MPI_COMM_WORLD);
-        };
-
-        if (core == 0) {
-          newSwarm.printopt(newSwarm, iter, cycle, freq);
-        };
-        newSwarm.printpos(newSwarm, iter, cycle, freq);
-        if (uq == true){
-          newSwarm.printUQFF(newSwarm, iter, cycle, freq);
-          newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
-        };
-        //newSwarm.printdisp(newSwarm, iter, cycle, freq);
-
-        // reset swarm randomly if gbfit == INF for ninf consecutive iterations
-        if (gbfit == numeric_limits < double > ::infinity()) {
-           ninf = ninf + 1;
-           if (ninf == 10) {
-               std::uniform_real_distribution < double > dist2(0.0,1.0);
-               for (int p = 0; p < NumP; p++) {
-                  for (int i = 0; i < dim; i++) {
-                     newSwarm.GetPar(p).set_posdim(i, dist2(generator));
-                     newSwarm.GetPar(p).set_veldim(i, 0.5*dist2(generator) - newSwarm.GetPar(p).get_pos(i));
-                     newSwarm.GetPar(p).bpos.at(i) = newSwarm.GetPar(p).pos.at(i);
+   
+           if (core == 0) {
+             newSwarm.printopt(newSwarm, iter, cycle, freq);
+           };
+           newSwarm.printpos(newSwarm, iter, cycle, freq);
+           if (uq == true){
+             newSwarm.printUQFF(newSwarm, iter, cycle, freq);
+             newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
+           };
+           //newSwarm.printdisp(newSwarm, iter, cycle, freq);
+   
+           // reset swarm randomly if gbfit == INF for ninf consecutive iterations
+           if (gbfit == numeric_limits < double > ::infinity()) {
+              ninf = ninf + 1;
+              if (ninf == 10) {
+                  std::uniform_real_distribution < double > dist2(0.0,1.0);
+                  for (int p = 0; p < NumP; p++) {
+                     for (int i = 0; i < dim; i++) {
+                        newSwarm.GetPar(p).set_posdim(i, dist2(generator));
+                        newSwarm.GetPar(p).set_veldim(i, 0.5*dist2(generator) - newSwarm.GetPar(p).get_pos(i));
+                        newSwarm.GetPar(p).bpos.at(i) = newSwarm.GetPar(p).pos.at(i);
+                     };
+                     ninf = 0;
                   };
-                  ninf = 0;
-               };
+              };
            };
-        };
-
-    };
-  }; // done loop over iterations
-
-  if (ptrainset == 1) {
-      MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-  }else {
-      if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-          MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, ACTIVESWARM);
-      };
-  };
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  if (core == 0) {
-    double temphys;
-    boost::filesystem::ofstream log("log.flocky", ofstream::app);
-    log << "\n\nTraining completed successfuly!\n";
-    log << "Total ReaxFF calls: " << funceval << endl;
-    log << "\nGlobal best ReaxFF fit: " << boost::format("        %1.10e") %newSwarm.get_gbfit() << endl;
-    log << "Global best ReaxFF parameters:" << endl;
-    log << "[ ";
-    for (int m = 0; m < dim; m++) {
-      temphys = newSwarm.get_gbpos().at(m)*(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)) + newSwarm.GetPar(0).mindomain.at(m);
-      // physical gbest position
-      //log << boost::format("%8.4f") %newSwarm.get_gbpos().at(m) << " ";
-      // standardized gbest position
-      log << boost::format("%8.4f") %temphys << " ";
-    };
-    log << "]\n" << endl;
-    log.close();
-  };
-
-  // ---- free the sub-communicators ------ //
-  for (const int& swarmcore : swarmcores) {
-    if (core == swarmcore) {
-        newcomm = &ACTIVESWARM;
-        MPI_Comm_free(newcomm);
-    };
-  };
-  for (const int& reaxffcore : reaxffcores) {
-    if (core == reaxffcore) {
-        newcomm = &PASSIVESWARM;
-        MPI_Comm_free(newcomm);
-    };
-  };
-if (core == 0 && verbose == true) {
-   cout << "core " << core << " left Populate!" << endl;
+   
+       }else { // done if ptrainset > 1
+           //newSwarm.get_com(newSwarm);
+   
+           // pair struct to hold the global best fitness across processes and its core rank
+           struct {
+             double tmp_fit;
+             int tmp_cpu;
+           } min_vals_in[1], min_vals_out[1];
+   
+           // store current fit on each process
+           min_vals_in[0].tmp_fit = gbfit;
+           // store core id of that current process
+           min_vals_in[0].tmp_cpu = core;
+           // get global best fitness *across processes* and corresponding core rank and store them in min_vals_out
+           MPI_Allreduce( & min_vals_in, & min_vals_out, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+   
+           // pair struct to hold the global best fitness across processes and its parID
+           // The parID is required in detection of overfitting to cp the correct ffield.gbest file
+           struct {
+             double tmp_fit2;
+             int tmp_parid;
+           } min_vals_in2[1], min_vals_out2[1];
+   
+           // store current fit on each process
+           min_vals_in2[0].tmp_fit2 = gbfit;
+           // store par id of that current process
+           min_vals_in2[0].tmp_parid = parid_gbfit;
+           // get global best fitness *across processes* and corresponding parID and store them in min_vals_out
+           MPI_Allreduce( & min_vals_in2, & min_vals_out2, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+           // parid of the gbfit
+           parid_gbfit = min_vals_out2[0].tmp_parid;
+   
+           // global best fitness across all processes
+           gbfit = min_vals_out[0].tmp_fit;
+           // core rank the above fitness came from
+           cpuid_gbfit = min_vals_out[0].tmp_cpu;
+           // broadcast contents of gbpos vector from rank cpuid_gbfit
+           MPI_Bcast(gbpos.data(), gbpos.size(), MPI_DOUBLE, cpuid_gbfit, MPI_COMM_WORLD);
+   
+           if (core == cpuid_gbfit && gbfitfound == true) {
+              write_ffield_gbest(cpuid_gbfit, cycle, iter, parid_gbfit);
+              //boost::filesystem::remove(pwd.string() + "/CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+           };
+           boost::filesystem::remove("CPU." + std::to_string(core) + "/ffield.tmp."+std::to_string(cycle)+"."+std::to_string(iter)+"."+std::to_string(parid_gbfit));
+   
+           if (ofit == true){
+             if (gbfitfound == true) {
+               // detect overfitting by evaluating fitness on validation set
+               if (core == cpuid_gbfit){
+                 boost::filesystem::ofstream log("log.flocky", ofstream::app);
+                 newSwarm.detovfit(newSwarm, cpuid_gbfit, cycle, iter, parid_gbfit);
+                 log.close();
+               };
+               firstovfit = false;
+             };
+             MPI_Bcast( &firstovfit, 1, MPI_C_BOOL, cpuid_gbfit, MPI_COMM_WORLD);
+           };
+   
+           if (core == 0) {
+             newSwarm.printopt(newSwarm, iter, cycle, freq);
+           };
+           newSwarm.printpos(newSwarm, iter, cycle, freq);
+           if (uq == true){
+             newSwarm.printUQFF(newSwarm, iter, cycle, freq);
+             newSwarm.printUQQoI(newSwarm, iter, cycle, freq);
+           };
+           //newSwarm.printdisp(newSwarm, iter, cycle, freq);
+   
+           // reset swarm randomly if gbfit == INF for ninf consecutive iterations
+           if (gbfit == numeric_limits < double > ::infinity()) {
+              ninf = ninf + 1;
+              if (ninf == 10) {
+                  std::uniform_real_distribution < double > dist2(0.0,1.0);
+                  for (int p = 0; p < NumP; p++) {
+                     for (int i = 0; i < dim; i++) {
+                        newSwarm.GetPar(p).set_posdim(i, dist2(generator));
+                        newSwarm.GetPar(p).set_veldim(i, 0.5*dist2(generator) - newSwarm.GetPar(p).get_pos(i));
+                        newSwarm.GetPar(p).bpos.at(i) = newSwarm.GetPar(p).pos.at(i);
+                     };
+                     ninf = 0;
+                  };
+              };
+           };
+   
+       };
+     }; // done loop over iterations
+   
+     if (ptrainset == 1) {
+         MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+     }else {
+         if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+             MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, ACTIVESWARM);
+         };
+     };
+     MPI_Barrier(MPI_COMM_WORLD);
+   
+     if (core == 0) {
+       double temphys;
+       boost::filesystem::ofstream log("log.flocky", ofstream::app);
+       log << "\n\nTraining completed successfuly!\n";
+       log << "Total ReaxFF calls: " << funceval << endl;
+       log << "\nGlobal best ReaxFF fit: " << boost::format("        %1.10e") %newSwarm.get_gbfit() << endl;
+       log << "Global best ReaxFF parameters:" << endl;
+       log << "[ ";
+       for (int m = 0; m < dim; m++) {
+         temphys = newSwarm.get_gbpos().at(m)*(newSwarm.GetPar(0).maxdomain.at(m) - newSwarm.GetPar(0).mindomain.at(m)) + newSwarm.GetPar(0).mindomain.at(m);
+         // physical gbest position
+         //log << boost::format("%8.4f") %newSwarm.get_gbpos().at(m) << " ";
+         // standardized gbest position
+         log << boost::format("%8.4f") %temphys << " ";
+       };
+       log << "]\n" << endl;
+       log.close();
+     };
+   
+     // ---- free the sub-communicators ------ //
+     for (const int& swarmcore : swarmcores) {
+       if (core == swarmcore) {
+           newcomm = &ACTIVESWARM;
+           MPI_Comm_free(newcomm);
+       };
+     };
+     for (const int& reaxffcore : reaxffcores) {
+       if (core == reaxffcore) {
+           newcomm = &PASSIVESWARM;
+           MPI_Comm_free(newcomm);
+       };
+     };
+   if (core == 0 && verbose == true) {
+      cout << "core " << core << " left Populate!" << endl;
+   };
 };
 #endif
 

@@ -1,5 +1,5 @@
 /*  ---------------------------------------------------------------------- *
-    flocky v1.0 Copyright (C) 2019 David Furman, PhD.
+    flocky v1.0 Copyright (C) 2018-2020 David Furman, PhD.
     df398@cam.ac.uk, University of Cambridge, UK.
 
     This program is free software: you can redistribute it and/or modify
@@ -92,6 +92,7 @@ extern bool perc_yn;
 extern double perc;
 extern int localmin;
 extern int lm_iter_max;
+extern int numffbags;
 extern double lm_err_tol;
 extern bool lm_vals_bound;
 const long double pi = 3.14159265358979323846;
@@ -133,6 +134,8 @@ class Par { // declaration of a particle
   void write_geo();
   void write_ffield_lg(const vector <double> &active_params, int cycle, int iter, int parid);
   void write_ffield(const vector <double> &active_params, int cycle, int iter, int parid);
+  void write_aveffield_lg();
+  void write_aveffield();
 
   double get_vel(int n);
   double get_pos(int k);
@@ -161,6 +164,8 @@ class Par { // declaration of a particle
   void set_bfit(double bfit);
 
   vector < vector < string >> ffieldmat; // ffield inside a vector of vectors (matrix) (for each particle)
+  vector < vector < vector <string> > > ffensemble; // ensemble of gbest ffields
+  vector < vector < string >> averageffield; // same as above but for ensemble-averaged force field
   vector < int > ffline; // line in ffield file
   vector < int > ffcol; // colum in line in ffield file
   vector < double > mindomain; // min function domain boundary

@@ -1,5 +1,5 @@
 /*  ---------------------------------------------------------------------- *
-    flocky v1.0 Copyright (C) 2019 David Furman, PhD. 
+    flocky v1.0 Copyright (C) 2018-2020 David Furman, PhD. 
     df398@cam.ac.uk, University of Cambridge, UK.
     
     This program is free software: you can redistribute it and/or modify
@@ -68,39 +68,7 @@ int main(int argc, char * argv[]) {
     log << "*********************************************************************\n";
     log.close();
 
-    // check for necessary files
-    std::ifstream fin1("ffield");
-    if (fin1.fail()) {
-      boost::filesystem::ofstream log("log.flocky", ofstream::app);
-      log << "Error: unable to open ReaxFF 'ffield' file on CPU " << core << ". Aborting! \n";
-      log.close();
-      exit(EXIT_FAILURE);
-    };
-
-    std::ifstream fin2("control");
-    if (fin2.fail()) {
-      boost::filesystem::ofstream log("log.flocky", ofstream::app);
-      log << "Error: unable to open 'control' file on CPU " << core << ". Aborting! \n";
-      log.close();
-      exit(EXIT_FAILURE);
-    };
-
-    std::ifstream fin3("geo");
-    if (fin3.fail()) {
-      boost::filesystem::ofstream log("log.flocky", ofstream::app);
-      log << "Error: unable to open geo file on CPU " << core << ". Aborting! \n";
-      log.close();
-      exit(EXIT_FAILURE);
-    };
-
-    std::ifstream fin4("params.mod");
-    if (fin4.fail()) {
-      boost::filesystem::ofstream log("log.flocky", ofstream::app);
-      log << "Error: unable to open 'params.mod' file on CPU " << core << ". Aborting! \n";
-      log.close();
-      exit(EXIT_FAILURE);
-    };
-  }; // end opening message and checks on core 0
+  };
 
   for (cycle = 0; cycle < maxcycles; cycle++) {
     string cyclecount = std::to_string(cycle);
