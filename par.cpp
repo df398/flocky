@@ -930,6 +930,8 @@ if (verbose == true) {
 };
 
 void Par::write_aveffield_lg() {
+  // write distribution of parameters
+  ofstream histo_file;
   // write averaged ffield
   ofstream output_file;
   // current ffield file stream
@@ -939,11 +941,13 @@ void Par::write_aveffield_lg() {
 if (core == 0) {
   output_file.open("ffield.ensemble", ios::out);
   ffield_file.open("ffield", ios:: in );
+  histo_file.open("ffield.histo",ios::out);
 };
 #endif
 #ifndef WITH_MPI
   output_file.open("ffield.ensemble", ios::out);
   ffield_file.open("ffield", ios:: in );
+  histo_file.open("ffield.histo",ios::out);
 #endif
 
   // store all ffield lines
@@ -971,6 +975,7 @@ if (core == 0) {
    * -------------------------------------
    */
 
+  histo_file << "#general parameters:\n";
   for (int m = 2; m < 41; m++) {
     boost::format f("%10.4f %s");
     f.exceptions(f.exceptions() &
@@ -980,6 +985,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            ss << boost::format("%10.4f") %average;
@@ -989,6 +995,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -998,6 +1005,7 @@ if (core == 0) {
     };
     output_file << f << endl; // print the result of formatter
   };
+
   /* ------------------------------------
    * WRITE ATOM PARAMS HEADERS
    * ------------------------------------
@@ -1022,6 +1030,7 @@ if (core == 0) {
    * -------------------------------------
    */
 
+  histo_file << "#atom parameters:\n";
   int m = 45;
   while (m < max_line_atompar) {
     boost::format f("% s%   9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
@@ -1032,6 +1041,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            ss << boost::format("%9.4f") %average;
@@ -1043,6 +1053,7 @@ if (core == 0) {
            averageffieldline.push_back( ss.str() );
            ss.str("");
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1063,6 +1074,7 @@ if (core == 0) {
       for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
           if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
              for (int k = 0; k < ffensemble.size(); k++) {
+                 histo_file << ffensemble.at(k).at(m).at(col) << " ";
                  average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
              };
              ss << boost::format("%9.4f") %average;
@@ -1074,6 +1086,7 @@ if (core == 0) {
              averageffieldline.push_back( ss.str() );
              ss.str("");
           };
+          histo_file << "\n";
       };
       averageffield.push_back(averageffieldline);
       averageffieldline.clear();
@@ -1094,6 +1107,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            ss << boost::format("%9.4f") %average;
@@ -1105,6 +1119,7 @@ if (core == 0) {
            averageffieldline.push_back( ss.str() );
            ss.str("");
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1141,6 +1156,7 @@ if (core == 0) {
    * ------------------------------------
    */
 
+  histo_file << "#bonds parameters:\n";
   for (int m = max_line_atompar + 2; m < max_line_bondpar + 2; m++) {
     boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
@@ -1150,6 +1166,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1)) {
@@ -1165,6 +1182,7 @@ if (core == 0) {
            averageffieldline.push_back( ss.str() );
            ss.str("");
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1185,6 +1203,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            ss << boost::format("%9.4f") %average;
@@ -1197,6 +1216,7 @@ if (core == 0) {
            ss.str("");
 
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1234,7 +1254,8 @@ if (core == 0) {
   boost::split(results_offdiag, numodty_line, is_any_of("\t "));
   numodty = stoi(results_offdiag.at(0));
   max_line_offdpar = max_line_bondpar + 3 + numodty;
-
+  
+  histo_file << "#off-diag parameters:\n";
   for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
     // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
     // So, to prevent it sticking to the left column
@@ -1246,6 +1267,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1)) {
@@ -1262,6 +1284,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1296,6 +1319,7 @@ if (core == 0) {
   numaty = stoi(results_angle.at(0));
   max_line_angles = max_line_offdpar + 1 + numaty;
 
+  histo_file << "#angle parameters:\n";
   for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
     boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
@@ -1306,6 +1330,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1) || (col == 2)) {
@@ -1319,6 +1344,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1354,6 +1380,7 @@ if (core == 0) {
   numtoty = stoi(results_tors.at(0));
   max_line_tors = max_line_angles + 1 + numtoty;
 
+  histo_file << "#torsion parameters:\n";
   for (int m = max_line_angles + 1; m < max_line_tors; m++) {
     boost::format f("  %i  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
@@ -1363,6 +1390,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1) || (col == 2) || (col == 3)) {
@@ -1376,6 +1404,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1410,6 +1439,7 @@ if (core == 0) {
   numhbty = stoi(results_hb.at(0));
   max_line_hbs = max_line_tors + 1 + numhbty;
 
+  histo_file << "#hbond parameters:\n";
   for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
     boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
@@ -1419,6 +1449,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1) || (col == 2)) {
@@ -1432,6 +1463,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+    histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1443,10 +1475,13 @@ if (core == 0) {
   };
 
   output_file.close();
+  histo_file.close();
 
 };
 
 void Par::write_aveffield() {
+  // distribution of parameters
+  ofstream histo_file;
   // write averaged ffield
   ofstream output_file;
   // current ffield file stream
@@ -1456,11 +1491,13 @@ void Par::write_aveffield() {
 if (core == 0) {
   output_file.open("ffield.ensemble", ios::out);
   ffield_file.open("ffield", ios:: in );
+  histo_file.open("ffield.histo",ios::out);
 };
 #endif
 #ifndef WITH_MPI
   output_file.open("ffield.ensemble", ios::out);
   ffield_file.open("ffield", ios:: in );
+  histo_file.open("ffield.histo",ios::out);
 #endif
 
   // store all ffield lines
@@ -1488,6 +1525,7 @@ if (core == 0) {
    * -------------------------------------
    */
 
+  histo_file << "#general parameters:\n";
   for (int m = 2; m < 41; m++) {
     boost::format f("%10.4f %s");
     f.exceptions(f.exceptions() &
@@ -1497,6 +1535,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            ss << boost::format("%10.4f") %average;
@@ -1506,6 +1545,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1533,11 +1573,13 @@ if (core == 0) {
   boost::split(results, numel_line, is_any_of("\t "));
   numel = stoi(results.at(0));
   max_line_atompar = 4 * numel + 45;
+
   /* -------------------------------------
    * WRITE ATOM PARAMS SECTION
    * -------------------------------------
    */
 
+  histo_file << "#atom parameters:\n";
   int m = 45;
   while (m < max_line_atompar) {
     boost::format f("% s%   9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
@@ -1548,6 +1590,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            ss << boost::format("%9.4f") %average;
@@ -1559,6 +1602,7 @@ if (core == 0) {
            averageffieldline.push_back( ss.str() );
            ss.str("");
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1579,6 +1623,7 @@ if (core == 0) {
       for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
           if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
              for (int k = 0; k < ffensemble.size(); k++) {
+                 histo_file << ffensemble.at(k).at(m).at(col) << " ";
                  average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
              };
              ss << boost::format("%9.4f") %average;
@@ -1590,6 +1635,7 @@ if (core == 0) {
              averageffieldline.push_back( ss.str() );
              ss.str("");
           };
+          histo_file << "\n";
       };
       averageffield.push_back(averageffieldline);
       averageffieldline.clear();
@@ -1627,6 +1673,7 @@ if (core == 0) {
    * ------------------------------------
    */
 
+  histo_file << "#bonds parameters:\n";
   for (int m = max_line_atompar + 2; m < max_line_bondpar + 2; m++) {
     if (mod(m, 2) != 0) {
       boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
@@ -1637,6 +1684,7 @@ if (core == 0) {
       for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
           if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
              for (int k = 0; k < ffensemble.size(); k++) {
+                 histo_file << ffensemble.at(k).at(m).at(col) << " ";
                  average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
              };
              if ((col == 0) || (col == 1)) {
@@ -1652,6 +1700,7 @@ if (core == 0) {
              averageffieldline.push_back( ss.str() );
              ss.str("");
           };
+          histo_file << "\n";
       };
       averageffield.push_back(averageffieldline);
       averageffieldline.clear();
@@ -1669,6 +1718,7 @@ if (core == 0) {
       for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
           if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
              for (int k = 0; k < ffensemble.size(); k++) {
+                 histo_file << ffensemble.at(k).at(m).at(col) << " ";
                  average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
              };
              ss << boost::format("%9.4f") %average;
@@ -1681,6 +1731,7 @@ if (core == 0) {
              ss.str("");
              
           };
+          histo_file << "\n";
       };
       averageffield.push_back(averageffieldline);
       averageffieldline.clear();
@@ -1716,6 +1767,7 @@ if (core == 0) {
   numodty = stoi(results_offdiag.at(0));
   max_line_offdpar = max_line_bondpar + 3 + numodty;
 
+  histo_file << "#off-diag parameters:\n";
   for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
     // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
     // So, to prevent it sticking to the left column
@@ -1727,6 +1779,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1)) {
@@ -1740,6 +1793,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1774,6 +1828,7 @@ if (core == 0) {
   numaty = stoi(results_angle.at(0));
   max_line_angles = max_line_offdpar + 1 + numaty;
 
+  histo_file << "#angle parameters:\n";
   for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
     boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
@@ -1784,6 +1839,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1) || (col == 2)) {
@@ -1797,6 +1853,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1832,6 +1889,7 @@ if (core == 0) {
   numtoty = stoi(results_tors.at(0));
   max_line_tors = max_line_angles + 1 + numtoty;
 
+  histo_file << "#torsion parameters:\n";
   for (int m = max_line_angles + 1; m < max_line_tors; m++) {
     boost::format f("  %i  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
@@ -1841,6 +1899,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1) || (col == 2) || (col == 3)) {
@@ -1854,6 +1913,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1888,6 +1948,7 @@ if (core == 0) {
   numhbty = stoi(results_hb.at(0));
   max_line_hbs = max_line_tors + 1 + numhbty;
 
+  histo_file << "#hbond parameters:\n";
   for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
     boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
@@ -1897,6 +1958,7 @@ if (core == 0) {
     for (int col = 0; col < ffensemble.at(0).at(m).size(); col++) {
         if ( is_numeric(ffensemble.at(0).at(m).at(col)) ) {
            for (int k = 0; k < ffensemble.size(); k++) {
+               histo_file << ffensemble.at(k).at(m).at(col) << " ";
                average += stod(ffensemble.at(k).at(m).at(col))/numffbags;
            };
            if ((col == 0) || (col == 1) || (col == 2)) {
@@ -1910,6 +1972,7 @@ if (core == 0) {
         }else{
            averageffieldline.push_back( ffensemble.at(0).at(m).at(col) );
         };
+        histo_file << "\n";
     };
     averageffield.push_back(averageffieldline);
     averageffieldline.clear();
@@ -1921,7 +1984,7 @@ if (core == 0) {
   };
 
   output_file.close();
-
+  histo_file.close();
 };
 
 void Par::write_ffield(const vector <double> &active_params, int cycle, int iter, int parid) {
