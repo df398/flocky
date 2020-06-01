@@ -80,11 +80,14 @@ int main(int argc, char * argv[]) {
     // ------------------------------------------------------------------------//
 
     // bkup original ffield
-    boost::filesystem::copy_file("ffield", "ffield.initial." + cyclecount, 
-      boost::filesystem::copy_option::overwrite_if_exists);
+    if ( boost::filesystem::exists("ffield") ) {
+       boost::filesystem::copy_file("ffield", "ffield.initial." + cyclecount, 
+         boost::filesystem::copy_option::overwrite_if_exists);
+    };
     
     Swarm MySwarm;
     MySwarm.get_userinp();
+    MySwarm.MakeFilesfromPath(MySwarm);
     MySwarm.MakeEnsembleFF(MySwarm);
     MySwarm.Populate(MySwarm, cycle);
     MySwarm.Propagate(MySwarm, cycle);
@@ -148,8 +151,10 @@ int main(int argc, char * argv[]) {
     auto starttime = chrono::steady_clock::now();
 
     // bkup original ffield before eval_fitness generates one for current particle fitness evaluation
-    boost::filesystem::copy_file("ffield", "ffield.initial." + cyclecount,
-    boost::filesystem::copy_option::overwrite_if_exists);
+    if ( boost::filesystem::exists("ffield") ) {
+       boost::filesystem::copy_file("ffield", "ffield.initial." + cyclecount,
+         boost::filesystem::copy_option::overwrite_if_exists);
+    };
 
     Swarm MySwarm;
     MySwarm.get_userinp();

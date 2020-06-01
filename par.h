@@ -76,6 +76,7 @@ extern double hlambda;
 extern bool ofit;
 extern bool uq;
 extern bool ensembleave;
+extern int preppath;
 extern bool gbfitfound;
 extern bool printonce;
 extern bool firstovfit;
@@ -207,6 +208,7 @@ class Swarm { // declaration of a Swarm
   void read_icharg_control();
   void AddPar(Par & newPar);
   void MakeEnsembleFF(Swarm & newSwarm);
+  void MakeFilesfromPath(Swarm & newSwarm);
   void Populate(Swarm & newSwarm, int iter);
   void Propagate(Swarm & newSwarm, int iter);
   void printdisp(Swarm & newSwarm, int timestep, int iter, int fr);

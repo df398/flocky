@@ -62,6 +62,7 @@ bool   uq = false;
 bool   gbfitfound = false;
 bool   firstovfit = true;
 bool   ensembleave = false;
+int    preppath = 0;
 double ovfitness = 0.0;
 double currovfitness = 0.0;
 double initial_disp = 0.0;
@@ -282,7 +283,7 @@ if (verbose == true) {
 
 Par::Par() {
 
-  if  (ensembleave == false) {
+  if  (ensembleave == false && preppath ==0) {
      // read ffield file into matrix ffieldmat. split by each entry.
      read_ffield();
 
@@ -3995,7 +3996,7 @@ if (verbose == true) {
     //      of not parallelising the training set. 
         ptrainset = 1;
     };
-    if (ptrainset > numcores && ensembleave == false) {
+    if (ptrainset > numcores && ensembleave == false && preppath == 0) {
       cout << "Error: Number of allocated processors < number of training set sub-units" << endl;
       MPI_Abort(MPI_COMM_WORLD,7);
     }else if (ptrainset > 1) {
@@ -4020,7 +4021,7 @@ if (verbose == true) {
     istringstream(tempinput.at(12)) >> ofit;
     istringstream(tempinput.at(13)) >> uq;
     istringstream(tempinput.at(14)) >> NumP;
-    if (ensembleave == false) {
+    if (ensembleave == false && preppath == 0) {
        if (NumP < numcores) {
          cout << "Error: Number of swarm members < number of allocated processors." << endl;
          MPI_Abort(MPI_COMM_WORLD,7);
@@ -4044,7 +4045,7 @@ if (verbose == true) {
     istringstream(tempinput.at(22)) >> maxiters;
     istringstream(tempinput.at(23)) >> maxcycles;
     istringstream(tempinput.at(24)) >> ensembleave;
-
+    istringstream(tempinput.at(25)) >> preppath;
   };  // close if core==0
  
 
@@ -4075,14 +4076,15 @@ if (verbose == true) {
   MPI_Bcast( & ofit, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ensembleave, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & preppath, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   // after broadcasting ensembleave all CPUs have the value of ensembleave
   // now it is possible to perform the following on every CPU
-  if (ptrainset == 1 && (ensembleave == false)) {
+  if (ptrainset == 1 && (ensembleave == false) && preppath == 0) {
     boost::filesystem::copy_file("trainset.in", "CPU." + str_core + "/trainset.in",
         boost::filesystem::copy_option::overwrite_if_exists);
   };
-  if (ptrainset > 1 && (ensembleave == false)) {
+  if (ptrainset > 1 && (ensembleave == false) && preppath == 0) {
     // define size of vectors for all the rest of the cores
     swarmcores.resize(numcores/ptrainset);
     reaxffcores.resize(numcores - (numcores/ptrainset));
@@ -4092,7 +4094,7 @@ if (verbose == true) {
   };
 
   // prepare dirs for each CPU process
-  if (ensembleave == false) {
+  if (ensembleave == false && preppath == 0) {
      boost::filesystem::create_directory("CPU." + str_core);
      boost::filesystem::copy_file("tapreaxff", "CPU." + str_core + "/tapreaxff",
          boost::filesystem::copy_option::overwrite_if_exists);
@@ -4104,7 +4106,7 @@ if (verbose == true) {
          boost::filesystem::copy_option::overwrite_if_exists);
   };
 
-  if (ensembleave == false) {
+  if (ensembleave == false && preppath == 0) {
      // check if reaxff was set to run with fixed charges and require charges file
      read_icharg_control();
 
@@ -4118,20 +4120,20 @@ if (verbose == true) {
      charge_file.close();
   };
 
-  if (fixcharges == true && (ensembleave == false)) {
+  if (fixcharges == true && (ensembleave == false) && preppath == 0) {
     boost::filesystem::copy_file("charges", "CPU." + str_core + "/charges",
       boost::filesystem::copy_option::overwrite_if_exists);
   };
 
   // create fort.20 file needed by tapreaxff
-  if (ensembleave == false) {
+  if (ensembleave == false && preppath == 0) {
      boost::filesystem::ofstream iopt_file("CPU." + str_core + "/fort.20");
      iopt_file << "0";
      iopt_file.close();
   };
 
   // create fort.35 file needed by tapreaxff
-  if (ensembleave == false) {
+  if (ensembleave == false && preppath == 0) {
      ofstream fort35_file("CPU." + str_core + "/fort.35");
      fort35_file << "23434.1" << endl;
      fort35_file.close();
@@ -4190,6 +4192,7 @@ if (verbose == true) {
     istringstream(tempinput.at(22)) >> maxiters;
     istringstream(tempinput.at(23)) >> maxcycles;
     istringstream(tempinput.at(24)) >> ensembleave;
+    istringstream(tempinput.at(25)) >> preppath;
 
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -4367,6 +4370,162 @@ if (verbose == true) {
   return particle_id;
 };
 
+void Swarm::MakeFilesfromPath(Swarm & newSwarm) {
+#ifdef WITH_MPI
+if (core == 0) {
+  if (verbose == true) {
+     cout << "CPU: " << core << " entered MakeFilesfromPath()" << endl;
+  };
+};
+#endif
+#ifndef WITH_MPI
+if (verbose == true) {
+   cout << "entered MakeFilesfromPath()" << endl;
+};
+#endif
+if (core == 0) {
+   if (preppath > 0 && ensembleave == false) {
+      for (int p = 0; p < 1; p++) {
+         Par NewPar;
+         newSwarm.AddPar(NewPar);
+      };
+
+      boost::filesystem::ofstream log("log.flocky", ofstream::app);
+      boost::filesystem::ifstream pathinfo_file("path.info");
+
+      if (pathinfo_file.fail()) {
+        cout << "Error: 'path.info' file not found!" << endl;
+        MPI_Abort(MPI_COMM_WORLD,8);
+        pathinfo_file.close();
+      }else{
+      log << "\n";
+      log << "Preparing training files from a path.info file..." << endl;
+      };
+
+      int natoms=preppath;
+      std::ifstream fin("path.info");
+
+      struct STpoint{
+        double energy;
+        string symmetry;
+        vector < vector <double> > frequencies;
+        vector < vector <double> > coordinates;
+      };
+
+      vector <STpoint> pathinfo;
+      pathinfo.clear();
+      STpoint mystpoint;
+
+      std::string line;
+      int numlines = 0;
+
+      // for each line
+      while (std::getline(fin, line)) {
+        numlines++;
+        // create a new row
+        std::vector < double > lineData;
+        string val;
+        std::istringstream lineStream(line);
+        // add 1st row in block to energy
+        if (numlines == 1) {
+           mystpoint.energy = stod(line);
+        };
+        // add 2nd row in block to symmetry
+        if (numlines == 2) {
+           mystpoint.symmetry = line;
+        };
+        // for each value in line
+        while (lineStream >> val && numlines > 2) {
+          // add val to the growing row
+          lineData.push_back(stod(val));
+        };
+        // add next rows to frequencies
+        if (numlines > 2 && numlines < 3+natoms) {
+           mystpoint.frequencies.push_back(lineData);
+        };
+        // add next rows to coordinates
+        if (numlines > 2+natoms && numlines < 3+2*natoms) {
+           mystpoint.coordinates.push_back(lineData);
+        };
+        // finished with 1st block (stationary point data)
+        // reset counter and start again in next block
+        // after adding the struct for current block to array pathinfo
+        if (numlines == 2*natoms+2) {
+           numlines = 0;
+           pathinfo.push_back(mystpoint);
+           mystpoint = {};
+        };
+      };
+
+
+      // Prepare frequencies file
+      vector <double> ::reverse_iterator col;
+      vector <vector <double>> ::reverse_iterator row;
+      boost::filesystem::create_directory("frequencies");
+      boost::filesystem::ofstream freqfile;
+      for (int k=0; k < pathinfo.size(); k++) {
+         freqfile.open( "frequencies/SP_" + std::to_string(k+1) + "_vib" , ofstream::app ) ;
+         freqfile << boost::format("%11a") %"frequencies";
+         for (row = pathinfo.at(k).frequencies.rbegin(); row != pathinfo.at(k).frequencies.rend(); ++row) {
+             for (col = row->rbegin(); col != row->rend(); ++col) {
+                 freqfile << boost::format("%8.2f%1x") %*col %"";
+             }
+             // remove newline so all values are in one line
+             //freqfile << endl;
+         }
+         freqfile.close();
+      };
+
+      // Prepare geo file
+      vector <double> ::iterator acol;
+      vector <vector <double>> ::iterator arow;
+      boost::filesystem::ofstream geofile;
+      int l=0;
+      for (int k=0; k < pathinfo.size(); k++) {
+         geofile.open( "geo.path" , ofstream::app ) ;
+         geofile << "BIOGRF 200\n";
+         geofile << boost::format("%6s%8s") %"DESCRP" %("SP_"+std::to_string(k+1));
+         geofile << "\n";
+         for (arow = pathinfo.at(k).coordinates.begin(); arow != pathinfo.at(k).coordinates.end(); ++arow) {
+             l++;
+             geofile << boost::format("%6s %5d %-5s %3s %1s %5s") %"HETATM" %l %"C" %"   " %" " %"   ";
+             for (acol = arow->begin(); acol != arow->end(); ++acol) {
+                 geofile << boost::format("%15.10f") %*acol;
+             }
+             geofile << boost::format(" %5s%3d%2d %8.5f\n") %"C" %"0" %"0" %"0.00000";
+         }
+         l=0;
+         geofile << "END\n" << endl;
+         geofile.close();
+      };
+
+
+      // Prepare trainset.in file
+      boost::filesystem::ofstream trainfile;
+      trainfile.open( "trainset.in.path", ofstream::app);
+      // energy section
+      trainfile << "ENERGY" << endl;
+      for (int k=0; k < pathinfo.size(); k++) {
+          // make a baseline - subtract energy of first stationary point from all energies
+          double ediff = pathinfo.at(k).energy - pathinfo.at(0).energy;
+          trainfile << " 1.0 + SP_" + std::to_string(k+1) + "/1 - SP_1/1" + "        " << boost::format("%5.2f") %ediff << endl;
+      };
+      trainfile << "ENDENERGY" << endl;
+      // frequencies section
+      trainfile << "FREQUENCIES" << endl;
+      for (int k=0; k < pathinfo.size(); k++) {
+          trainfile << " SP_" + std::to_string(k+1) + "  10.0  10.0 " + "SP_" + std::to_string(k+1) + "_vib" << endl;
+      };
+      trainfile << "ENDFREQUENCIES" << endl;
+      trainfile.close();
+
+
+      log.close();
+      pathinfo_file.close();
+
+   };
+};
+};
 
 void Swarm::MakeEnsembleFF(Swarm & newSwarm) {
 #ifdef WITH_MPI
@@ -4383,7 +4542,7 @@ if (verbose == true) {
 #endif
 #ifdef WITH_MPI
 if (core == 0) {
-   if (ensembleave == true) {
+   if (ensembleave == true && preppath == 0) {
       for (int p = 0; p < 1; p++) {
          Par NewPar;
          newSwarm.AddPar(NewPar);
@@ -4477,7 +4636,7 @@ if (verbose == true) {
 #endif
 
 #ifdef WITH_MPI
-if (ensembleave == false) {
+if (ensembleave == false && preppath == 0) {
     if (core == 0 && verbose == true) {
        cout << "CPU: " << core << " entered Populate!" << endl; 
     };
@@ -4937,7 +5096,7 @@ if (verbose == true) {
 };
 #endif
 #ifdef WITH_MPI
-if (ensembleave == false) {
+if (ensembleave == false && preppath == 0) {
    if (core == 0 && verbose == true) {
       cout << "CPU: " << core << " entered Propagate!" << endl;
    };
