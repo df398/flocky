@@ -4400,6 +4400,7 @@ if (core == 0) {
       }else{
       log << "\n";
       log << "Preparing training files from a path.info file..." << endl;
+      log << "Note: |frequencies| <= 1.0E-4 will be ignored" << endl;
       };
 
       int natoms=preppath;
@@ -4436,8 +4437,14 @@ if (core == 0) {
         };
         // for each value in line
         while (lineStream >> val && numlines > 2) {
-          // add val to the growing row
-          lineData.push_back(stod(val));
+          // add frequency vals to the growing row if non-zero
+          if (numlines < 3+natoms && abs(stod(val)) > 1.0E-4) {
+             lineData.push_back(stod(val));
+          };
+          // add coordinates vals to the growing row
+          if (numlines > 2+natoms) {
+             lineData.push_back(stod(val));
+          };
         };
         // add next rows to frequencies
         if (numlines > 2 && numlines < 3+natoms) {
@@ -4463,15 +4470,26 @@ if (core == 0) {
       vector <vector <double>> ::reverse_iterator row;
       boost::filesystem::create_directory("frequencies");
       boost::filesystem::ofstream freqfile;
+
+      int count = 0;
+      bool printheader = true;
       for (int k=0; k < pathinfo.size(); k++) {
          freqfile.open( "frequencies/SP_" + std::to_string(k+1) + "_vib" , ofstream::app ) ;
-         freqfile << boost::format("%11a") %"frequencies";
+         //freqfile << boost::format("%11a") %"frequencies";
          for (row = pathinfo.at(k).frequencies.rbegin(); row != pathinfo.at(k).frequencies.rend(); ++row) {
+             if (printheader == true) {
+                freqfile << boost::format("%11a") %"frequencies";
+                printheader = false;
+             };
              for (col = row->rbegin(); col != row->rend(); ++col) {
                  freqfile << boost::format("%8.2f%1x") %*col %"";
-             }
-             // remove newline so all values are in one line
-             //freqfile << endl;
+                 count = count + 1;
+             };
+             if (count == 6) {
+                freqfile << endl;
+                printheader = true;
+                count =0;
+             };
          }
          freqfile.close();
       };
@@ -4519,7 +4537,7 @@ if (core == 0) {
       trainfile << "ENDFREQUENCIES" << endl;
       trainfile.close();
 
-
+      log << "Done!" << endl;
       log.close();
       pathinfo_file.close();
 
