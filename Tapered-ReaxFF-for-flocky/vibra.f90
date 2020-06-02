@@ -346,48 +346,48 @@
     ifh=0
     nufreq=klinear+3*na-6
     open (19,file=qfreqfile,status='old',err=60)
-    read (19,'(a200)')qhulp
-    read (19,'(a200)')qhulp
-    read (19,'(a200)')qhulp
+    !read (19,'(a200)')qhulp
+    !read (19,'(a200)')qhulp
+    !read (19,'(a200)')qhulp
     ijagvers=1
-    if (qhulp(21:23) == '4.2') ijagvers=2
+    !if (qhulp(21:23) == '4.2') ijagvers=2
 
     15 read (19,'(a200)',err=60,end=50)qhulp
 
-    if (ijagvers == 1) then
+    !if (ijagvers == 1) then
         ihulp=6
         if (ifh+6 > nufreq) ihulp=nufreq-ifh
         if (qhulp(3:13) == 'frequencies') then
             read (qhulp,'(17x,6(f8.2,1x))')(vibqc(i1+ifh),i1=1,ihulp)
-            read (19,*)
-            read (19,*)
-            do i1=1,na
-                do i2=1,3
-                    read (19,'(17x,6(f8.2,1x))') &
-                    (vmodqc(i2+(i1-1)*3,i3+ifh),i3=1,ihulp)
-                end do
-            end do
+            !read (19,*)
+            !read (19,*)
+            !do i1=1,na
+            !    do i2=1,3
+            !        read (19,'(17x,6(f8.2,1x))') &
+            !        (vmodqc(i2+(i1-1)*3,i3+ifh),i3=1,ihulp)
+            !    end do
+            !end do
             ifh=ifh+6
         end if
         goto 15
-    end if
+    !end if
 
-    if (ijagvers == 2) then
-        ihulp=7
-        if (ifh+7 > nufreq) ihulp=nufreq-ifh
-        if (qhulp(3:13) == 'frequencies') then
-            read (qhulp,'(13x,7(f8.2,1x))')(vibqc(i1+ifh),i1=1,ihulp)
-            read (19,*)
-            do i1=1,na
-                do i2=1,3
-                    read (19,'(13x,7(f8.2,1x))') &
-                    (vmodqc(i2+(i1-1)*3,i3+ifh),i3=1,ihulp)
-                end do
-            end do
-            ifh=ifh+7
-        end if
-        goto 15
-    end if
+    !if (ijagvers == 2) then
+    !    ihulp=7
+    !    if (ifh+7 > nufreq) ihulp=nufreq-ifh
+    !    if (qhulp(3:13) == 'frequencies') then
+    !        read (qhulp,'(13x,7(f8.2,1x))')(vibqc(i1+ifh),i1=1,ihulp)
+    !        read (19,*)
+    !        do i1=1,na
+    !            do i2=1,3
+    !                read (19,'(13x,7(f8.2,1x))') &
+    !                (vmodqc(i2+(i1-1)*3,i3+ifh),i3=1,ihulp)
+    !            end do
+    !        end do
+    !        ifh=ifh+7
+    !    end if
+    !    goto 15
+    !end if
      
     50 close (19)
 !*********************************************************************
@@ -396,93 +396,96 @@
 !                                                                    *
 !*********************************************************************
     do i1=1,navib*3
-        errmatch2(i1)=5e+35
-        imatch(i1)=-1
-        imatch2(i1)=-1
+        !errmatch2(i1)=5e+35
+        !imatch(i1)=-1
+        !imatch2(i1)=-1
+        errmatch2(i1)=0.0d0
+        imatch(i1)=i1
+        imatch2(i1)=i1
     end do
     nagain=0
 
-    100 continue
-    nagain=nagain+1
-    iagain=0
-    do i1=1,klinear+3*na-6
-        diffmin=5e+35
-        if (imatch(i1) < 0) then
-            do i2=1,klinear+3*na-6
-                diffp=0.0
-                diffm=0.0
-                do i3=1,3*na
-                    diffph=vmode(i3,i1+6-klinear)-vmodqc(i3,i2)
-                    diffmh=vmode(i3,i1+6-klinear)+vmodqc(i3,i2)
-                    diffp=diffp+diffph*diffph*diffph*diffph
-                    diffm=diffm+diffmh*diffmh*diffmh*diffmh
-                end do
-                diffp=diffp/float(3*na)
-                diffm=diffm/float(3*na)
-                if (diffp < diffmin) then
-                    if (diffp < errmatch2(i2)) then
-                        diffmin=diffp
-                        imatch(i1)=i2
-                        errmatch(i1)=diffp
-                        if (imatch2(i2) < i1) then
-                            errmatch(imatch2(i2))=5e+35
-                            imatch(imatch2(i2))=-1
-                            iagain=1
-                        end if
-                        imatch2(i2)=i1
-                        errmatch2(i2)=diffp
-                    end if
-                end if
-                if (diffm < diffmin) then
-                    if (diffm < errmatch2(i2)) then
-                        diffmin=diffm
-                        imatch(i1)=i2
-                        errmatch(i1)=diffm
-                        if (imatch2(i2) < i1) then
-                            errmatch(imatch2(i2))=5e+35
-                            imatch(imatch2(i2))=-1
-                            iagain=1
-                        end if
-                        imatch2(i2)=i1
-                        errmatch2(i2)=diffm
-                    end if
-                end if
-            end do
-        end if
-    end do
-     
-    do i1=1,navib*3
-        errmatch2(i1)=5e+35
-        imatch2(i1)=-1
-    end do
+    !100 continue
+    !nagain=nagain+1
+    !iagain=0
+    !do i1=1,klinear+3*na-6
+    !    diffmin=5e+35
+    !    if (imatch(i1) < 0) then
+    !        do i2=1,klinear+3*na-6
+    !            diffp=0.0
+    !            diffm=0.0
+    !            do i3=1,3*na
+    !                diffph=vmode(i3,i1+6-klinear)-vmodqc(i3,i2)
+    !                diffmh=vmode(i3,i1+6-klinear)+vmodqc(i3,i2)
+    !                diffp=diffp+diffph*diffph*diffph*diffph
+    !                diffm=diffm+diffmh*diffmh*diffmh*diffmh
+    !            end do
+    !            diffp=diffp/float(3*na)
+    !            diffm=diffm/float(3*na)
+    !            if (diffp < diffmin) then
+    !                if (diffp < errmatch2(i2)) then
+    !                    diffmin=diffp
+    !                    imatch(i1)=i2
+    !                    errmatch(i1)=diffp
+    !                    if (imatch2(i2) < i1) then
+    !                        errmatch(imatch2(i2))=5e+35
+    !                        imatch(imatch2(i2))=-1
+    !                        iagain=1
+    !                    end if
+    !                    imatch2(i2)=i1
+    !                    errmatch2(i2)=diffp
+    !                end if
+    !            end if
+    !            if (diffm < diffmin) then
+    !                if (diffm < errmatch2(i2)) then
+    !                    diffmin=diffm
+    !                    imatch(i1)=i2
+    !                    errmatch(i1)=diffm
+    !                    if (imatch2(i2) < i1) then
+    !                        errmatch(imatch2(i2))=5e+35
+    !                        imatch(imatch2(i2))=-1
+    !                        iagain=1
+    !                    end if
+    !                    imatch2(i2)=i1
+    !                    errmatch2(i2)=diffm
+    !                end if
+    !            end if
+    !        end do
+    !    end if
+    !end do
+    ! 
+    !do i1=1,navib*3
+    !    errmatch2(i1)=5e+35
+    !    imatch2(i1)=-1
+    !end do
 
-    do i1=1,klinear+3*na-6
-        imatch2(imatch(i1))=i1
-        errmatch2(imatch(i1))=errmatch(i1)
-    end do
+    !do i1=1,klinear+3*na-6
+    !    imatch2(imatch(i1))=i1
+    !    errmatch2(imatch(i1))=errmatch(i1)
+    !end do
 
-    if (iopt == 0 .AND. nsurp < 2) then
-        write (61,*)qmol,nagain,iagain
-         
-        do i1=1,klinear+3*na-6
-            write (61,*)i1,imatch(i1),errmatch(i1)
-            write (61,*)vibqc(imatch(i1)),vibreax(i1+6-klinear)
-            do i2=1,na
-                write (61,'(i4,a2,6(f8.2,1x))')i2,qa(i2), &
-                (vmodqc((i2-1)*3+i3,imatch(i1)),i3=1,3), &
-                (vmode((i2-1)*3+i3,i1+6-klinear),i3=1,3)
-            end do
-        end do
-    end if
+    !if (iopt == 0 .AND. nsurp < 2) then
+    !    write (61,*)qmol,nagain,iagain
+    !     
+    !    do i1=1,klinear+3*na-6
+    !        write (61,*)i1,imatch(i1),errmatch(i1)
+    !        write (61,*)vibqc(imatch(i1)),vibreax(i1+6-klinear)
+    !        do i2=1,na
+    !            write (61,'(i4,a2,6(f8.2,1x))')i2,qa(i2), &
+    !            (vmodqc((i2-1)*3+i3,imatch(i1)),i3=1,3), &
+    !            (vmode((i2-1)*3+i3,i1+6-klinear),i3=1,3)
+    !        end do
+    !    end do
+    !end if
 
-    if (iagain == 1 .AND. nagain < 15) goto 100
+    !if (iagain == 1 .AND. nagain < 15) goto 100
 
-    if (imfreq == -1) then   !Do not match modes
-        do i1=1,klinear+3*na-6
-            imatch(i1)=i1
-            errmatch(i1)=0.0
-        end do
-    end if
+    !if (imfreq == -1) then   !Do not match modes
+    !    do i1=1,klinear+3*na-6
+    !        imatch(i1)=i1
+    !        errmatch(i1)=0.0
+    !    end do
+    !end if
      
     return
     60 write (*,*)'Could not open Jaguar vibrational data'

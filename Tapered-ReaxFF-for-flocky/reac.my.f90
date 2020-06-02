@@ -10350,10 +10350,10 @@ end subroutine valtaper
                 compdat(ndata2)=vibqc(imatch(i1))
                 write (qdatid(ndata2),178)qkeyhulp,i1+6
                 ndata2=ndata2+1
-                caldat(ndata2)=1000.0d0*errmatch(i1)
-                weightdat(ndata2)=weightm
-                compdat(ndata2)=zero
-                write (qdatid(ndata2),179)qkeyhulp,i1+6
+                !caldat(ndata2)=1000.0d0*errmatch(i1)
+                !weightdat(ndata2)=weightm
+                !compdat(ndata2)=zero
+                !write (qdatid(ndata2),179)qkeyhulp,i1+6
             end do
         end if
 
