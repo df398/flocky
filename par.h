@@ -28,6 +28,7 @@
 #include <boost/spirit/include/qi_numeric.hpp>
 #include <sstream>
 #include <algorithm>
+#include <functional>
 #include <iterator>
 #include <iomanip>
 #include <boost/format.hpp>

@@ -4078,6 +4078,19 @@ if (verbose == true) {
   MPI_Bcast( & ensembleave, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & preppath, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+  // prepare dirs for each CPU process
+  if (ensembleave == false && preppath == 0) {
+     boost::filesystem::create_directory("CPU." + str_core);
+     boost::filesystem::copy_file("tapreaxff", "CPU." + str_core + "/tapreaxff",
+         boost::filesystem::copy_option::overwrite_if_exists);
+     boost::filesystem::copy_file("ffield", "CPU." + str_core + "/ffield",
+         boost::filesystem::copy_option::overwrite_if_exists);
+     boost::filesystem::copy_file("control", "CPU." + str_core + "/control",
+         boost::filesystem::copy_option::overwrite_if_exists);
+     boost::filesystem::copy_file("geo", "CPU." + str_core + "/geo",
+         boost::filesystem::copy_option::overwrite_if_exists);
+  };
+
   // after broadcasting ensembleave all CPUs have the value of ensembleave
   // now it is possible to perform the following on every CPU
   if (ptrainset == 1 && (ensembleave == false) && preppath == 0) {
@@ -4091,19 +4104,6 @@ if (verbose == true) {
     // now is possible to bcast swarmcores.data() and reaxffcores.data()
     MPI_Bcast( swarmcores.data(), swarmcores.size(), MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast( reaxffcores.data(), reaxffcores.size(), MPI_INT, 0, MPI_COMM_WORLD);
-  };
-
-  // prepare dirs for each CPU process
-  if (ensembleave == false && preppath == 0) {
-     boost::filesystem::create_directory("CPU." + str_core);
-     boost::filesystem::copy_file("tapreaxff", "CPU." + str_core + "/tapreaxff",
-         boost::filesystem::copy_option::overwrite_if_exists);
-     boost::filesystem::copy_file("ffield", "CPU." + str_core + "/ffield",
-         boost::filesystem::copy_option::overwrite_if_exists);
-     boost::filesystem::copy_file("control", "CPU." + str_core + "/control",
-         boost::filesystem::copy_option::overwrite_if_exists);
-     boost::filesystem::copy_file("geo", "CPU." + str_core + "/geo",
-         boost::filesystem::copy_option::overwrite_if_exists);
   };
 
   if (ensembleave == false && preppath == 0) {
@@ -4400,7 +4400,7 @@ if (core == 0) {
       }else{
       log << "\n";
       log << "Preparing training files from a path.info file..." << endl;
-      log << "Note: |frequencies| <= 1.0E-4 will be ignored" << endl;
+      log << "Note: 6 smallest |frequencies| will be ignored" << endl;
       };
 
       int natoms=preppath;
@@ -4438,13 +4438,13 @@ if (core == 0) {
         // for each value in line
         while (lineStream >> val && numlines > 2) {
           // add frequency vals to the growing row if non-zero
-          if (numlines < 3+natoms && abs(stod(val)) > 1.0E-4) {
-             lineData.push_back(stod(val));
-          };
+          //if (numlines < 3+natoms && abs(stod(val)) > 1.0E-4) {
+          //   lineData.push_back(stod(val));
+          //};
           // add coordinates vals to the growing row
-          if (numlines > 2+natoms) {
+          //if (numlines > 2+natoms) {
              lineData.push_back(stod(val));
-          };
+          //};
         };
         // add next rows to frequencies
         if (numlines > 2 && numlines < 3+natoms) {
@@ -4470,6 +4470,53 @@ if (core == 0) {
       vector <vector <double>> ::reverse_iterator row;
       boost::filesystem::create_directory("frequencies");
       boost::filesystem::ofstream freqfile;
+      // remove 6 smallest (in absolute value) frequencies
+      // of overall translation and rotation
+      vector <double> tempfreq;
+      for (int k=0; k < pathinfo.size(); k++) {
+         for (int i=0; i < pathinfo[k].frequencies.size(); i++) {
+            for (int j=0; j < pathinfo[k].frequencies.at(i).size(); j++) {
+              // add the first 3*natoms-6 frequencies to the vector
+              if (tempfreq.size() < 3*natoms-6)
+              {
+                  tempfreq.push_back(pathinfo[k].frequencies.at(i).at(j));
+                  if ( tempfreq.size() == 3*natoms-6 )
+                      // make the max-heap of the 5 elements   
+                      std::make_heap(tempfreq.begin(), tempfreq.end());
+                  continue;
+              }
+
+              if (k==1) {
+                cout << tempfreq.front() << endl;
+                cout << pathinfo[k].frequencies.at(i).at(j) << endl;
+              };
+
+              // now check if the next element is larger than the top of the heap
+              if (abs(tempfreq.front()) < abs(pathinfo[k].frequencies.at(i).at(j)))
+              {
+                  // remove the front of the heap by placing it at the end of the vector
+                  std::pop_heap(tempfreq.begin(), tempfreq.end(), std::less<double>());
+
+                  // get rid of that item now 
+                  tempfreq.pop_back();
+
+                  // add the new item 
+                  tempfreq.push_back(pathinfo[k].frequencies.at(i).at(j));
+
+                  // heapify
+                  std::push_heap(tempfreq.begin(), tempfreq.end(), std::less<double>());
+              }
+            }
+         };
+         // sort the heap    
+         std::sort_heap(tempfreq.begin(), tempfreq.end());
+         for (double d : tempfreq) {
+           std::cout << d << " ";  // print the 3*na-6 largest elements in ascending order      
+         };
+         cout << '\n';
+         tempfreq.clear();
+      };
+
 
       int count = 0;
       bool printheader = true;
