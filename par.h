@@ -37,6 +37,7 @@
 #include <boost/process.hpp>
 #include <boost/process/async_system.hpp>
 #include <nlopt.hpp>
+#include <map>
 # define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 # undef BOOST_NO_CXX11_SCOPED_ENUMS

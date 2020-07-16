@@ -2954,7 +2954,7 @@ if (verbose == true) {
 #endif
 
   //std::normal_distribution <double> normdist2(0.0, 1.0);
-  double levystep = abs(get_levy_McCul(iter, maxiters));
+  double levystep = fabs(get_levy_McCul(iter, maxiters));
   vector < double > direction = get_normdir();
 
   for (int i = 0; i < dim; i++) {
@@ -3871,7 +3871,7 @@ if (verbose == true) {
   // calculate L1 penalty
   if (regular == 1) {
     for (int i = 0; i < dim; i++) {
-        reg = reg + abs( pos_for_reg.at(i) );
+        reg = reg + fabs( pos_for_reg.at(i) );
     };
     reg = hlambda*reg;
   };
@@ -4392,24 +4392,30 @@ if (core == 0) {
 
       boost::filesystem::ofstream log("log.flocky", ofstream::app);
       boost::filesystem::ifstream pathinfo_file("path.info");
+      boost::filesystem::ifstream vectordump_file("vector.dump.path");
 
-      if (pathinfo_file.fail()) {
-        cout << "Error: 'path.info' file not found!" << endl;
+      if (pathinfo_file.fail() || vectordump_file.fail()) {
+        cout << "Error: 'path.info or vector.dump.path' files not found!" << endl;
         MPI_Abort(MPI_COMM_WORLD,8);
         pathinfo_file.close();
       }else{
       log << "\n";
-      log << "Preparing training files from a path.info file..." << endl;
-      log << "Note: 6 smallest |frequencies| will be ignored" << endl;
+      log << "Preparing training files from path.info and vector.dump.path files..." << endl;
+      log << "Note: 6 smallest |frequencies| will be ignored. Assuming non-linear molecule." << endl;
       };
 
       int natoms=preppath;
       std::ifstream fin("path.info");
+      std::ifstream fin2("vector.dump.path");
 
+
+
+      // struct to store energies, symmetries, mass-weighted hessian eigenvalues
+      // and coordinates as given in path.info file
       struct STpoint{
         double energy;
         string symmetry;
-        vector < vector <double> > frequencies;
+        vector < vector <double> > Mwhessevals;
         vector < vector <double> > coordinates;
       };
 
@@ -4417,10 +4423,10 @@ if (core == 0) {
       pathinfo.clear();
       STpoint mystpoint;
 
+
       std::string line;
       int numlines = 0;
-
-      // for each line
+      // for each line of path.info file
       while (std::getline(fin, line)) {
         numlines++;
         // create a new row
@@ -4437,18 +4443,11 @@ if (core == 0) {
         };
         // for each value in line
         while (lineStream >> val && numlines > 2) {
-          // add frequency vals to the growing row if non-zero
-          //if (numlines < 3+natoms && abs(stod(val)) > 1.0E-4) {
-          //   lineData.push_back(stod(val));
-          //};
-          // add coordinates vals to the growing row
-          //if (numlines > 2+natoms) {
              lineData.push_back(stod(val));
-          //};
         };
-        // add next rows to frequencies
+        // add next rows to Mwhessevals
         if (numlines > 2 && numlines < 3+natoms) {
-           mystpoint.frequencies.push_back(lineData);
+           mystpoint.Mwhessevals.push_back(lineData);
         };
         // add next rows to coordinates
         if (numlines > 2+natoms && numlines < 3+2*natoms) {
@@ -4465,81 +4464,217 @@ if (core == 0) {
       };
 
 
-      // Prepare frequencies file
+      // struct to store freqs and normal mode vectors as given in vector.dump.path file
+      struct frqandmodes{
+        double freqfromdump;
+        vector <double> normalmodes; // size [3*natoms]
+      };
+
+      vector <frqandmodes> vdumpinfo; // vector to contain all frequencies and associated modes of a given stationary point
+      vector < vector <frqandmodes> > totvdumpinfo; // vector to contain all previous vectors (i.e. for all stationary points)
+      vdumpinfo.clear();
+      totvdumpinfo.clear();
+
+      frqandmodes myvdump;
+
+      numlines=0;
+      int numstructs=0;
+      // for each line of vector.dump.path file
+      while (std::getline(fin2, line)) {
+        // create a new row
+        std::vector < double > lineData;
+        string val;
+        std::istringstream lineStream(line);
+
+        // add frequency element into struct myvdump
+        if (mod(numlines,natoms+1)==0) {
+           myvdump.freqfromdump = stod(line);
+           //cout << "freq: " << stod(line) << endl;
+        };
+
+        // fill up normal modes of one frequency
+        //myvdump.normalmodes.clear();
+        while ( lineStream >> val && (mod(numlines,natoms+1) != 0) ) {
+             myvdump.normalmodes.push_back(stod(val));
+             //cout << "nmodes pushed back: " << stod(val) << endl;
+        };
+        //cout << "numlines = " << numlines << endl;
+        //cout << "number of modes in myvdump.normalmodes = " << myvdump.normalmodes.size() << endl; 
+        numlines++;
+
+        // fill up the nmodes of current stationary point
+        if (myvdump.normalmodes.size() == 3*natoms) {
+           //cout << "myvdump.normalmodes reached 3*natoms modes. filling vdumpinfo" << endl;
+           vdumpinfo.push_back(myvdump);
+           myvdump = {};
+        };
+
+        // fill up the nmodes of all stationary points
+        if (vdumpinfo.size() == 3*natoms) {
+           //vdumpinfo.push_back(myvdump);
+           //numstructs++;
+           //cout << "finished inserting freqs and nmodes of stationary point #" << numstructs << endl;
+           totvdumpinfo.push_back(vdumpinfo);
+           myvdump = {};
+           vdumpinfo.clear();
+        };
+
+      };
+
+      //cout << "============ debug nmodes ===============" << endl;
+      //cout << "totvdumpinfo.size = " << totvdumpinfo.size() << endl;
+      //for (int k=0; k < totvdumpinfo.size(); k++) {
+      //    cout << "struct #" << k << endl;
+      //    for (int v=0; v < totvdumpinfo.at(k).size(); v++) {
+      //        cout << "freq #" << v << endl;
+      //        for (int r=0; r < totvdumpinfo[k].at(v).normalmodes.size(); r++) {
+      //            cout << totvdumpinfo[k].at(v).normalmodes.at(r) << endl;
+      //        };
+      //    };
+      //};
+
+
+      // Prepare chopped frequencies (sqrt of Mwhessevals) file
+      // remove 6 smallest (in absolute value) Mwhessevals and store
+      // in tempfreq. 
+      // note: needs to be modified for linear molecules.
+      boost::filesystem::ofstream freqfile;
       vector <double> ::reverse_iterator col;
       vector <vector <double>> ::reverse_iterator row;
       boost::filesystem::create_directory("frequencies");
-      boost::filesystem::ofstream freqfile;
-      // remove 6 smallest (in absolute value) frequencies
-      // of overall translation and rotation
-      vector <double> tempfreq;
+
+      // define a struct to hold a frequency and it's ID in Mwhessevals
+      struct freqandID {
+         int freqID;
+         double freq;
+      };
+
+      // define a "greater than" comparator for freqandID type elements to use in max heap
+      struct freqandID_greater_than {
+          bool operator()(freqandID const& a, freqandID const& b) const {
+              return a.freq > b.freq;
+          };
+      };
+
+      // define a "less than" comparator for freqandID type elements to use in sort
+      struct freqandID_less_than {
+          bool operator()(freqandID const& a, freqandID const& b) const {
+              return a.freq < b.freq;
+          };
+      };
+
+      freqandID mytempfreq; // a single pair of ID and frequency
+      vector <freqandID> tempfreq; // all pairs of ID-frequency
+
+      tempfreq.clear();
+      int chunk;
+      int endcol;
       for (int k=0; k < pathinfo.size(); k++) {
-         for (int i=0; i < pathinfo[k].frequencies.size(); i++) {
-            for (int j=0; j < pathinfo[k].frequencies.at(i).size(); j++) {
-              // add the first 3*natoms-6 frequencies to the vector
+          chunk=0;
+          endcol=6;
+         for (int i=0; i < pathinfo[k].Mwhessevals.size(); i++) {
+            for (int j=0; j < pathinfo[k].Mwhessevals.at(i).size(); j++) {
+              //add the first 3*natoms-6 Mwhessevals to the vector
               if (tempfreq.size() < 3*natoms-6)
               {
-                  tempfreq.push_back(pathinfo[k].frequencies.at(i).at(j));
+                  // convert mass-weighted hessian eigenvalues to frequencies
+                  // convention: negative eigenvalue --> negative frequency
+                  if (pathinfo[k].Mwhessevals.at(i).at(j) < 0.0) {
+                       //tempfreq.push_back(-1.0*pow(fabs(pathinfo[k].Mwhessevals.at(i).at(j)),0.5));
+                       mytempfreq.freqID=i+j;
+                       mytempfreq.freq=-1.0*pow(fabs(pathinfo[k].Mwhessevals.at(i).at(j)),0.5);
+                  }else{
+                       //tempfreq.push_back(pow(pathinfo[k].Mwhessevals.at(i).at(j),0.5));
+                       mytempfreq.freqID=i+j;
+                       mytempfreq.freq=pow(pathinfo[k].Mwhessevals.at(i).at(j),0.5);
+                  };
+                  // fill in the tempfreq with a new mytempfreq struct
+                  tempfreq.push_back(mytempfreq);
+
                   if ( tempfreq.size() == 3*natoms-6 )
-                      // make the max-heap of the 5 elements   
-                      std::make_heap(tempfreq.begin(), tempfreq.end());
+                      // make the max_heap
+                      std::make_heap(tempfreq.begin(), tempfreq.end(),freqandID_greater_than());
                   continue;
               }
 
-              if (k==1) {
-                cout << tempfreq.front() << endl;
-                cout << pathinfo[k].frequencies.at(i).at(j) << endl;
-              };
-
               // now check if the next element is larger than the top of the heap
-              if (abs(tempfreq.front()) < abs(pathinfo[k].frequencies.at(i).at(j)))
+              //cout << "structure #" << k << endl;
+              //cout << "new candidate: " << pow(fabs(pathinfo[k].Mwhessevals.at(i).at(j)),0.5) << endl;
+              //cout << "front of heap: " << fabs(tempfreq.front().freq) << endl;
+              if (fabs(tempfreq.front().freq) < pow(fabs(pathinfo[k].Mwhessevals.at(i).at(j)),0.5))
               {
+                  //cout << "exchange!" << endl;
+
                   // remove the front of the heap by placing it at the end of the vector
-                  std::pop_heap(tempfreq.begin(), tempfreq.end(), std::less<double>());
+                  std::pop_heap(tempfreq.begin(), tempfreq.end(),freqandID_greater_than());
 
                   // get rid of that item now 
                   tempfreq.pop_back();
 
-                  // add the new item 
-                  tempfreq.push_back(pathinfo[k].frequencies.at(i).at(j));
+                  // add the new item after converting mass-weighted hessian eigenvalues to frequencies
+                  // convention: negative eigenvalue --> negative frequency
+                  if (pathinfo[k].Mwhessevals.at(i).at(j) < 0.0) {
+                       //tempfreq.push_back(-1.0*pow(fabs(pathinfo[k].Mwhessevals.at(i).at(j)),0.5));
+                       mytempfreq.freqID=i+j;
+                       mytempfreq.freq=-1.0*pow(fabs(pathinfo[k].Mwhessevals.at(i).at(j)),0.5);
+                       //cout << "pushed back into tempfreq: " << -1.0*pow(fabs(pathinfo[k].Mwhessevals.at(i).at(j)),0.5) << endl;
+                  }else{
+                       //tempfreq.push_back(pow(pathinfo[k].Mwhessevals.at(i).at(j),0.5));
+                       mytempfreq.freqID=i+j;
+                       mytempfreq.freq=pow(pathinfo[k].Mwhessevals.at(i).at(j),0.5);
+                       //cout << "pushed back into tempfreq: " << pow(pathinfo[k].Mwhessevals.at(i).at(j),0.5) << endl;
+                  };
+                  //cout << "front of heap after push_back but before push_heap: " << tempfreq.front() << endl;
 
                   // heapify
-                  std::push_heap(tempfreq.begin(), tempfreq.end(), std::less<double>());
-              }
-            }
+                  std::push_heap(tempfreq.begin(), tempfreq.end(),freqandID_greater_than());
+                  //cout << "front of heap after push_heap with greater: " << tempfreq.front() << endl;
+              };
+            };
          };
-         // sort the heap    
-         std::sort_heap(tempfreq.begin(), tempfreq.end());
-         for (double d : tempfreq) {
-           std::cout << d << " ";  // print the 3*na-6 largest elements in ascending order      
+
+         // sort the chopped (3*natoms - 6) frequencies in ascending order
+         std::sort(tempfreq.begin(), tempfreq.end(),freqandID_less_than());
+
+         // ========== PRINTING frequencies and normal modes in chunks of 6 columns =========== //
+         // assemble all indices of chopped frequencies into vector `matches`
+         vector <int> matches;
+         matches.clear();
+         for (int i=0; i < tempfreq.size(); i++){
+            matches.push_back(tempfreq.at(i).freqID);
          };
-         cout << '\n';
-         tempfreq.clear();
-      };
+         //cout << "total number of matches: " << matches.size() << endl;
 
-
-      int count = 0;
-      bool printheader = true;
-      for (int k=0; k < pathinfo.size(); k++) {
+         // print the chopped (3*natoms-6) sorted frequencies (tempfreq) to files
          freqfile.open( "frequencies/SP_" + std::to_string(k+1) + "_vib" , ofstream::app ) ;
-         //freqfile << boost::format("%11a") %"frequencies";
-         for (row = pathinfo.at(k).frequencies.rbegin(); row != pathinfo.at(k).frequencies.rend(); ++row) {
-             if (printheader == true) {
-                freqfile << boost::format("%11a") %"frequencies";
-                printheader = false;
-             };
-             for (col = row->rbegin(); col != row->rend(); ++col) {
-                 freqfile << boost::format("%8.2f%1x") %*col %"";
-                 count = count + 1;
-             };
-             if (count == 6) {
-                freqfile << endl;
-                printheader = true;
-                count =0;
-             };
-         }
+         while (chunk < tempfreq.size()) {
+              freqfile << boost::format("%11a%6x") %"frequencies"%"";
+              for (int i=chunk; i<chunk+endcol; i++){
+                  freqfile << boost::format("%8.2f%1x") %tempfreq.at(i).freq %"";
+              };
+              freqfile << endl;
+
+              // print normal modes that belong to the frequency ID's
+              for (int r=0; r<3*natoms; r++) {
+                  //for (auto n : matches) {
+                  freqfile << boost::format("%17x") %"";
+                  for (int i=chunk; i<chunk+endcol; i++){
+                      int n;
+                      n=matches.at(i);
+                      freqfile << boost::format("%8.5f%1x") %totvdumpinfo[k].at(n).normalmodes.at(r)%"";
+                  };
+                  freqfile << endl;
+              };
+
+              chunk=chunk+6;
+              if (chunk+6 > tempfreq.size()) {
+                 endcol = tempfreq.size() - chunk;
+              };
+         }; // done printing for stationary point
+         tempfreq.clear();
          freqfile.close();
       };
+
 
       // Prepare geo file
       vector <double> ::iterator acol;
