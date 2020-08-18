@@ -98,6 +98,10 @@ extern int lm_iter_max;
 extern int numffbags;
 extern double lm_err_tol;
 extern bool lm_vals_bound;
+extern double econv;
+extern double frqconv;
+extern int count_lmin_success;
+extern int lmin_success;
 const long double pi = 3.14159265358979323846;
 const long double econst = 2.71828182845904523536;
 

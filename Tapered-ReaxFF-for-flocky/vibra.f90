@@ -43,6 +43,7 @@
     dimension imatch(3*navib),imatch2(3*navib)
     character(40) :: qfreqfile
     character(200) :: qhulp
+    character(20) :: myformat
 !*********************************************************************
 !                                                                    *
 !     Calculate vibrational frequencies                              *
@@ -233,9 +234,6 @@
 !     call diag(d2,vmode,navib*3,vibreax)
     call EIGVAL(navib*3,na*3,d2,vibreax,hulp1,hulp2,ierr)
     do i1=1,na*3
-    end do
-
-    do i1=1,na*3
         do i2=1,na*3
             iathu=int(dble(i1-1)/3.0)+1
             vmode(i1,i2)=d2(i1,i2)/dsqrt(xmasat(iathu))
@@ -250,6 +248,9 @@
         nr=1
         if (vibreax(i1) < zero) nr=-1 !df398 convention: if eigenvalue is negative, make associated frequency negative as well (instead of imaginary)
         vibreax(i1)=dble(nr)*dsqrt(abs(vibreax(i1)))*conrcm
+        !write(*,*) 'reaxff vibreax'
+        !write(*,*) vibreax(i1)
+
         if (iopt == 0 .AND. nsurp == 0) then
             write (51,*)i1,vibreax(i1)
             do i2=1,na
@@ -357,13 +358,15 @@
     !if (ijagvers == 1) then
         ihulp=6
         if (ifh+6 > nufreq) ihulp=nufreq-ifh
-        if (qhulp(3:13) == 'frequencies') then
+        if (qhulp(1:11) == 'frequencies') then
             read (qhulp,'(17x,6(f8.2,1x))')(vibqc(i1+ifh),i1=1,ihulp)
             !read (19,*)
             !read (19,*)
+            !write(*,*) ('Frequency #',i1+ifh,vibqc(i1+ifh),i1=1,ihulp)
             do i1=1,na
                 do i2=1,3
-                    read (19,'(17x,6(f8.2,1x))') (vmodqc(i2+(i1-1)*3,i3+ifh),i3=1,ihulp)
+                    read (19,'(17x,6(f8.5,1x))') &
+                    (vmodqc(i2+(i1-1)*3,i3+ifh),i3=1,ihulp)
                 end do
             end do
             ifh=ifh+6
@@ -411,6 +414,8 @@
                 diffp=0.0
                 diffm=0.0
                 do i3=1,3*na
+                    !write(*,*) i2,i3
+                    !write(*,*) 'vmode:',vmode(i3,i1+6-klinear),'vmodqc:',vmodqc(i3,i2)
                     diffph=vmode(i3,i1+6-klinear)-vmodqc(i3,i2)
                     diffmh=vmode(i3,i1+6-klinear)+vmodqc(i3,i2)
                     diffp=diffp+diffph*diffph*diffph*diffph
@@ -418,6 +423,7 @@
                 end do
                 diffp=diffp/dble(3*na)
                 diffm=diffm/dble(3*na)
+                !write(*,*) 'diffp:',diffp,'diffm:',diffm
                 if (diffp < diffmin) then
                     if (diffp < errmatch2(i2)) then
                         diffmin=diffp
@@ -466,10 +472,19 @@
         do i1=1,klinear+3*na-6
             write (61,*)i1,imatch(i1),errmatch(i1)
             write (61,*)vibqc(imatch(i1)),vibreax(i1+6-klinear)
+
+            !write (*,*)'frequencies:'
+            !write (*,*)'atom:',i1,'match:',imatch(i1),'error in match:',errmatch(i1)
+            !write (*,*)'vibqc:',vibqc(imatch(i1)),'vibreax:',vibreax(i1+6-klinear)
+            !write (*,*)'modes:'
             do i2=1,na
-                write (61,'(i4,a2,6(f8.2,1x))')i2,qa(i2), &
+                write (61,'(i4,a2,6(f8.5,1x))')i2,qa(i2), &
                 (vmodqc((i2-1)*3+i3,imatch(i1)),i3=1,3), &
                 (vmode((i2-1)*3+i3,i1+6-klinear),i3=1,3)
+                
+                !write (*,'(i4,a2,6(f8.5,1x))')i2,qa(i2), &
+                !(vmodqc((i2-1)*3+i3,i1),i3=1,3), &
+                !(vmode((i2-1)*3+i3,i1+6-klinear),i3=1,3)
             end do
         end do
     end if
@@ -793,7 +808,7 @@
                         H=H+A(I,K)**2
                     12 END DO
                     F=A(I,L)
-                    G=-SIGN(SQRT(H),F)
+                    G=-SIGN(DSQRT(H),F)
                     E(I)=SCALE*G
                     H=H-F*G
                     A(I,L)=F-G
@@ -879,7 +894,7 @@
                 IF(ITER == 30) stop 'too many iterations'
                 ITER=ITER+1
                 G=(D(L+1)-D(L))/(2.*E(L))
-                R=SQRT(G**2+1.)
+                R=DSQRT(G**2+1.)
                 G=D(M)-D(L)+E(L)/(G+SIGN(R,G))
                 S=1.
                 C=1.
@@ -889,13 +904,13 @@
                     B=C*E(I)
                     IF(ABS(F) >= ABS(G))THEN
                         C=G/F
-                        R=SQRT(C**2+1.)
+                        R=DSQRT(C**2+1.)
                         E(I+1)=F*R
                         S=1./R
                         C=C*S
                     ELSE
                         S=F/G
-                        R=SQRT(S**2+1.)
+                        R=DSQRT(S**2+1.)
                         E(I+1)=G*R
                         C=1./R
                         S=S*C
@@ -1043,7 +1058,7 @@
             H=H+D(K)*D(K)
         10 END DO
         F=D(L)
-        G=-SIGN(SQRT(H),F)
+        G=-SIGN(DSQRT(H),F)
         E(I)=SCALE*G
         H=H-F*G
         D(L)=F-G
@@ -1333,7 +1348,7 @@
      
 !***********************************************************************
 !                                                                      *
-!     FINDS SQRT(A**2+B**2) WITHOUT OVERFLOW OR DESTRUCTIVE UNDERFLOW  *
+!     FINDS DSQRT(A**2+B**2) WITHOUT OVERFLOW OR DESTRUCTIVE UNDERFLOW  *
 !                                                                      *
 !***********************************************************************
      

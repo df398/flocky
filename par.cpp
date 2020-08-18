@@ -76,7 +76,10 @@ double levyscale = 1.0;
 double confac = 1.0;
 int    faili = 1;
 int    ninf = 0;
-
+double econv = 627.50947406;
+double frqconv = 2721.2220202;
+int    count_lmin_success = 0;
+int    lmin_success = 0;
 /* define global variables for start
    and end lines of ffield sections
    -------------------------------- */
@@ -203,6 +206,10 @@ if (verbose == true) {
   cout << "entered wrapper" << endl;
 };
 #endif
+  // force-stop the lmin for passive swarm members if all active swarm members completed their lmin
+  if (count_lmin_success == swarmcores.size()) {
+     throw nlopt::forced_stop();
+  };
 
   // *** test function (2D Rosenbrock. x_opt[1,1] = 0.0. Search domain = [-5,5] should be defined in params.mod
   //double xp, yp;
@@ -407,7 +414,7 @@ if (verbose == true) {
 
     // find total number of structures in geo file
     while (std::getline(fin, line)) {
-       boost::split(keywords, line, boost::is_any_of(" "));
+       boost::split(keywords, line, boost::is_any_of(" "),boost::token_compress_on);
        geodata_nonsplit.push_back(line);
        geodata.push_back(keywords);
        if (keywords.at(0) == "DESCRP")  {
@@ -421,7 +428,7 @@ if (verbose == true) {
     // and for each line in geo find start and end line numbers of blocks
     for (auto line : geodata_nonsplit) {
        numlines++;
-       boost::split(keywords, line, boost::is_any_of(" "));
+       boost::split(keywords, line, boost::is_any_of(" "),boost::token_compress_on);
  
        if (keywords.at(0) == "BIOGRF" || keywords.at(0) == "XTLGRF") {
          myblock[blockID].mystart = numlines;
@@ -437,7 +444,6 @@ if (verbose == true) {
        };
        
     };
-
     for (int i=0; i < numstructs; i++) {
         for (int j=myblock[i].mystart-1; j < myblock[i].myend; j++) {
             if (!geodata_nonsplit.at(j).empty()) {
@@ -468,7 +474,6 @@ if (verbose == true) {
     vector <string> traindata;
     vector <string> traindata_nonsplit;
     vector <string> geokeywords;
-
     if (fin.fail()) {
       cout << "Error: unable to open 'trainset.in' file on CPU" << core << " \n";
       fin.close();
@@ -483,11 +488,12 @@ if (verbose == true) {
            if (geoline.length() != 0 && geoline[0] != '#') {
              traindata_nonsplit.push_back(geoline);
              // split to separate words with delimeters
-             boost::split(geokeywords, geoline, boost::is_any_of("=!@$*&^%:;)(/+- "));
+             boost::split(geokeywords, geoline, boost::is_any_of("=!@$*&^%:;)(/+- "),boost::token_compress_on);
              // filter out words
              for (int i=0; i < geokeywords.size(); i++) {
                boost::trim(geokeywords.at(i));
                if (geokeywords.at(i) != "CHARGE"      && geokeywords.at(i) != "GEOMETRY"  && 
+                   geokeywords.at(i) != "FREQUENCIES" && geokeywords.at(i) != "ENDFREQUENCIES"  &&
                    geokeywords.at(i) != "ENDGEOMETRY" && geokeywords.at(i) != "FORCES"    &&
                    geokeywords.at(i) != "ENDENERGY"   && geokeywords.at(i) != "ENERGY"    &&
                    geokeywords.at(i) != "HEATFO"      && geokeywords.at(i) != "CELL"      &&
@@ -508,7 +514,6 @@ if (verbose == true) {
         std::sort(traindata.begin(), traindata.end());
         traindata.erase(std::unique(traindata.begin(), traindata.end()), traindata.end());
     };
-
     // print all blocks that pertain to unique trainset entries
     // into respective newgeo files
     ofstream newgeofile;
@@ -521,6 +526,7 @@ if (verbose == true) {
           newgeofile << endl;
        };
     };
+    newgeofile << std::flush;
     newgeofile.close();
     // rename the new geo file
     //boost::filesystem::path pwd(boost::filesystem::current_path());
@@ -566,6 +572,8 @@ if (verbose == true) {
     int energy_end = 0;
     int forces_begin = 0;
     int forces_end = 0;
+    int freqs_begin = 0; 
+    int freqs_end = 0;
     vector < vector <string> > traindata;
     vector <string> traindata_nonsplit;
     vector <string> keywords;
@@ -580,6 +588,15 @@ if (verbose == true) {
       boost::split(keywords, line, boost::is_any_of(" "));
       traindata_nonsplit.push_back(line);
       traindata.push_back(keywords);
+
+      if (keywords.at(0) == "FREQUENCIES") {
+         freqs_begin = numlines;
+      };
+
+      if (keywords.at(0) == "ENDFREQUENCIES" || (keywords.at(0) == "END" && keywords.at(1) == "FREQUENCIES")) {
+         freqs_end = numlines;
+      };
+
 
       if (keywords.at(0) == "FORCES") {
          forces_begin = numlines;
@@ -635,6 +652,55 @@ if (verbose == true) {
     string str_core = std::to_string(core);
     ofstream trainset_file;
     trainset_file.open("CPU." + str_core + "/trainset.in", ios::out);
+
+    // FREQUENCIES SECTION
+    if (freqs_end - freqs_begin > 1) {
+       // calculate where to start and end
+       int keyword_begin_traindata = freqs_begin-1;
+       int keyword_end_traindata = freqs_end-1;
+       int substart = keyword_begin_traindata + 1;
+       //int subend = min(substart + int(floor((freqs_end - freqs_begin)/ptrainset)), keyword_end_traindata);
+       int subend = min(substart + ( (freqs_end - freqs_begin) - mod((freqs_end - freqs_begin), ptrainset) )/ptrainset, keyword_end_traindata);
+       int tries = 0;
+       int reset_start = 0;
+       int reset_end = 0;
+       // print keyword
+       trainset_file << traindata_nonsplit.at(keyword_begin_traindata) << endl;
+
+       // print data for swarmcores
+       if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
+         for (int i = substart; i < subend; i++) {
+            trainset_file << traindata_nonsplit.at(i) << endl;
+         };
+       };
+       substart = subend;
+       //subend = min(substart + int(floor((freqs_end - freqs_begin)/ptrainset)), keyword_end_traindata);
+       subend = min(substart + ( (freqs_end - freqs_begin) - mod((freqs_end - freqs_begin), ptrainset) )/ptrainset, keyword_end_traindata);
+       reset_start = substart;
+       reset_end = subend;
+       // print data for reaxffcores
+       for (const int& reaxffcore : reaxffcores) {
+           tries = tries + 1;
+           if (core == reaxffcore) {
+              if (tries == ptrainset-1) {subend = keyword_end_traindata;};
+              for (int i = substart; i < subend; i++) {
+                 trainset_file << traindata_nonsplit.at(i) << endl;
+              };
+           };
+           //tries = tries + 1;
+           substart = subend;
+           //subend = min(substart + int(floor((freqs_end - freqs_begin)/ptrainset)), keyword_end_traindata);
+           subend = min(substart + ( (freqs_end - freqs_begin) - mod((freqs_end - freqs_begin), ptrainset) )/ptrainset, keyword_end_traindata);
+           if (tries == ptrainset-1) {
+              substart = reset_start;
+              subend = reset_end;
+              tries = 0;
+           };
+       };
+       // print end keyword
+       trainset_file << traindata_nonsplit.at(keyword_end_traindata) << endl;
+    };
+
     // FORCES SECTION
     if (forces_end - forces_begin > 1) {
        // calculate where to start and end
@@ -3047,21 +3113,23 @@ if (verbose == true) {
    opt.set_xtol_rel(lm_err_tol);
    opt.set_maxeval(lm_iter_max);
    x = pos;
+   //reset counter for swarm core lmin successes
+   count_lmin_success=0;
 
    try{
        nlopt::result result = opt.optimize(x, minf);
        if (ptrainset > 1) {
           if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-               #ifdef WITH_MPI
                ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
-               #endif
-               #ifndef WITH_MPI
-               ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle), ofstream::app);
-               #endif
                lmin_rep << "local min completed! --> flocky iter: " << state.iter << endl;
                lmin_rep << "new local min: " << boost::format("        %1.10e") %minf << endl;
                lmin_rep << "new parameters:" << endl;
                lmin_rep << "[ ";
+               // mark lmin as success and increase overall counter across active swarm members
+               // if count_lmin_success == swarmcores.size(), this will cause a forced-termination as given in the wrapper.
+               lmin_success=1;
+               //MPI_Allreduce( & lmin_success, & count_lmin_success, 1, MPI_INT, MPI_SUM, ACTIVESWARM);
+
                for (int m = 0; m < dim; m++) {
                  // print physical local min positions
                  temphys = x[m]*(maxdomain.at(m) - mindomain.at(m)) + mindomain.at(m);
@@ -3070,6 +3138,9 @@ if (verbose == true) {
                lmin_rep << "]\n" << endl;
                lmin_rep.close();
           };
+          // sum the success counter throughout MPI_COMM_WORLD. Passive swarm members will contribute 0 each,
+          // while the active swarm members will contribute 1 each.
+          MPI_Allreduce( & lmin_success, & count_lmin_success, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
        }else {
                #ifdef WITH_MPI
                ofstream lmin_rep("lmin_rep.out." + std::to_string(state.cycle)+"."+std::to_string(core), ofstream::app);
@@ -4046,6 +4117,8 @@ if (verbose == true) {
     istringstream(tempinput.at(23)) >> maxcycles;
     istringstream(tempinput.at(24)) >> ensembleave;
     istringstream(tempinput.at(25)) >> preppath;
+    istringstream(tempinput.at(26)) >> econv;
+    istringstream(tempinput.at(27)) >> frqconv;
   };  // close if core==0
  
 
@@ -4077,6 +4150,8 @@ if (verbose == true) {
   MPI_Bcast( & uq, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & ensembleave, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
   MPI_Bcast( & preppath, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & econv, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast( & frqconv, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   // prepare dirs for each CPU process
   if (ensembleave == false && preppath == 0) {
@@ -4193,6 +4268,8 @@ if (verbose == true) {
     istringstream(tempinput.at(23)) >> maxcycles;
     istringstream(tempinput.at(24)) >> ensembleave;
     istringstream(tempinput.at(25)) >> preppath;
+    istringstream(tempinput.at(26)) >> econv;
+    istringstream(tempinput.at(27)) >> frqconv;
 
   // check if reaxff was set to run with fixed charges and require charges file
   read_icharg_control();
@@ -4650,6 +4727,7 @@ if (core == 0) {
          while (chunk < tempfreq.size()) {
               freqfile << boost::format("%11a%6x") %"frequencies"%"";
               for (int i=chunk; i<chunk+endcol; i++){
+                  tempfreq.at(i).freq = tempfreq.at(i).freq*frqconv;
                   freqfile << boost::format("%8.2f%1x") %tempfreq.at(i).freq %"";
               };
               freqfile << endl;
@@ -4708,7 +4786,8 @@ if (core == 0) {
       for (int k=0; k < pathinfo.size(); k++) {
           // make a baseline - subtract energy of first stationary point from all energies
           double ediff = pathinfo.at(k).energy - pathinfo.at(0).energy;
-          trainfile << " 1.0 + SP_" + std::to_string(k+1) + "/1 - SP_1/1" + "        " << boost::format("%5.2f") %ediff << endl;
+          ediff=ediff*econv;
+          trainfile << " 1.0 + SP_" + std::to_string(k+1) + "/1 - SP_1/1" + "        " << boost::format("%5.4f") %ediff << endl;
       };
       trainfile << "ENDENERGY" << endl;
       // frequencies section

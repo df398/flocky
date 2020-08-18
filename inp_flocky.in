@@ -1,28 +1,30 @@
 # flocky user specified input, order-sensitive
  
-0      ! 0: default printing 1: verbose printing (debug flocky)
-0      ! 0: ffield belongs to ReaxFF function 1: ffield belongs to ReaxFF-lg function
-1      ! 1: do not parallelize training set M>1: parallelize training set over M units
-1      ! 0: randomize initial positions 1: use current ffield as initial positions
-0      ! 0: take position bounds from params.mod file 1: set %change from current ffield positions
-0.9    ! percent change from current ffield positions (in case above choice is 1)
-0      ! 0: no local minimization 1: LBFGS minimization 2: Nelder-Mead (SBPLX) minimization
-2      ! max number of local minimization iterations
-1.0e-3 ! stopping tolerance for local minimization (relative change in position)
-0      ! 0: no regularization 1: L1 regularization 2: L2 regularization 3: Dropout
-0.5    ! dropout percentage (in case above choice is 3)
-1.0    ! scaling factor for regularization penalty
-0      ! 0: do not detect overfitting 1: detect overfitting
-0      ! 0: do not perform UQ 1: perform UQ
-2      ! swarm size (integer => 2)
-2.0    ! c1 parameter
-2.0    ! c2 parameter
-0.9    ! w1 parameter
-0.4    ! w2 parameter
-1      ! fail_i parameter
-0.1    ! gamma parameter
-1      ! frequency of output
-10     ! Max number of optimization iterations per cycle
-1      ! Max number of training cycles
-0      ! 1: perform ensemble averageing 0: normal run
-0      ! prepare training files from available path.info file assuming [n] atoms; do not prepare for [0]
+0              ! 0: default printing 1: verbose printing (debug flocky)
+0              ! 0: ffield belongs to ReaxFF function 1: ffield belongs to ReaxFF-lg function
+1              ! 1: do not parallelize training set M>1: parallelize training set over M units
+1              ! 0: randomize initial positions 1: use current ffield as initial positions
+0              ! 0: take position bounds from params.mod file 1: set %change from current ffield positions
+0.9            ! percent change from current ffield positions (in case above choice is 1)
+0              ! 0: no local minimization 1: LBFGS minimization 2: Nelder-Mead (SBPLX) minimization
+2              ! max number of local minimization iterations
+1.0e-3         ! stopping tolerance for local minimization (relative change in position)
+0              ! 0: no regularization 1: L1 regularization 2: L2 regularization 3: Dropout
+0.5            ! dropout percentage (in case above choice is 3)
+1.0            ! scaling factor for regularization penalty
+0              ! 0: do not detect overfitting 1: detect overfitting
+0              ! 0: do not perform UQ 1: perform UQ
+2              ! swarm size (integer => 2)
+2.0            ! c1 parameter
+2.0            ! c2 parameter
+0.9            ! w1 parameter
+0.4            ! w2 parameter
+1              ! fail_i parameter
+0.1            ! gamma parameter
+1              ! frequency of output
+10             ! Max number of optimization iterations per cycle
+1              ! Max number of training cycles
+0              ! 1: perform ensemble averageing 0: normal run
+0              ! prepare training files from available path.info and vector.dump.path files assuming [n] atoms; do not prepare for [0]
+627.50947406   ! conversion factor to ReaxFF units for energy differences if above choice [n] > 0; default assumes [Hartree]-->[kcal/mol]
+2721.2220202   ! conversion factor to ReaxFF units for harmonic frequencies if above choice [n] > 0; default assumes [((Hartree)/((g/mol)*angstrom^2))^0.5]-->[cm^-1]
