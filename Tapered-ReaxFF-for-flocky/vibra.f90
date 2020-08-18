@@ -61,7 +61,7 @@
 !                                                                    *
 !*********************************************************************
     CLIGHT=2.99792458D8        !             [m/s]
-    conrcm=dsqrt(caljou)*1d11/(2.0*pi*clight)
+    conrcm=dsqrt(caljou)*1d11/(2.0d0*pi*clight)
     if (na > navib) stop 'Nr. of atoms > navib; stop in vibra'
     do i1=1,na*3
         do i2=1,na*3

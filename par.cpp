@@ -4673,6 +4673,7 @@ if (core == 0) {
                       std::make_heap(tempfreq.begin(), tempfreq.end(),freqandID_greater_than());
                   continue;
               }
+              //cout << "tempfreq.size = " << tempfreq.size() << endl;
 
               // now check if the next element is larger than the top of the heap
               //cout << "structure #" << k << endl;
@@ -4701,6 +4702,7 @@ if (core == 0) {
                        mytempfreq.freq=pow(pathinfo[k].Mwhessevals.at(i).at(j),0.5);
                        //cout << "pushed back into tempfreq: " << pow(pathinfo[k].Mwhessevals.at(i).at(j),0.5) << endl;
                   };
+                  tempfreq.push_back(mytempfreq);
                   //cout << "front of heap after push_back but before push_heap: " << tempfreq.front() << endl;
 
                   // heapify
