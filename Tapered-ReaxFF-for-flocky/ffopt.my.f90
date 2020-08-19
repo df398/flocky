@@ -704,8 +704,8 @@
     close(99)
     !rewind (99)
 
-    100 format (62x,'FField value',1x,'QM/Lit value',2x,'Weight', &
-    & 6x,'Error',4x,'Total error')
+    100 format (71x,'FField value',7x,'QM/Lit value',11x,'Weight', &
+    & 14x,'Error',13x,'Total error')
     400 format (f30.10)
     return
     end subroutine calcerr
