@@ -418,8 +418,10 @@
                     !write(*,*) 'vmode:',vmode(i3,i1+6-klinear),'vmodqc:',vmodqc(i3,i2)
                     diffph=vmode(i3,i1+6-klinear)-vmodqc(i3,i2)
                     diffmh=vmode(i3,i1+6-klinear)+vmodqc(i3,i2)
-                    diffp=diffp+diffph*diffph*diffph*diffph
-                    diffm=diffm+diffmh*diffmh*diffmh*diffmh
+                    !df398 5th power works better than 4th power
+                    !in below products of diffp and diffm
+                    diffp=diffp+diffph*diffph*diffph*diffph*diffph
+                    diffm=diffm+diffmh*diffmh*diffmh*diffmh*diffmh
                 end do
                 diffp=diffp/dble(3*na)
                 diffm=diffm/dble(3*na)
