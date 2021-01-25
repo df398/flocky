@@ -9,11 +9,11 @@
 0              ! 0: no local minimization 1: LBFGS minimization 2: Nelder-Mead (SBPLX) minimization
 2              ! max number of local minimization iterations
 1.0e-3         ! stopping tolerance for local minimization (relative change in position)
-0              ! 0: no regularization 1: L1 regularization 2: L2 regularization 3: Dropout
-0.5            ! dropout percentage (in case above choice is 3)
-1.0            ! scaling factor for regularization penalty
-0              ! 0: do not detect overfitting 1: detect overfitting
-0              ! 0: do not perform UQ 1: perform UQ
+0              ! 0: no regularization 1: L1 regularization 2: L2 regularization 3: Dropout [EXPERIMENTAL]
+0.5            ! dropout percentage (in case above choice is 3) [EXPERIMENTAL]
+1.0            ! scaling factor for regularization penalty [EXPERIMENTAL]
+0              ! 0: do not detect overfitting 1: detect overfitting [EXPERIMENTAL]
+0              ! 0: do not perform UQ 1: perform UQ [EXPERIMENTAL]
 2              ! swarm size (integer => 2)
 2.0            ! c1 parameter
 2.0            ! c2 parameter
@@ -24,7 +24,7 @@
 1              ! frequency of output
 10             ! Max number of optimization iterations per cycle
 1              ! Max number of training cycles
-0              ! 1: perform ensemble averageing 0: normal run
+0              ! 1: perform ensemble averageing 0: normal run [EXPERIMENTAL]
 0              ! prepare training files from available path.info and vector.dump.path files assuming [n] atoms; do not prepare for [0]
 627.50947406   ! conversion factor to ReaxFF units for energy differences if above choice [n] > 0; default assumes [Hartree]-->[kcal/mol]
 2721.2220202   ! conversion factor to ReaxFF units for harmonic frequencies if above choice [n] > 0; default assumes [((Hartree)/((g/mol)*angstrom^2))^0.5]-->[cm^-1]
