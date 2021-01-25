@@ -1,0 +1,26 @@
+Example 1 :  Train C60 molecule energy differences and atomic forces
+
+Note (1): Each structure in geo file corresponds to a rigid C60 with a different bond length for a specified pair of atoms (i.e. bond scan).
+Note (2): We do not use here geometry relaxation for all the other atoms to save CPU time (0 imaxit in control file). If we did, then we had to define bond restraints
+          for the pair of atoms we are stretching (to hold them in place during geometry relaxation). If needed, restraints can be defined in the geo 
+          file. See standalone reaxff manual. In addition, 'imaxit' keyword in control file will need to change to any value larger than 0. 
+Note (3): Since we are using a relatively small training set (not many structures), we do not split the training set over sub-units (no training set parallelization).
+          Thus, the only parallelization is over swarm members (each swarm runs on a different CPU if #members=#requested cpus)
+          For large training sets, we can include training set parallelization in inp_flocky.in file. In this mode, the training set (and structures) are shared
+          among M swarm members of which #1, #2, ... #M-1, #M are the helper members of swarm member #0 (independent member). 
+          Hence, to split a training set by 4, with a total of 32 swarm members: M=4, swarm members=32 ==> independent members = 32/4 = 8. Each independent member
+          will have a different set of training parameters (i.e. a different force field candidate).
+Note (4): We do not perform a local minimization for the cost function (since RiPSOGM includes some local search behaviour already), however including rigorous
+          local minimization may help for particularly noisy cost functions. We can choose between Nelder-Mead or LBFGS (with numerical derivatives).
+
+Description of input files
+
+1. ffield = ReaxFF force field file (standard or lg type)
+2. geo = BIOGRF file with coordinates of training set structures. Format sensitive. 
+3. fbgf/*.fbgf = BIOGRF files with coordinates of atomic forces for a structure described by the filename (has to correspond the same name in geo file)
+4. control = various control settings for Tapered ReaxFF
+5. inp_flocky.in = control settings for flocky
+6. params = specification of training parameters and their bounds. parameters are specified by their absolute line and column values in ffield file.
+7. batch = standard slurm batch script for submitting flocky tasks under HPC platform
+8. trainset.in = training set file
+9. tapreaxff = Tapered ReaxFF executable needs to be present in the working directory

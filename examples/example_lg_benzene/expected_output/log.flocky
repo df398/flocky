@@ -1,0 +1,43 @@
+*********************************************************************
+*                __   _                  _                          *
+*               / _| | |                | |                         *
+*              | |_  | |   ___     ___  | | __  _   _               *
+*              |  _| | |  / _ \   / __| | |/ / | | | |              *
+*              | |   | | | (_) | | (__  |   <  | |_| |              *
+*              |_|   |_|  \___/   \___| |_|\_\  \__, |              *
+*                                                __/ |              *
+*                                               |___/               *
+*                                                                   *
+*                                                                   *
+*            f l o c k y  - training reactive force fields          *
+*                            Version 1.0                            *
+*                                                                   *
+*                David Furman, PhD ; df398@cam.ac.uk                *
+*                       University of Cambridge                     *
+*                  Copyright (C) 2018-2020 GPL-3.0                  *
+*                                                                   *
+*       Users using flocky are requested to cite:                   *
+*       1. Furman, David; Carmeli, Benny; Zeiri, Yehuda;            *
+*       Kosloff, Ronnie, J. Chem. Theory Comput. 2018, 14 (6)       *
+*       2. Furman, David; Wales J. David, J. Phys. Chem. Lett.      *
+*       2019, 10 (22)                                               *
+*                                                                   *
+*                    https://www.furmanlab.com                      *
+*                                                                   *
+*********************************************************************
+
+Swarm generation started. Please wait.
+
+Swarm generation completed.
+Initial global best fit:         1.0928700080e+07
+flocky optimization started!
+
+
+Training completed successfuly!
+Total ReaxFF calls: 320
+
+Global best ReaxFF fit:         6.2088600073e+06
+Global best ReaxFF parameters:
+[   1.2648  64.8999   1.7106 ]
+
+Total CPU time:   17.4 seconds

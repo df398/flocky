@@ -2766,6 +2766,7 @@ if (verbose == true) {
 
     // for each line
     while (std::getline(fin, line)) {
+      if (line[0] == '#') {continue;};
       numlines++;
       // create a new row
       std::vector < double > lineData;
