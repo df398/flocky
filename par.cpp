@@ -28,6 +28,7 @@ int    size_swarmcores = 0;
 int    mycore_reaxffcore = 0;
 int    size_reaxffcores = 0;
 int    funceval = 0;
+int    ifunceval = 0;
 double curfit;
 double localminfit;
 // tag if particle position in dimension lies inside [mindomain, maxdomain]
@@ -3304,7 +3305,7 @@ if (verbose == true) {
   string str_cycle = std::to_string(cycle);
   string str_iter = std::to_string(iter);
   // count total # func evaluations
-  funceval = funceval + 1;
+  ifunceval = ifunceval + 1;
 
   // prepare fort.3 files
   boost::filesystem::copy_file("CPU." + str_core + "/geo." + str_cycle + "." + str_parID,
@@ -3755,7 +3756,7 @@ if (verbose == true) {
   };
   
   // count total # func evaluations
-  funceval = funceval + 2*dim;
+  ifunceval = ifunceval + 2*dim;
 
   // retrive back saved ffield
   if (boost::filesystem::exists("CPU." + str_core + "/fort.4.save")) {
@@ -4957,7 +4958,7 @@ if (ensembleave == false && preppath == 0) {
         log << "Swarm generation started. Please wait." << endl;
         log.close();
       };
-      funceval = 0; // clear counter for cycles
+      ifunceval = 0; // clear counter for cycles
     
       // find inverse parameters and store them in inversep
       if (regular == 1 || regular == 2) {
@@ -5717,10 +5718,10 @@ if (ensembleave == false && preppath == 0) {
      }; // done loop over iterations
    
      if (ptrainset == 1) {
-         MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+         MPI_Allreduce(& ifunceval, & funceval, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
      }else {
          if (find(swarmcores.begin(), swarmcores.end(), core) != swarmcores.end()) {
-             MPI_Allreduce(& funceval, & funceval, 1, MPI_INT, MPI_SUM, ACTIVESWARM);
+             MPI_Allreduce(& ifunceval, & funceval, 1, MPI_INT, MPI_SUM, ACTIVESWARM);
          };
      };
      MPI_Barrier(MPI_COMM_WORLD);
