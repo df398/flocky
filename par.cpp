@@ -1101,7 +1101,7 @@ if (core == 0) {
   histo_file << "#atom parameters:\n";
   int m = 45;
   while (m < max_line_atompar) {
-    boost::format f("% s%   9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f(" %-2s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions( f.exceptions() &
     ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
 
@@ -1650,7 +1650,7 @@ if (core == 0) {
   histo_file << "#atom parameters:\n";
   int m = 45;
   while (m < max_line_atompar) {
-    boost::format f("% s%   9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f(" %-2s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions( f.exceptions() &
     ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
 
@@ -2144,7 +2144,7 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
 
   int m = 45;
   while (m < max_line_atompar) {
-    boost::format f("% s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f(" %-2s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions( f.exceptions() &
     ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
     for (std::vector<std::string>::iterator it=ffieldmat.at(m).begin();it!=ffieldmat.at(m).end();++it){
@@ -2448,7 +2448,7 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
 
   int m = 45;
   while (m < max_line_atompar) {
-    boost::format f("% s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f(" %-2s%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions( f.exceptions() &
     ~ ( boost::io::too_many_args_bit | boost::io::too_few_args_bit )  );
     for (std::vector<std::string>::iterator it=ffieldmat.at(m).begin();it!=ffieldmat.at(m).end();++it){
