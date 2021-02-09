@@ -2190,7 +2190,7 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
 
   for (int m = max_line_atompar + 2; m < max_line_bondpar + 2; m++) {
     if (mod(m, 2) != 0) {
-      boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+      boost::format f("%3i%3i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
       f.exceptions(f.exceptions() &
         ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
       for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2234,7 +2234,7 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
   for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
     // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
     // So, to prevent it sticking to the left column
-    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f("%3i%3i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2267,7 +2267,7 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
   max_line_angles = max_line_offdpar + 1 + numaty;
 
   for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
-    boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f("%3i%3i%3i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2300,7 +2300,7 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
   max_line_tors = max_line_angles + 1 + numtoty;
 
   for (int m = max_line_angles + 1; m < max_line_tors; m++) {
-    boost::format f("  %i  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f("%3i%3i%3i%3i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2333,7 +2333,7 @@ void Par::write_ffield(const vector <double> &active_params, int cycle, int iter
   max_line_hbs = max_line_tors + 1 + numhbty;
 
   for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
-    boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f");
+    boost::format f("%3i%3i%3i%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2510,7 +2510,7 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
    */
 
   for (int m = max_line_atompar + 2; m < max_line_bondpar + 2; m++) {
-    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f("%3i%3i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2561,7 +2561,7 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
   for (int m = max_line_bondpar + 3; m < max_line_offdpar; m++) {
     // the last entry is 10.4f because dispersion coeff. can get to 4 digits long.
     // So, to prevent it sticking to the left column
-    boost::format f("  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%10.4f");
+    boost::format f("%3i%3i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%10.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2600,7 +2600,7 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
   max_line_angles = max_line_offdpar + 1 + numaty;
 
   for (int m = max_line_offdpar + 1; m < max_line_angles; m++) {
-    boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f("%3i%3i%3i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2639,7 +2639,7 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
   max_line_tors = max_line_angles + 1 + numtoty;
 
   for (int m = max_line_angles + 1; m < max_line_tors; m++) {
-    boost::format f("  %i  %i  %i  %i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
+    boost::format f("%3i%3i%3i%3i%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
@@ -2677,7 +2677,7 @@ void Par::write_ffield_lg(const vector <double> &active_params, int cycle, int i
   max_line_hbs = max_line_tors + 1 + numhbty;
 
   for (int m = max_line_tors + 1; m < max_line_hbs; m++) {
-    boost::format f("  %i  %i  %i%9.4f%9.4f%9.4f%9.4f");
+    boost::format f("%3i%3i%3i%9.4f%9.4f%9.4f%9.4f");
     f.exceptions(f.exceptions() &
       ~(boost::io::too_many_args_bit | boost::io::too_few_args_bit));
     for (std::vector < std::string > ::iterator it = ffieldmat.at(m).begin(); it != ffieldmat.at(m).end(); ++it) {
